@@ -20,13 +20,24 @@ export function loadConfig() {
     const clientIdInput = document.getElementById('clientId');
     const otaUrlInput = document.getElementById('otaUrl');
 
-    // 从localStorage加载MAC地址，如果没有则生成新的
-    let savedMac = localStorage.getItem('xz_tester_deviceMac');
+    // 解析URL参数
+    const urlParams = new URLSearchParams(window.location.search);
+    const agentId = urlParams.get('agentId');
+    const queryOtaUrl = urlParams.get('otaUrl');
+
+    // 优先从URL获取MAC地址（agentId），否则从localStorage加载，最后生成随机的
+    let savedMac = agentId || localStorage.getItem('xz_tester_deviceMac');
     if (!savedMac) {
         savedMac = generateRandomMac();
         localStorage.setItem('xz_tester_deviceMac', savedMac);
     }
     deviceMacInput.value = savedMac;
+
+    // 优先从URL获取OTA URL
+    const savedOtaUrl = queryOtaUrl || localStorage.getItem('xz_tester_otaUrl');
+    if (savedOtaUrl) {
+        otaUrlInput.value = savedOtaUrl;
+    }
 
     // 从localStorage加载其他配置
     const savedDeviceName = localStorage.getItem('xz_tester_deviceName');
@@ -37,11 +48,6 @@ export function loadConfig() {
     const savedClientId = localStorage.getItem('xz_tester_clientId');
     if (savedClientId) {
         clientIdInput.value = savedClientId;
-    }
-
-    const savedOtaUrl = localStorage.getItem('xz_tester_otaUrl');
-    if (savedOtaUrl) {
-        otaUrlInput.value = savedOtaUrl;
     }
 }
 

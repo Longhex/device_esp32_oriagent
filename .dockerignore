@@ -1,7 +1,44 @@
+# Version Control
 .git
-__pycache__
-*.pyc
+.gitignore
+.github
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache/
+**/venv/
+**/.venv/
+**/env/
+
+# Node.js
+**/node_modules/
+**/dist/
+**/npm-debug.log*
+
+# Java
+**/target/
+**/*.class
+**/*.jar
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project Specific
+**/data/
+**/tmp/
+**/logs/
+**/uploadfile/
+**/mysql/data/
+
+# Docker
+docker-compose*.yml
 .env
-Dockerfile
-tmp/
-data/
+Dockerfile*
+!Dockerfile-web
+!Dockerfile-server

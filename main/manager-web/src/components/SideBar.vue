@@ -118,19 +118,46 @@
     </el-menu>
     
     <div class="sidebar-footer">
-      <version-footer />
+      <div class="account-actions">
+        <!-- Language Switcher Button -->
+        <el-dropdown trigger="click" @command="handleLanguageChange" placement="top-start" class="action-dropdown">
+          <div class="action-btn language-btn" :title="$t('sidebar.language')">
+            <i class="el-icon-info action-icon"></i>
+            <span class="action-label">{{ currentLanguageLabel }}</span>
+          </div>
+          <el-dropdown-menu slot="dropdown" class="modern-lang-dropdown">
+            <el-dropdown-item v-for="lang in languages" :key="lang.value" :command="lang.value" :class="{ 'is-active': currentLanguage === lang.value }">
+              {{ lang.label }}
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </el-dropdown>
+
+        <!-- Logout Button -->
+        <div class="action-btn logout-btn" @click="handleLogout" :title="$t('sidebar.logout')">
+          <img src="@/assets/icons/LogOut01.svg" class="action-icon" />
+          <span class="action-label">{{ $t('sidebar.logout') }}</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { mapState } from "vuex";
-import VersionFooter from "./VersionFooter.vue";
+import { mapState, mapActions } from "vuex";
+import { changeLanguage } from "@/i18n";
 
 export default {
   name: "SideBar",
-  components: {
-    VersionFooter
+  data() {
+    return {
+      accountMenuVisible: false,
+      isLanguageMenuVisible: false,
+      languages: [
+        { label: "中文简体", value: "zh_CN" },
+        { label: "English", value: "en" },
+        { label: "Tiếng Việt", value: "vi" }
+      ]
+    };
   },
   computed: {
     ...mapState({
@@ -145,7 +172,7 @@ export default {
       if (path === '/model-config' && query.tab) {
         return `${path}?tab=${query.tab}`;
       }
-      if (path === '/role-config' || path === '/device-management' || path === '/template-quick-config') {
+      if (path === '/agent-config' || path === '/template-quick-config') {
           return '/home';
       }
       if (path === '/knowledge-file-upload') {
@@ -155,6 +182,19 @@ export default {
           return '/voice-clone-management';
       }
       return path;
+    },
+    currentLanguage() {
+      return this.$i18n.locale || "zh_CN";
+    },
+    currentLanguageLabel() {
+      const lang = this.languages.find(l => l.value === this.currentLanguage);
+      if (this.currentLanguage === 'zh_CN') return 'CN';
+      if (this.currentLanguage === 'en') return 'EN';
+      if (this.currentLanguage === 'vi') return 'VI';
+      return lang ? lang.label : 'EN';
+    },
+    hasGlobeIcon() {
+       return false;
     }
   },
   watch: {
@@ -175,7 +215,21 @@ export default {
       if (this.$route.path !== '/home') {
         this.$router.push("/home");
       }
-    }
+    },
+    handleLanguageChange(lang) {
+      changeLanguage(lang);
+      this.$message.success(this.$t("message.success"));
+    },
+    async handleLogout() {
+      try {
+        await this.logout();
+        this.$router.push("/login"); // Ensure redirect after logout
+        this.$message.success(this.$t("message.success"));
+      } catch (error) {
+        this.$message.error(this.$t("message.error"));
+      }
+    },
+    ...mapActions(["logout"])
   }
 };
 </script>
@@ -302,8 +356,81 @@ export default {
 }
 
 .sidebar-footer {
-  padding: 15px;
-  border-top: 1px solid rgba(0, 0, 0, 0.03);
-  background: rgba(0, 0, 0, 0.01);
+  padding: 12px 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  margin-top: auto;
+}
+
+.account-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+
+  .action-dropdown {
+    flex: 1;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border: 1px solid #E5E7EB;
+    background-color: #F9FAFB;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    flex: 1;
+    min-width: 0;
+
+    &:hover {
+      background-color: #F3F4F6;
+      border-color: #D1D5DB;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .action-icon {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      object-fit: contain;
+    }
+
+    .action-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  .logout-btn {
+    &:hover {
+      background-color: #FEF2F2;
+      border-color: #FECACA;
+      .action-label { color: #DC2626; }
+    }
+  }
+}
+
+.modern-lang-dropdown {
+  border-radius: 12px;
+  padding: 4px;
+  border: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  
+  .el-dropdown-menu__item {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin: 2px 0;
+    
+    &:hover { background-color: #F3F4F6; color: #000; }
+    &.is-active { background-color: #000; color: #fff; }
+  }
 }
 </style>

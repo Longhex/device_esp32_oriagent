@@ -122,12 +122,13 @@ class OTAHandler(BaseHandler):
             self.logger.bind(tag=TAG).error(f"生成MQTT密码签名失败: {e}")
             return ""
 
-    def _get_websocket_url(self, local_ip: str, port: int) -> str:
-        """获取websocket地址
+    def _get_websocket_url(self, local_ip: str, port: int, request: web.Request = None) -> str:
+        """获取websocket地址，支持通过请求头动态识别
 
         Args:
             local_ip: 本地IP地址
             port: 端口号
+            request: 当前的HTTP请求对象
 
         Returns:
             str: websocket地址
@@ -135,14 +136,27 @@ class OTAHandler(BaseHandler):
         server_config = self.config["server"]
         websocket_config = server_config.get("websocket", "")
 
-        if "你的" not in websocket_config:
+        # 如果手动配置了WebSocket地址，且不是默认占位符，则优先使用
+        if websocket_config and "你的" not in websocket_config:
             return websocket_config
-        else:
-            return f"ws://{local_ip}:{port}/xiaozhi/v1/"
+
+        # 智能识别逻辑：优先使用当前请求的Host
+        if request is not None:
+            host = request.host
+            # 判断是否是HTTPS/SSL访问
+            # aiohttp 默认 scheme 可能受 proxy 影响，这里优先识别 wss
+            scheme = "wss" if request.scheme == "https" or request.headers.get("X-Forwarded-Proto") == "https" else "ws"
+            
+            # 如果是 localhost 访问且 host 中没有端口号，可能需要根据配置补充端口 (通常 80/443 可以省略)
+            # 但为了通用性，直接使用 Request 的 Host 是最精准的
+            return f"{scheme}://{host}/xiaozhi/v1/"
+
+        # 兜底逻辑：使用本地IP
+        return f"ws://{local_ip}:{port}/xiaozhi/v1/"
 
     async def handle_post(self, request):
         """处理 OTA POST 请求
-
+        
         This handler will:
         - read device id/client id (as before)
         - attempt to determine device model and current firmware version (prefer headers, fallback to body)
@@ -288,13 +302,16 @@ class OTAHandler(BaseHandler):
                             token = self.auth.generate_token(client_id, device_id)
                     else:
                         token = self.auth.generate_token(client_id, device_id)
-                # NOTE: use websocket_port here
+                # NOTE: pass request here for smart detection
                 return_json["websocket"] = {
-                    "url": self._get_websocket_url(local_ip, websocket_port),
+                    "url": self._get_websocket_url(local_ip, websocket_port, request),
                     "token": token,
                 }
                 self.logger.bind(tag=TAG).info(
                     f"未配置MQTT网关，为设备 {device_id} 下发WebSocket配置"
+                )
+                self.logger.bind(tag=TAG).info(
+                    f"下发的WebSocket地址是: {return_json['websocket']['url']}"
                 )
 
             # Now check firmware files for updates
@@ -359,7 +376,8 @@ class OTAHandler(BaseHandler):
             local_ip = get_local_ip()
             # use websocket port for websocket URL
             websocket_port = int(server_config.get("port", 8000))
-            websocket_url = self._get_websocket_url(local_ip, websocket_port)
+            # pass request for smart detection
+            websocket_url = self._get_websocket_url(local_ip, websocket_port, request)
             message = f"OTA接口运行正常，向设备发送的websocket地址是：{websocket_url}"
             response = web.Response(text=message, content_type="text/plain")
         except Exception as e:

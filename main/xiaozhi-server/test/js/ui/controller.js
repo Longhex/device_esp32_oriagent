@@ -61,6 +61,13 @@ class UIController {
 
         this.updateDialButton(false);
 
+        // 如果URL中存在agentId和otaUrl，则自动开始拨号连接
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('agentId') && urlParams.get('otaUrl')) {
+            console.log('检测到自动化参数，触发自动连接...');
+            setTimeout(() => this.handleConnect(), 1000);
+        }
+
         console.log('UIController init completed');
     }
 

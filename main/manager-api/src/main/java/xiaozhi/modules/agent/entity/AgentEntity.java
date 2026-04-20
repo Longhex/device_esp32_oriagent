@@ -92,6 +92,12 @@ public class AgentEntity {
     @Schema(description = "更新者")
     private Long updater;
 
+    @Schema(description = "Oriagent API Key")
+    private String oriagentApiKey;
+
+    @Schema(description = "Oriagent Model Name")
+    private String oriagentModelName;
+
     @Schema(description = "更新时间")
     private Date updatedAt;
 }

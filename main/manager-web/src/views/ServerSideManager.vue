@@ -1,6 +1,5 @@
 <template>
   <div class="welcome">
-    <HeaderBar />
 
     <div class="operation-bar">
       <h2 class="page-title">{{ $t('serverSideManager.pageTitle') }}</h2>
@@ -41,13 +40,12 @@
 
 <script>
 import Api from "@/apis/api";
-import HeaderBar from "@/components/HeaderBar.vue";
 import ParamDialog from "@/components/ParamDialog.vue";
 import VersionFooter from "@/components/VersionFooter.vue";
 import i18n from '@/i18n';
 
 export default {
-  components: { HeaderBar, ParamDialog, VersionFooter },
+  components: { ParamDialog, VersionFooter },
   data() {
     return {
       paramsList: [],

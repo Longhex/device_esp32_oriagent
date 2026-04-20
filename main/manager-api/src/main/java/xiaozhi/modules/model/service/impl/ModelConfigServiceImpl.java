@@ -188,8 +188,13 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
 
     @Override
     public ModelConfigEntity selectById(Serializable id) {
+        return selectById(id, true);
+    }
+
+    @Override
+    public ModelConfigEntity selectById(Serializable id, boolean mask) {
         ModelConfigEntity entity = super.selectById(id);
-        if (entity != null && entity.getConfigJson() != null) {
+        if (entity != null && entity.getConfigJson() != null && mask) {
             entity.setConfigJson(maskSensitiveFields(entity.getConfigJson()));
         }
         return entity;

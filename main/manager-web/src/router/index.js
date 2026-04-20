@@ -12,13 +12,6 @@ const routes = [
     }
   },
   {
-    path: '/role-config',
-    name: 'RoleConfig',
-    component: function () {
-      return import('../views/roleConfig.vue')
-    }
-  },
-  {
     path: '/voice-print',
     name: 'VoicePrint',
     component: function () {
@@ -51,14 +44,6 @@ const routes = [
     name: 'RetrievePassword',
     component: function () {
       return import('../views/retrievePassword.vue')
-    }
-  },
-  // 设备管理页面路由
-  {
-    path: '/device-management',
-    name: 'DeviceManagement',
-    component: function () {
-      return import('../views/DeviceManagement.vue')
     }
   },
   // 添加用户管理路由
@@ -196,6 +181,17 @@ const routes = [
       title: '功能配置'
     }
   },
+  {
+    path: '/agent-config',
+    name: 'AgentConfig',
+    component: function () {
+      return import('../views/AgentConfig.vue')
+    },
+    meta: {
+      requiresAuth: true,
+      title: '智能体配置'
+    }
+  },
 ]
 const router = new VueRouter({
   base: process.env.VUE_APP_PUBLIC_PATH || '/',
@@ -217,7 +213,7 @@ VueRouter.prototype.push = function push(location) {
 }
 
 // 需要登录才能访问的路由
-const protectedRoutes = ['home', 'RoleConfig', 'DeviceManagement', 'UserManagement', 'ModelConfig', 'KnowledgeBaseManagement', 'KnowledgeFileUpload']
+const protectedRoutes = ['home', 'UserManagement', 'ModelConfig', 'KnowledgeBaseManagement', 'KnowledgeFileUpload', 'AgentConfig']
 
 // 路由守卫
 router.beforeEach((to, from, next) => {

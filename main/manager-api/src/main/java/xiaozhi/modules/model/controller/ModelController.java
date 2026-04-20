@@ -63,7 +63,7 @@ public class ModelController {
 
     @GetMapping("/{modelType}/provideTypes")
     @Operation(summary = "获取模型供应器列表")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")
     public Result<List<ModelProviderDTO>> getModelProviderList(@PathVariable String modelType) {
         List<ModelProviderDTO> modelProviderDTOS = modelProviderService.getListByModelType(modelType);
         return new Result<List<ModelProviderDTO>>().ok(modelProviderDTOS);
@@ -71,7 +71,7 @@ public class ModelController {
 
     @GetMapping("/list")
     @Operation(summary = "获取模型配置列表")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")
     public Result<PageData<ModelConfigDTO>> getModelConfigList(
             @RequestParam(required = true) String modelType,
             @RequestParam(required = false) String modelName,
@@ -83,7 +83,7 @@ public class ModelController {
 
     @PostMapping("/{modelType}/{provideCode}")
     @Operation(summary = "新增模型配置")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")
     public Result<ModelConfigDTO> addModelConfig(@PathVariable String modelType,
             @PathVariable String provideCode,
             @RequestBody ModelConfigBodyDTO modelConfigBodyDTO) {
@@ -94,7 +94,7 @@ public class ModelController {
 
     @PutMapping("/{modelType}/{provideCode}/{id}")
     @Operation(summary = "编辑模型配置")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")
     public Result<ModelConfigDTO> editModelConfig(@PathVariable String modelType,
             @PathVariable String provideCode,
             @PathVariable String id,
@@ -106,7 +106,7 @@ public class ModelController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "删除模型配置")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")
     public Result<Void> deleteModelConfig(@PathVariable String id) {
         modelConfigService.delete(id);
         return new Result<>();
@@ -114,16 +114,16 @@ public class ModelController {
 
     @GetMapping("/{id}")
     @Operation(summary = "获取模型配置")
-    @RequiresPermissions("sys:role:superAdmin")
-    public Result<ModelConfigDTO> getModelConfig(@PathVariable String id) {
-        ModelConfigEntity item = modelConfigService.selectById(id);
+    @RequiresPermissions("sys:role:normal")
+    public Result<ModelConfigDTO> getModelConfig(@PathVariable String id, @RequestParam(required = false, defaultValue = "true") boolean mask) {
+        ModelConfigEntity item = modelConfigService.selectById(id, mask);
         ModelConfigDTO modelConfigDTO = ConvertUtils.sourceToTarget(item, ModelConfigDTO.class);
         return new Result<ModelConfigDTO>().ok(modelConfigDTO);
     }
 
     @PutMapping("/enable/{id}/{status}")
     @Operation(summary = "启用/关闭模型配置")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")
     public Result<Void> enableModelConfig(@PathVariable String id, @PathVariable Integer status) {
         ModelConfigEntity entity = modelConfigService.selectById(id);
         if (entity == null) {
@@ -142,7 +142,7 @@ public class ModelController {
 
     @PutMapping("/default/{id}")
     @Operation(summary = "设置默认模型")
-    @RequiresPermissions("sys:role:superAdmin")
+    @RequiresPermissions("sys:role:normal")
     public Result<Void> setDefaultModel(@PathVariable String id) {
         ModelConfigEntity entity = modelConfigService.selectById(id);
         if (entity == null) {

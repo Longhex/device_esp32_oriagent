@@ -1,6 +1,5 @@
 <template>
   <div class="welcome">
-    <HeaderBar />
 
     <div class="operation-bar">
           <h2 class="page-title">{{ $t('header.featureManagement') }}</h2>
@@ -98,14 +97,12 @@
 </template>
 
 <script>
-import HeaderBar from "@/components/HeaderBar.vue";
 import VersionFooter from "@/components/VersionFooter.vue";
 import featureManager from "@/utils/featureManager.js";
 
 export default {
   name: "FeatureManagement",
   components: {
-    HeaderBar,
     VersionFooter
   },
   data() {

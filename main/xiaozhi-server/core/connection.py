@@ -203,8 +203,61 @@ class ConnectionHandler:
         # 标记连接是否来自MQTT
         self.conn_from_mqtt_gateway = False
 
+        # Readiness gating: track AI module initialization state
+        # Possible values: "initializing", "ready", "failed"
+        self.ai_state = "ready"
+        self.ai_ready_event = asyncio.Event()
+        self.ai_ready_event.set()  # Default to ready
+
+        # Oriagent (Dify) conversation tracking
+        self.oriagent_conversation_id = ""
+
         # 初始化提示词管理器
         self.prompt_manager = PromptManager(self.config, self.logger)
+
+    def _is_dify_llm(self) -> bool:
+        """Check if current LLM is a Dify-based provider (Oriagent)"""
+        return getattr(self.llm, "is_dify_provider", False)
+    def _should_use_dynamic_functions(self, force_final_answer: bool) -> bool:
+        """
+        Dynamic runtime functions are only available for non-Dify function-calling flows.
+        Oriagent/Dify manages tools in Studio, so do not inject runtime functions there
+        UNLESS dify_enable_tools is set to True in config.
+        """
+        dify_enable_tools = self.config.get("dify_enable_tools", False)
+        return (
+            self.intent_type == "function_call"
+            and hasattr(self, "func_handler")
+            and self.func_handler is not None
+            and not force_final_answer
+            and (not self._is_dify_llm() or dify_enable_tools)
+        )
+
+    def get_available_tool_names(self) -> list[str]:
+        """
+        Safe accessor for runtime available tool names.
+        """
+        if not hasattr(self, "func_handler") or self.func_handler is None:
+            return []
+
+        try:
+            return self.func_handler.current_support_functions() or []
+        except Exception as e:
+            self.logger.bind(tag=TAG).warning(f"Failed to get available tool names: {e}")
+            return []
+
+    def has_device_gateway_tools(self) -> bool:
+        available_tools = self.get_available_tool_names()
+        return any(name in available_tools for name in ("device_control", "device_query"))
+
+
+    def _on_oriagent_conversation_id(self, conversation_id):
+        """Callback from Oriagent provider when conversation_id is received"""
+        if self.oriagent_conversation_id != conversation_id:
+            self.oriagent_conversation_id = conversation_id
+            self.logger.bind(tag=TAG).info(
+                f"Oriagent conversation_id updated: {conversation_id[:16]}..."
+            )
 
     async def handle_connection(self, ws: websockets.ServerConnection):
         try:
@@ -821,8 +874,16 @@ class ConnectionHandler:
 
         """加载统一工具处理器"""
         self.func_handler = UnifiedToolHandler(self)
-
         # 异步初始化工具处理器
+        if self._is_dify_llm():
+            self.logger.bind(tag=TAG).info(
+                "UnifiedToolHandler initialized for local routing and gateway tools only (Oriagent mode)"
+            )
+        else:
+            self.logger.bind(tag=TAG).info(
+                "UnifiedToolHandler initialized for dynamic function calling"
+            )
+
         if hasattr(self, "loop") and self.loop:
             asyncio.run_coroutine_threadsafe(self.func_handler._initialize(), self.loop)
 
@@ -893,16 +954,13 @@ class ConnectionHandler:
         # Define intent functions
         functions = None
         # 达到最大深度时，禁用工具调用，强制 LLM 直接回答
-        if (
-                self.intent_type == "function_call"
-                and hasattr(self, "func_handler")
-                and not force_final_answer
-        ):
+        # Dify (Oriagent) manages tools in Studio, so we skip dynamic function injection
+        if self._should_use_dynamic_functions(force_final_answer):
             functions = self.func_handler.get_functions()
 
         # 长对话工具调用规则强化：动态生成基于当前可用工具的提醒
         tool_call_reminder = None
-        if depth == 0 and query is not None and functions is not None:
+        if depth == 0 and query is not None and functions is not None and not self._is_dify_llm():
             dialogue_length = len(self.dialogue.dialogue)
             # 当对话历史超过4条消息时，注入规则强化
             if dialogue_length > 4:
@@ -945,8 +1003,40 @@ class ConnectionHandler:
                 )
                 memory_str = future.result()
 
-            if self.intent_type == "function_call" and functions is not None:
-                # 使用支持functions的streaming接口
+            if self._is_dify_llm() and functions is not None:
+                # Oriagent with tool calling enabled
+                available_tools = self.get_available_tool_names()
+                self.logger.bind(tag=TAG).debug(
+                    f"Oriagent mode with tool calling. "
+                    f"Gateway available={self.has_device_gateway_tools()}. "
+                    f"Available runtime tools: {available_tools}"
+                )
+                llm_responses = self.llm.response_with_functions(
+                    self.session_id,
+                    self.dialogue.get_llm_dialogue_with_memory(
+                        memory_str, self.config.get("voiceprint", {})
+                    ),
+                    functions=functions,
+                    conversation_id=self.oriagent_conversation_id,
+                    on_conversation_id=self._on_oriagent_conversation_id,
+                )
+            elif self._is_dify_llm():
+                # Oriagent text-only mode
+                available_tools = self.get_available_tool_names()
+                self.logger.bind(tag=TAG).debug(
+                    f"Oriagent mode active. Dynamic tools disabled. "
+                    f"Gateway available={self.has_device_gateway_tools()}. "
+                    f"Available runtime tools: {available_tools}"
+                )
+                llm_responses = self.llm.response(
+                    self.session_id,
+                    self.dialogue.get_llm_dialogue_with_memory(
+                        memory_str, self.config.get("voiceprint", {})
+                    ),
+                    conversation_id=self.oriagent_conversation_id,
+                    on_conversation_id=self._on_oriagent_conversation_id,
+                )
+            elif self.intent_type == "function_call" and functions is not None:
                 llm_responses = self.llm.response_with_functions(
                     self.session_id,
                     self.dialogue.get_llm_dialogue_with_memory(
@@ -961,6 +1051,11 @@ class ConnectionHandler:
                         memory_str, self.config.get("voiceprint", {})
                     ),
                 )
+            
+            # Log current active conversation ID for debugging
+            if self._is_dify_llm() and self.oriagent_conversation_id:
+                self.logger.bind(tag=TAG).debug(f"Using Oriagent Conversation ID: {self.oriagent_conversation_id}")
+                
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"LLM 处理出错 {query}: {e}")
             return None
@@ -1115,11 +1210,14 @@ class ConnectionHandler:
                 if tool_results:
                     self._handle_function_result(tool_results, depth=depth)
 
-        # 存储对话内容
         if len(response_message) > 0:
             text_buff = "".join(response_message)
             self.tts_MessageText = text_buff
             self.dialogue.put(Message(role="assistant", content=text_buff))
+            
+            # Enhanced Logging: Final message returned to user
+            conv_info = f" [ConvID: {self.oriagent_conversation_id}]" if self._is_dify_llm() and self.oriagent_conversation_id else ""
+            self.logger.bind(tag=TAG).info(f"LLM Response complete: {text_buff[:100]}...{conv_info}")
 
             # 更新工具调用统计：如果没有调用工具，增加计数
             if depth == 0 and not tool_call_flag:

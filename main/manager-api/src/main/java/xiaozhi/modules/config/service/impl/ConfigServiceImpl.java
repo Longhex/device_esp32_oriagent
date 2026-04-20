@@ -99,6 +99,8 @@ public class ConfigServiceImpl implements ConfigService {
                 null,
                 null,
                 null,
+                null,
+                null,
                 result,
                 isCache);
 
@@ -119,19 +121,26 @@ public class ConfigServiceImpl implements ConfigService {
             redisUtils.delete(redisKey); // 使用后清理
             return (Map<String, Object>) getConfig(true);
         }
+
+        AgentEntity agent = null;
         // 根据MAC地址查找设备
         DeviceEntity device = deviceService.getDeviceByMacAddress(macAddress);
         if (device == null) {
-            // 如果设备，去redis里看看有没有需要连接的设备
-            String cachedCode = deviceService.geCodeByDeviceId(macAddress);
-            if (StringUtils.isNotBlank(cachedCode)) {
-                throw new RenException(ErrorCode.OTA_DEVICE_NEED_BIND, cachedCode);
+            // 尝试作为 Agent ID 查找 (Live Test 模拟场景)
+            agent = agentService.getAgentById(macAddress);
+            if (agent == null) {
+                // 如果还不是Agent ID，则进入原有的注册绑定逻辑
+                String cachedCode = deviceService.geCodeByDeviceId(macAddress);
+                if (StringUtils.isNotBlank(cachedCode)) {
+                    throw new RenException(ErrorCode.OTA_DEVICE_NEED_BIND, cachedCode);
+                }
+                throw new RenException(ErrorCode.OTA_DEVICE_NOT_FOUND);
             }
-            throw new RenException(ErrorCode.OTA_DEVICE_NOT_FOUND);
+        } else {
+            // 获取智能体信息
+            agent = agentService.getAgentById(device.getAgentId());
         }
 
-        // 获取智能体信息
-        AgentEntity agent = agentService.getAgentById(device.getAgentId());
         if (agent == null) {
             throw new RenException(ErrorCode.AGENT_NOT_FOUND);
         }
@@ -233,6 +242,8 @@ public class ConfigServiceImpl implements ConfigService {
                 agent.getMemModelId(),
                 agent.getIntentModelId(),
                 null,
+                agent.getOriagentApiKey(),
+                agent.getOriagentModelName(),
                 result,
                 true);
 
@@ -414,6 +425,8 @@ public class ConfigServiceImpl implements ConfigService {
             String memModelId,
             String intentModelId,
             String ragModelId,
+            String oriagentApiKey,
+            String oriagentModelName,
             Map<String, Object> result,
             boolean isCache) {
         Map<String, String> selectedModule = new HashMap<>();
@@ -435,55 +448,57 @@ public class ConfigServiceImpl implements ConfigService {
             }
             Map<String, Object> typeConfig = new HashMap<>();
             if (model.getConfigJson() != null) {
-                typeConfig.put(model.getId(), model.getConfigJson());
+                // Clone the config to avoid polluting the cache
+                Map<String, Object> configCopy = new HashMap<>(model.getConfigJson());
+                typeConfig.put(model.getId(), configCopy);
+
                 // 如果是TTS类型，添加private_voice属性
                 if ("TTS".equals(modelTypes[i])) {
                     if (voice != null)
-                        ((Map<String, Object>) model.getConfigJson()).put("private_voice", voice);
+                        configCopy.put("private_voice", voice);
                     if (referenceAudio != null)
-                        ((Map<String, Object>) model.getConfigJson()).put("ref_audio", referenceAudio);
+                        configCopy.put("ref_audio", referenceAudio);
                     if (referenceText != null)
-                        ((Map<String, Object>) model.getConfigJson()).put("ref_text", referenceText);
+                        configCopy.put("ref_text", referenceText);
                     if (language != null)
-                        ((Map<String, Object>) model.getConfigJson()).put("language", language);
+                        configCopy.put("language", language);
                     if (ttsVolume != null)
-                        ((Map<String, Object>) model.getConfigJson()).put("ttsVolume", ttsVolume);
+                        configCopy.put("ttsVolume", ttsVolume);
                     if (ttsRate != null)
-                        ((Map<String, Object>) model.getConfigJson()).put("ttsRate", ttsRate);
+                        configCopy.put("ttsRate", ttsRate);
                     if (ttsPitch != null)
-                        ((Map<String, Object>) model.getConfigJson()).put("ttsPitch", ttsPitch);
+                        configCopy.put("ttsPitch", ttsPitch);
 
                     // 火山引擎声音克隆需要替换resource_id
-                    Map<String, Object> map = (Map<String, Object>) model.getConfigJson();
-                    if (Constant.VOICE_CLONE_HUOSHAN_DOUBLE_STREAM.equals(map.get("type"))) {
+                    if (Constant.VOICE_CLONE_HUOSHAN_DOUBLE_STREAM.equals(configCopy.get("type"))) {
                         // 如果voice是”S_“开头的，使用seed-icl-1.0
                         if (voice != null && voice.startsWith("S_")) {
-                            map.put("resource_id", "seed-icl-1.0");
+                            configCopy.put("resource_id", "seed-icl-1.0");
                         }
                     }
                 }
                 // 如果是Intent类型，且type=intent_llm，则给他添加附加模型
                 if ("Intent".equals(modelTypes[i])) {
-                    Map<String, Object> map = (Map<String, Object>) model.getConfigJson();
-                    if ("intent_llm".equals(map.get("type"))) {
-                        intentLLMModelId = (String) map.get("llm");
+                    if ("intent_llm".equals(configCopy.get("type"))) {
+                        intentLLMModelId = (String) configCopy.get("llm");
                         if (StringUtils.isNotBlank(intentLLMModelId) && intentLLMModelId.equals(llmModelId)) {
                             intentLLMModelId = null;
                         }
                     }
-                    if (map.get("functions") != null) {
-                        String functionStr = (String) map.get("functions");
-                        if (StringUtils.isNotBlank(functionStr)) {
-                            String[] functions = functionStr.split("\\;");
-                            map.put("functions", functions);
+                    if (configCopy.get("functions") != null) {
+                        try {
+                            Object funcs = configCopy.get("functions");
+                            if (funcs instanceof String && StringUtils.isNotBlank((String) funcs)) {
+                                String[] functions = ((String) funcs).split("\\;");
+                                configCopy.put("functions", functions);
+                            }
+                        } catch (Exception e) {
                         }
                     }
-                    System.out.println("map: " + map);
                 }
                 if ("Memory".equals(modelTypes[i])) {
-                    Map<String, Object> map = (Map<String, Object>) model.getConfigJson();
-                    if ("mem_local_short".equals(map.get("type"))) {
-                        memLocalShortLLMModelId = (String) map.get("llm");
+                    if ("mem_local_short".equals(configCopy.get("type"))) {
+                        memLocalShortLLMModelId = (String) configCopy.get("llm");
                         if (StringUtils.isNotBlank(memLocalShortLLMModelId)
                                 && memLocalShortLLMModelId.equals(llmModelId)) {
                             memLocalShortLLMModelId = null;
@@ -492,19 +507,49 @@ public class ConfigServiceImpl implements ConfigService {
                 }
                 // 如果是LLM类型，且intentLLMModelId不为空，则添加附加模型
                 if ("LLM".equals(modelTypes[i])) {
+                    // Inject agent-specific Oriagent configuration
+                    if ("oriagent_ws".equals(configCopy.get("type"))) {
+                        if (StringUtils.isNotBlank(oriagentApiKey)) {
+                            configCopy.put("api_key", oriagentApiKey);
+                        }
+                        if (StringUtils.isNotBlank(oriagentModelName)) {
+                            configCopy.put("model_name", oriagentModelName);
+                        }
+                    }
+
                     if (StringUtils.isNotBlank(intentLLMModelId)) {
                         if (!typeConfig.containsKey(intentLLMModelId)) {
-                            // 修改这里：添加isMaskSensitive=false参数
                             ModelConfigEntity intentLLM = modelConfigService.getModelByIdFromCache(intentLLMModelId);
-                            typeConfig.put(intentLLM.getId(), intentLLM.getConfigJson());
+                            if (intentLLM != null && intentLLM.getConfigJson() != null) {
+                                Map<String, Object> intentLLMCopy = new HashMap<>(intentLLM.getConfigJson());
+                                if ("oriagent_ws".equals(intentLLMCopy.get("type"))) {
+                                    if (StringUtils.isNotBlank(oriagentApiKey)) {
+                                        intentLLMCopy.put("api_key", oriagentApiKey);
+                                    }
+                                    if (StringUtils.isNotBlank(oriagentModelName)) {
+                                        intentLLMCopy.put("model_name", oriagentModelName);
+                                    }
+                                }
+                                typeConfig.put(intentLLM.getId(), intentLLMCopy);
+                            }
                         }
                     }
                     if (StringUtils.isNotBlank(memLocalShortLLMModelId)) {
                         if (!typeConfig.containsKey(memLocalShortLLMModelId)) {
-                            // 修改这里：添加isMaskSensitive=false参数
                             ModelConfigEntity memLocalShortLLM = modelConfigService
                                     .getModelByIdFromCache(memLocalShortLLMModelId);
-                            typeConfig.put(memLocalShortLLM.getId(), memLocalShortLLM.getConfigJson());
+                            if (memLocalShortLLM != null && memLocalShortLLM.getConfigJson() != null) {
+                                Map<String, Object> memLLMCopy = new HashMap<>(memLocalShortLLM.getConfigJson());
+                                if ("oriagent_ws".equals(memLLMCopy.get("type"))) {
+                                    if (StringUtils.isNotBlank(oriagentApiKey)) {
+                                        memLLMCopy.put("api_key", oriagentApiKey);
+                                    }
+                                    if (StringUtils.isNotBlank(oriagentModelName)) {
+                                        memLLMCopy.put("model_name", oriagentModelName);
+                                    }
+                                }
+                                typeConfig.put(memLocalShortLLM.getId(), memLLMCopy);
+                            }
                         }
                     }
                 }

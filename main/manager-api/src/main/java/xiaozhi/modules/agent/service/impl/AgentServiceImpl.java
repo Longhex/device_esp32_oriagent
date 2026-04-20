@@ -213,6 +213,10 @@ public class AgentServiceImpl extends BaseServiceImpl<AgentDao, AgentEntity> imp
             dto.setTags(tags.stream().map(this::convertTagToDTO).collect(Collectors.toList()));
         }
 
+        // Set Oriagent fields
+        dto.setOriagentApiKey(agent.getOriagentApiKey());
+        dto.setOriagentModelName(agent.getOriagentModelName());
+
         return dto;
     }
 
@@ -345,6 +349,12 @@ public class AgentServiceImpl extends BaseServiceImpl<AgentDao, AgentEntity> imp
         if (dto.getSort() != null) {
             existingEntity.setSort(dto.getSort());
         }
+        if (dto.getOriagentApiKey() != null) {
+            existingEntity.setOriagentApiKey(dto.getOriagentApiKey());
+        }
+        if (dto.getOriagentModelName() != null) {
+            existingEntity.setOriagentModelName(dto.getOriagentModelName());
+        }
 
         // 更新函数插件信息
         List<AgentUpdateDTO.FunctionInfo> functions = dto.getFunctions();
@@ -443,8 +453,8 @@ public class AgentServiceImpl extends BaseServiceImpl<AgentDao, AgentEntity> imp
         }
         ModelConfigEntity llmModelData = modelConfigService.selectById(llmModelId);
         String type = llmModelData.getConfigJson().get("type").toString();
-        // 如果查询大语言模型是openai或者ollama，意图识别选参数都可以
-        if ("openai".equals(type) || "ollama".equals(type)) {
+        // 如果查询大语言模型是openai或者ollama或者oriagent_ws，意图识别选参数都可以
+        if ("openai".equals(type) || "ollama".equals(type) || "oriagent_ws".equals(type)) {
             return true;
         }
         // 除了openai和ollama的类型，不可以选择id为Intent_function_call（函数调用）的意图识别

@@ -50,4 +50,10 @@ public class AgentDTO {
 
     @Schema(description = "标签列表")
     private List<AgentTagDTO> tags;
+
+    @Schema(description = "Oriagent API Key")
+    private String oriagentApiKey;
+
+    @Schema(description = "Oriagent Model Name")
+    private String oriagentModelName;
 }

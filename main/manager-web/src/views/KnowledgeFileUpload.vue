@@ -1,6 +1,5 @@
 <template>
   <div class="welcome">
-    <HeaderBar />
 
     <div class="operation-bar">
       <div class="left-operations">
@@ -264,11 +263,10 @@
 <script>
 import Api from "@/apis/api";
 import KnowledgeBaseAPI from "@/apis/module/knowledgeBase";
-import HeaderBar from "@/components/HeaderBar.vue";
 import VersionFooter from "@/components/VersionFooter.vue";
 
 export default {
-  components: { HeaderBar, VersionFooter },
+  components: { VersionFooter },
   data() {
     return {
       datasetId: '',

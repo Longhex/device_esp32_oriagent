@@ -14,12 +14,13 @@ class SimpleHttpServer:
         self.ota_handler = OTAHandler(config)
         self.vision_handler = VisionHandler(config)
 
-    def _get_websocket_url(self, local_ip: str, port: int) -> str:
+    def _get_websocket_url(self, local_ip: str, port: int, request: web.Request = None) -> str:
         """获取websocket地址
 
         Args:
             local_ip: 本地IP地址
             port: 端口号
+            request: 当前的HTTP请求对象
 
         Returns:
             str: websocket地址
@@ -29,8 +30,14 @@ class SimpleHttpServer:
 
         if websocket_config and "你" not in websocket_config:
             return websocket_config
-        else:
-            return f"ws://{local_ip}:{port}/xiaozhi/v1/"
+        
+        # 智能识别逻辑：优先使用当前请求的Host
+        if request is not None:
+            host = request.host
+            scheme = "wss" if request.scheme == "https" or request.headers.get("X-Forwarded-Proto") == "https" else "ws"
+            return f"{scheme}://{host}/xiaozhi/v1/"
+
+        return f"ws://{local_ip}:{port}/xiaozhi/v1/"
 
     async def start(self):
         try:
@@ -42,26 +49,25 @@ class SimpleHttpServer:
             if port:
                 app = web.Application()
 
-                if not read_config_from_api:
-                    # 如果没有开启智控台，只是单模块运行，就需要再添加简单OTA接口，用于下发websocket接口
-                    app.add_routes(
-                        [
-                            web.get("/xiaozhi/ota/", self.ota_handler.handle_get),
-                            web.post("/xiaozhi/ota/", self.ota_handler.handle_post),
-                            web.options(
-                                "/xiaozhi/ota/", self.ota_handler.handle_options
-                            ),
-                            # 下载接口，仅提供 data/bin/*.bin 下载
-                            web.get(
-                                "/xiaozhi/ota/download/{filename}",
-                                self.ota_handler.handle_download,
-                            ),
-                            web.options(
-                                "/xiaozhi/ota/download/{filename}",
-                                self.ota_handler.handle_options,
-                            ),
-                        ]
-                    )
+                # 添加OTA接口，用于模拟设备（Live Test）下发websocket接口
+                app.add_routes(
+                    [
+                        web.get("/xiaozhi/ota/", self.ota_handler.handle_get),
+                        web.post("/xiaozhi/ota/", self.ota_handler.handle_post),
+                        web.options(
+                            "/xiaozhi/ota/", self.ota_handler.handle_options
+                        ),
+                        # 下载接口，仅提供 data/bin/*.bin 下载
+                        web.get(
+                            "/xiaozhi/ota/download/{filename}",
+                            self.ota_handler.handle_download,
+                        ),
+                        web.options(
+                            "/xiaozhi/ota/download/{filename}",
+                            self.ota_handler.handle_options,
+                        ),
+                    ]
+                )
                 # 添加路由
                 app.add_routes(
                     [

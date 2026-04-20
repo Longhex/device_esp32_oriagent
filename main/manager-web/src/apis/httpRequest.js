@@ -37,7 +37,7 @@ function sendRequest() {
                 acceptLanguage = 'en-US';
             }
             this._header['Accept-Language'] = acceptLanguage;
-            
+
             if (isNotNull(store.getters.getToken)) {
                 this._header.Authorization = 'Bearer ' + (JSON.parse(store.getters.getToken)).token
             }
@@ -129,7 +129,7 @@ function httpHandlerError(info, failCallback, networkFailCallback) {
         } else {
             // 直接使用后端返回的国际化消息
             let errorMessage = info.data.msg;
-            
+
             if (failCallback) {
                 failCallback(info)
             } else {
@@ -141,7 +141,7 @@ function httpHandlerError(info, failCallback, networkFailCallback) {
     if (networkFailCallback) {
         networkFailCallback(info)
     } else {
-        showDanger(`网络请求出现了错误【${info.status}】`)
+        showDanger(`Network request failed【${info.status}】`)
     }
     return true
 }
@@ -156,9 +156,9 @@ function reAjaxFun(fn) {
     }
     let ajaxIndex = parseInt((nowTimeSec - requestTime) / reAjaxSec)
     if (ajaxIndex > 10) {
-        showWarning('似乎无法连接服务器')
+        showWarning('Can not connect to server')
     } else {
-        showWarning('正在连接服务器(' + ajaxIndex + ')')
+        showWarning('Connecting to server(' + ajaxIndex + ')')
     }
     if (ajaxIndex < 10 && fn) {
         setTimeout(() => {

@@ -27,6 +27,11 @@ export default {
   'header.logout': '退出登录',
   'header.searchPlaceholder': '名称、标签或mac搜索',
 
+  // SideBar text
+  'sidebar.myAccount': '我的账户',
+  'sidebar.language': '语言',
+  'sidebar.logout': '退出登录',
+
   // McpToolCallDialog组件文本
   'mcpToolCall.title': '工具调用',
   'mcpToolCall.execute': '执行',

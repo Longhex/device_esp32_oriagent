@@ -22,6 +22,8 @@
         <result column="ttsPitch" property="ttsPitch"/>
         <result column="memModelId" property="memModelId"/>
         <result column="intentModelId" property="intentModelId"/>
+        <result column="oriagentApiKey" property="oriagentApiKey"/>
+        <result column="oriagentModelName" property="oriagentModelName"/>
 
         <result column="functions" property="functions"
                 typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
@@ -55,6 +57,8 @@
                a.tts_pitch         AS ttsPitch,
                a.mem_model_id      AS memModelId,
                a.intent_model_id   AS intentModelId,
+               a.oriagent_api_key  AS oriagentApiKey,
+               a.oriagent_model_name AS oriagentModelName,
                COALESCE(
                        (SELECT JSON_ARRAYAGG(
                                        JSON_OBJECT(

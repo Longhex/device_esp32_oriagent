@@ -82,6 +82,12 @@ public class AgentUpdateDTO implements Serializable {
     @Schema(description = "排序", example = "1", nullable = true)
     private Integer sort;
 
+    @Schema(description = "Oriagent API Key", example = "app-xxx", nullable = true)
+    private String oriagentApiKey;
+
+    @Schema(description = "Oriagent Model Name", example = "gpt-4o", nullable = true)
+    private String oriagentModelName;
+
     @Schema(description = "上下文源配置", nullable = true)
     private List<ContextProviderDTO> contextProviders;
 

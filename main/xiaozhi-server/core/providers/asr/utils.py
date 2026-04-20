@@ -57,7 +57,7 @@ def lang_tag_filter(text: str) -> dict | str:
         return clean_text
 
     # 按照 FunASR 的固定顺序提取标签，返回 dict
-    language = all_tags[0] if len(all_tags) > 0 else "zh"
+    language = all_tags[0] if len(all_tags) > 0 else "vi"
     emotion = all_tags[1] if len(all_tags) > 1 else "NEUTRAL"
     # event = all_tags[2] if len(all_tags) > 2 else "Speech"  # 事件标签暂不使用
 

@@ -1,6 +1,5 @@
 <template>
   <div class="welcome">
-    <HeaderBar />
 
     <div class="operation-bar">
       <h2 class="page-title">{{ $t("modelConfig." + activeTab) }}</h2>
@@ -252,12 +251,11 @@
 <script>
 import Api from "@/apis/api";
 import AddModelDialog from "@/components/AddModelDialog.vue";
-import HeaderBar from "@/components/HeaderBar.vue";
 import ModelEditDialog from "@/components/ModelEditDialog.vue";
 import TtsModel from "@/components/TtsModel.vue";
 import VersionFooter from "@/components/VersionFooter.vue";
 export default {
-  components: { HeaderBar, ModelEditDialog, TtsModel, AddModelDialog, VersionFooter },
+  components: { ModelEditDialog, TtsModel, AddModelDialog, VersionFooter },
   data() {
     return {
       addDialogVisible: false,

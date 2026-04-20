@@ -5,6 +5,7 @@ TAG = __name__
 logger = setup_logging()
 
 class LLMProviderBase(ABC):
+    is_dify_provider = False
     @abstractmethod
     def response(self, session_id, dialogue):
         """LLM response generator"""

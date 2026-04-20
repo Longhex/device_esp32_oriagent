@@ -145,10 +145,10 @@ public class SysParamsController {
                     throw new RenException(ErrorCode.WEBSOCKET_URL_FORMAT_ERROR);
                 }
 
-                // 测试WebSocket连接
-                if (!WebSocketValidator.testConnection(url)) {
-                    throw new RenException(ErrorCode.WEBSOCKET_CONNECTION_FAILED);
-                }
+                // // 测试WebSocket连接
+                // if (!WebSocketValidator.testConnection(url)) {
+                //     throw new RenException(ErrorCode.WEBSOCKET_CONNECTION_FAILED);
+                // }
             }
         }
     }

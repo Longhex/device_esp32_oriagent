@@ -1,6 +1,5 @@
 <template>
   <div class="welcome">
-    <HeaderBar />
 
     <div class="operation-bar">
       <h2 class="page-title">{{ $t("agentTemplateManagement.title") }}</h2>
@@ -143,14 +142,12 @@
 </template>
 
 <script>
-import HeaderBar from "@/components/HeaderBar";
 import agentApi from "@/apis/module/agent";
 import VersionFooter from "@/components/VersionFooter.vue";
 
 export default {
   name: "AgentTemplateManagement",
   components: {
-    HeaderBar,
     VersionFooter
   },
 

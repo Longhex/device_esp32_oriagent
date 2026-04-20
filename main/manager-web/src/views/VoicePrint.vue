@@ -1,6 +1,5 @@
 <template>
     <div class="welcome">
-        <HeaderBar />
 
         <div class="operation-bar">
             <h2 class="page-title">{{ $t('voicePrint.pageTitle') }}</h2>
@@ -46,11 +45,10 @@
 
 <script>
 import Api from "@/apis/api";
-import HeaderBar from "@/components/HeaderBar.vue";
 import VersionFooter from "@/components/VersionFooter.vue";
 import VoicePrintDialog from "@/components/VoicePrintDialog.vue";
 export default {
-    components: { HeaderBar, VoicePrintDialog, VersionFooter },
+    components: { VoicePrintDialog, VersionFooter },
     data() {
         return {
             voicePrintList: [],

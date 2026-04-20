@@ -1,6 +1,5 @@
 <template>
     <div class="welcome">
-        <HeaderBar />
 
         <div class="operation-bar">
             <h2 class="page-title">{{ $t('paramManagement.pageTitle') }}</h2>
@@ -104,11 +103,10 @@
 
 <script>
 import Api from "@/apis/api";
-import HeaderBar from "@/components/HeaderBar.vue";
 import ParamDialog from "@/components/ParamDialog.vue";
 import VersionFooter from "@/components/VersionFooter.vue";
 export default {
-    components: { HeaderBar, ParamDialog, VersionFooter },
+    components: { ParamDialog, VersionFooter },
     data() {
         return {
             searchCode: "",

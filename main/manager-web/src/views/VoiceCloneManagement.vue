@@ -1,6 +1,5 @@
 <template>
     <div class="welcome">
-        <HeaderBar />
         <div class="operation-bar">
             <h2 class="page-title">{{ $t('voiceClone.title') }}</h2>
             <div class="right-operations">
@@ -127,13 +126,12 @@
 
 <script>
 import Api from "@/apis/api";
-import HeaderBar from "@/components/HeaderBar.vue";
 import VersionFooter from "@/components/VersionFooter.vue";
 import VoiceCloneDialog from "@/components/VoiceCloneDialog.vue";
 import { formatDate } from "@/utils/format";
 
 export default {
-    components: { HeaderBar, VersionFooter, VoiceCloneDialog },
+    components: { VersionFooter, VoiceCloneDialog },
     data() {
         return {
             searchName: "",

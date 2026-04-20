@@ -1,6 +1,5 @@
 <template>
   <div class="welcome">
-    <HeaderBar />
 
     <div class="operation-bar">
       <h2 class="page-title">{{ $t('header.userManagement') }}</h2>
@@ -98,12 +97,11 @@
 
 <script>
 import Api from "@/apis/api";
-import HeaderBar from "@/components/HeaderBar.vue";
 import VersionFooter from "@/components/VersionFooter.vue";
 import ViewPasswordDialog from "@/components/ViewPasswordDialog.vue";
 import i18n from '@/i18n';
 export default {
-  components: { HeaderBar, ViewPasswordDialog, VersionFooter },
+  components: { ViewPasswordDialog, VersionFooter },
   data() {
     return {
       showViewPassword: false,

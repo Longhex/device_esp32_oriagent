@@ -1,5 +1,6 @@
 package xiaozhi.modules.model.service;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
@@ -12,6 +13,8 @@ import xiaozhi.modules.model.dto.ModelConfigDTO;
 import xiaozhi.modules.model.entity.ModelConfigEntity;
 
 public interface ModelConfigService extends BaseService<ModelConfigEntity> {
+
+    ModelConfigEntity selectById(Serializable id, boolean mask);
 
     List<ModelBasicInfoDTO> getModelCodeList(String modelType, String modelName);
 

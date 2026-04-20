@@ -1,5 +1,5 @@
 <template>
-  <div class="device-item">
+  <div class="device-item card-clickable" @click="handleCardClick">
     <div style="display: flex;justify-content: space-between;">
     <el-tooltip :content="device.agentName" placement="top" effect="light">
       <div class="device-item-title">
@@ -21,24 +21,13 @@
     <div class="device-name">
       {{ $t('home.voiceModel') }}：{{ device.ttsModelName }} ({{ device.ttsVoiceName }})
     </div>
-    <div style="display: flex;gap: 10px;align-items: center;">
-      <div class="settings-btn" @click="handleConfigure">
-        {{ $t('home.configureRole') }}
-      </div>
-      <div v-if="featureStatus.voiceprintRecognition" class="settings-btn" @click="handleVoicePrint">
-        {{ $t('home.voiceprintRecognition') }}
-      </div>
-      <div class="settings-btn" @click="handleDeviceManage">
-        {{ $t('home.deviceManagement') }}({{ device.deviceCount }})
-      </div>
-      <div :class="['settings-btn', { 'disabled-btn': device.memModelId === 'Memory_nomem' }]"
-        @click="handleChatHistory">
-        <el-tooltip effect="light" v-if="device.memModelId === 'Memory_nomem'" :content="$t('home.enableMemory')" placement="top">
-          <span>{{ $t('home.chatHistory') }}</span>
-        </el-tooltip>
-        <span v-else>{{ $t('home.chatHistory') }}</span>
-      </div>
+    
+    <!-- Redesigned Mini Stats -->
+    <div class="device-stats-mini">
+        <span class="stat-tag"><i class="el-icon-monitor"></i> {{ device.deviceCount || 0 }} {{ $t('roleConfig.tabDevice') }}</span>
+        <span v-if="device.memModelId !== 'Memory_nomem'" class="stat-tag"><i class="el-icon-chat-dot-round"></i> History</span>
     </div>
+
     <div class="version-info">
       <div>{{ $t('home.lastConversation') }}：{{ formattedLastConnectedTime }}</div>
       <el-tooltip :content="tags.join()" placement="top" effect="light">
@@ -51,8 +40,6 @@
 </template>
 
 <script>
-import i18n from '@/i18n';
-
 export default {
   name: 'DeviceItem',
   props: {
@@ -67,7 +54,7 @@ export default {
     }
   },
   data() {
-    return { switchValue: false }
+    return {}
   },
   computed: {
     formattedLastConnectedTime() {
@@ -98,62 +85,68 @@ export default {
     handleDelete() {
       this.$emit('delete', this.device.agentId)
     },
-    handleConfigure() {
-      this.$router.push({ path: '/role-config', query: { agentId: this.device.agentId } });
-    },
-    handleVoicePrint() {
-      this.$router.push({ path: '/voice-print', query: { agentId: this.device.agentId } });
-    },
-    handleDeviceManage() {
-      this.$router.push({ path: '/device-management', query: { agentId: this.device.agentId } });
-    },
-    handleChatHistory() {
-      if (this.device.memModelId === 'Memory_nomem') {
-        return
-      }
-      this.$emit('chat-history', { agentId: this.device.agentId, agentName: this.device.agentName })
+    handleCardClick() {
+      this.$router.push({ path: '/agent-config', query: { agentId: this.device.agentId } });
     }
   },
 }
 </script>
 <style lang="scss" scoped>
 .device-item {
-  width: 342px;
+  width: 100%;
   border-radius: 20px;
-  background: #fafcfe;
-  padding: 22px 22px 14px;
+  background: white;
+  padding: 24px;
   box-sizing: border-box;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  border: 1px solid #f0f2f5;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+  
   &-title {
     flex: 1;
     font-weight: bold;
     font-size: 18px;
-    color: #3d4566;
+    color: #313133;
     text-align: left;
     text-overflow: ellipsis;
     white-space: nowrap;
     overflow: hidden;
   }
+
+  &.card-clickable {
+    cursor: pointer;
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+      border-color: #08c45b;
+    }
+  }
 }
 
 .device-name {
-  margin: 7px 0 10px;
+  margin: 10px 0;
   font-weight: 400;
-  font-size: 11px;
-  color: #3d4566;
+  font-size: 12px;
+  color: #64748b;
   text-align: left;
 }
 
-.settings-btn {
-  font-weight: 500;
-  font-size: 12px;
-  color: #000000;
-  background: #e6ebff;
-  width: auto;
-  padding: 0 12px;
-  height: 21px;
-  line-height: 21px;
-  cursor: pointer;
-  border-radius: 14px;
+.device-stats-mini {
+    display: flex;
+    gap: 8px;
+    margin: 15px 0;
+    
+    .stat-tag {
+        font-size: 11px;
+        background: #f1f5f9;
+        color: #475569;
+        padding: 4px 10px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        i { font-size: 12px; color: #94a3b8; }
+    }
 }
 
 .version-info {
@@ -161,34 +154,20 @@ export default {
   justify-content: space-between;
   align-items: center;
   margin-top: 15px;
-  font-size: 12px;
+  font-size: 11px;
   color: #979db1;
   font-weight: 400;
+  padding-top: 15px;
+  border-top: 1px solid #f8fafc;
+  
   &-scroll {
     margin-left: 20px;
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
-    text-wrap: nowrap;
+    white-space: nowrap;
     text-align: right;
   }
-}
-
-.more-tag {
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.all-tags-popover {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.disabled-btn {
-  background: #e6e6e6;
-  color: #999;
-  cursor: not-allowed;
 }
 </style>
 
