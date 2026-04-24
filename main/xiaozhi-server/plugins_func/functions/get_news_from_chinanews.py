@@ -18,25 +18,25 @@ GET_NEWS_FROM_CHINANEWS_FUNCTION_DESC = {
     "function": {
         "name": "get_news_from_chinanews",
         "description": (
-            "获取最新新闻，随机选择一条新闻进行播报。"
-            "用户可以指定新闻类型，如社会新闻、科技新闻、国际新闻等。"
-            "如果没有指定，默认播报社会新闻。"
-            "用户可以要求获取详细内容，此时会获取新闻的详细内容。"
+            "Lấy tin tức mới nhất và chọn ngẫu nhiên một tin để thông báo."
+            "Người dùng có thể chỉ định loại tin tức, như tin tức xã hội, tin tức công nghệ, tin tức quốc tế, v.v."
+            "Nếu không chỉ định, mặc định thông báo tin tức xã hội."
+            "Người dùng có thể yêu cầu lấy nội dung chi tiết, khi đó sẽ lấy nội dung chi tiết của tin tức."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "category": {
                     "type": "string",
-                    "description": "新闻类别，例如社会、科技、国际。可选参数，如果不提供则使用默认类别",
+                    "description": "Danh mục tin tức, ví dụ: xã hội, công nghệ, quốc tế. Tham số tùy chọn, nếu không cung cấp sẽ dùng danh mục mặc định",
                 },
                 "detail": {
                     "type": "boolean",
-                    "description": "是否获取详细内容，默认为false。如果为true，则获取上一条新闻的详细内容",
+                    "description": "Có lấy nội dung chi tiết hay không, mặc định là false. Nếu là true, sẽ lấy nội dung chi tiết của tin tức trước đó",
                 },
                 "lang": {
                     "type": "string",
-                    "description": "返回用户使用的语言code，例如zh_CN/zh_HK/en_US/ja_JP等，默认zh_CN",
+                    "description": "Mã ngôn ngữ người dùng, ví dụ: zh_CN/vi_VN/en_US, mặc định vi_VN",
                 },
             },
             "required": ["lang"],
@@ -58,18 +58,18 @@ def fetch_news_from_rss(rss_url):
         news_items = []
         for item in root.findall(".//item"):
             title = (
-                item.find("title").text if item.find("title") is not None else "无标题"
+                item.find("title").text if item.find("title") is not None else "Không có tiêu đề"
             )
             link = item.find("link").text if item.find("link") is not None else "#"
             description = (
                 item.find("description").text
                 if item.find("description") is not None
-                else "无描述"
+                else "Không có mô tả"
             )
             pubDate = (
                 item.find("pubDate").text
                 if item.find("pubDate") is not None
-                else "未知时间"
+                else "Thời gian không xác định"
             )
 
             news_items.append(
@@ -83,7 +83,7 @@ def fetch_news_from_rss(rss_url):
 
         return news_items
     except Exception as e:
-        logger.bind(tag=TAG).error(f"获取RSS新闻失败: {e}")
+        logger.bind(tag=TAG).error(f"Failed to fetch RSS news: {e}")
         return []
 
 
@@ -113,8 +113,8 @@ def fetch_news_detail(url):
             )
             return content[:2000]  # 限制长度
     except Exception as e:
-        logger.bind(tag=TAG).error(f"获取新闻详情失败: {e}")
-        return "无法获取详细内容"
+        logger.bind(tag=TAG).error(f"Failed to fetch news detail: {e}")
+        return "Không thể lấy nội dung chi tiết"
 
 
 def map_category(category_text):
@@ -125,16 +125,15 @@ def map_category(category_text):
     # 类别映射字典，目前支持社会、国际、财经新闻，如需更多类型，参见配置文件
     category_map = {
         # 社会新闻
-        "社会": "society_rss_url",
-        "社会新闻": "society_rss_url",
+        "xã hội": "society_rss_url",
+        "tin xã hội": "society_rss_url",
         # 国际新闻
-        "国际": "world_rss_url",
-        "国际新闻": "world_rss_url",
+        "quốc tế": "world_rss_url",
+        "tin quốc tế": "world_rss_url",
         # 财经新闻
-        "财经": "finance_rss_url",
-        "财经新闻": "finance_rss_url",
-        "金融": "finance_rss_url",
-        "经济": "finance_rss_url",
+        "tài chính": "finance_rss_url",
+        "tin tài chính": "finance_rss_url",
+        "kinh tế": "finance_rss_url",
     }
 
     # 转换为小写并去除空格
@@ -153,7 +152,7 @@ def get_news_from_chinanews(
     conn: "ConnectionHandler",
     category: str = None,
     detail: bool = False,
-    lang: str = "zh_CN",
+    lang: str = "vi_VN",
 ):
     """获取新闻并随机选择一条进行播报，或获取上一条新闻的详细内容"""
     try:
@@ -166,7 +165,7 @@ def get_news_from_chinanews(
             ):
                 return ActionResponse(
                     Action.REQLLM,
-                    "抱歉，没有找到最近查询的新闻，请先获取一条新闻。",
+                    "Rất tiếc, không tìm thấy tin tức đã truy vấn gần đây, vui lòng lấy một tin tức trước.",
                     None,
                 )
 
@@ -175,7 +174,7 @@ def get_news_from_chinanews(
 
             if link == "#":
                 return ActionResponse(
-                    Action.REQLLM, "抱歉，该新闻没有可用的链接获取详细内容。", None
+                    Action.REQLLM, "Rất tiếc, tin tức này không có liên kết khả dụng để lấy nội dung chi tiết.", None
                 )
 
             logger.bind(tag=TAG).debug(f"获取新闻详情: {title}, URL={link}")
@@ -183,20 +182,20 @@ def get_news_from_chinanews(
             # 获取新闻详情
             detail_content = fetch_news_detail(link)
 
-            if not detail_content or detail_content == "无法获取详细内容":
+            if not detail_content or detail_content == "Không thể lấy nội dung chi tiết":
                 return ActionResponse(
                     Action.REQLLM,
-                    f"抱歉，无法获取《{title}》的详细内容，可能是链接已失效或网站结构发生变化。",
+                    f"Rất tiếc, không thể lấy nội dung chi tiết của 《{title}》, có thể liên kết đã hết hạn hoặc cấu trúc trang web đã thay đổi.",
                     None,
                 )
 
             # 构建详情报告
             detail_report = (
-                f"根据下列数据，用{lang}回应用户的新闻详情查询请求：\n\n"
-                f"新闻标题: {title}\n"
-                f"详细内容: {detail_content}\n\n"
-                f"(请对上述新闻内容进行总结，提取关键信息，以自然、流畅的方式向用户播报，"
-                f"不要提及这是总结，就像是在讲述一个完整的新闻故事)"
+                f"Dựa trên dữ liệu sau, dùng ngôn ngữ {lang} để trả lời yêu cầu truy vấn chi tiết tin tức của người dùng：\n\n"
+                f"Tiêu đề tin tức: {title}\n"
+                f"Nội dung chi tiết: {detail_content}\n\n"
+                f"(Vui lòng tóm tắt nội dung tin tức trên, trích xuất các thông tin chính, thông báo cho người dùng một cách tự nhiên và trôi chảy, "
+                f"đừng đề cập rằng đây là bản tóm tắt, hãy giống như đang kể một câu chuyện tin tức hoàn chỉnh)"
             )
 
             return ActionResponse(Action.REQLLM, detail_report, None)
@@ -225,7 +224,7 @@ def get_news_from_chinanews(
 
         if not news_items:
             return ActionResponse(
-                Action.REQLLM, "抱歉，未能获取到新闻信息，请稍后再试。", None
+                Action.REQLLM, "Rất tiếc, không thể lấy thông tin tin tức, vui lòng thử lại sau.", None
             )
 
         # 随机选择一条新闻
@@ -236,24 +235,24 @@ def get_news_from_chinanews(
             conn.last_news_link = {}
         conn.last_news_link = {
             "link": selected_news.get("link", "#"),
-            "title": selected_news.get("title", "未知标题"),
+            "title": selected_news.get("title", "Không có tiêu đề"),
         }
 
         # 构建新闻报告
         news_report = (
-            f"根据下列数据，用{lang}回应用户的新闻查询请求：\n\n"
-            f"新闻标题: {selected_news['title']}\n"
-            f"发布时间: {selected_news['pubDate']}\n"
-            f"新闻内容: {selected_news['description']}\n"
-            f"(请以自然、流畅的方式向用户播报这条新闻，可以适当总结内容，"
-            f"直接读出新闻即可，不需要额外多余的内容。"
-            f"如果用户询问更多详情，告知用户可以说'请详细介绍这条新闻'获取更多内容)"
+            f"Dựa trên dữ liệu sau, dùng ngôn ngữ {lang} để trả lời yêu cầu truy vấn tin tức của người dùng：\n\n"
+            f"Tiêu đề tin tức: {selected_news['title']}\n"
+            f"Thời gian phát hành: {selected_news['pubDate']}\n"
+            f"Nội dung tin tức: {selected_news['description']}\n"
+            f"(Vui lòng thông báo tin tức này cho người dùng một cách tự nhiên và trôi chảy, có thể tóm tắt nội dung phù hợp, "
+            f"đọc trực tiếp tin tức, không cần thêm nội dung dư thừa. "
+            f"Nếu người dùng yêu cầu biết thêm chi tiết, hãy nói rằng người dùng có thể nói 'Hãy giới thiệu chi tiết tin tức này' để biết thêm thông tin)"
         )
 
         return ActionResponse(Action.REQLLM, news_report, None)
 
     except Exception as e:
-        logger.bind(tag=TAG).error(f"获取新闻出错: {e}")
+        logger.bind(tag=TAG).error(f"Error fetching news: {e}")
         return ActionResponse(
-            Action.REQLLM, "抱歉，获取新闻时发生错误，请稍后再试。", None
+            Action.REQLLM, "Rất tiếc, đã xảy ra lỗi khi lấy tin tức, vui lòng thử lại sau.", None
         )

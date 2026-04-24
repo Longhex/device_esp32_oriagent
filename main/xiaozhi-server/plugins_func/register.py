@@ -84,7 +84,7 @@ def register_function(name, desc, type=None):
 
     def decorator(func):
         all_function_registry[name] = FunctionItem(name, desc, func, type)
-        logger.bind(tag=TAG).debug(f"函数 '{name}' 已加载，可以注册使用")
+        logger.bind(tag=TAG).debug(f"Function '{name}' loaded, ready for use")
         return func
 
     return decorator
@@ -94,7 +94,7 @@ def register_device_function(name, desc, type=None):
     """注册设备级别的函数到函数注册字典的装饰器"""
 
     def decorator(func):
-        logger.bind(tag=TAG).debug(f"设备函数 '{name}' 已加载")
+        logger.bind(tag=TAG).debug(f"Device function '{name}' loaded")
         return func
 
     return decorator
@@ -109,25 +109,25 @@ class FunctionRegistry:
         # 如果提供了func_item，直接注册
         if func_item:
             self.function_registry[name] = func_item
-            self.logger.bind(tag=TAG).debug(f"函数 '{name}' 直接注册成功")
+            self.logger.bind(tag=TAG).debug(f"Function '{name}' registered successfully (direct)")
             return func_item
 
         # 否则从all_function_registry中查找
         func = all_function_registry.get(name)
         if not func:
-            self.logger.bind(tag=TAG).error(f"函数 '{name}' 未找到")
+            self.logger.bind(tag=TAG).error(f"Function '{name}' not found")
             return None
         self.function_registry[name] = func
-        self.logger.bind(tag=TAG).debug(f"函数 '{name}' 注册成功")
+        self.logger.bind(tag=TAG).debug(f"Function '{name}' registered successfully")
         return func
 
     def unregister_function(self, name):
         # 注销函数，检测是否存在
         if name not in self.function_registry:
-            self.logger.bind(tag=TAG).error(f"函数 '{name}' 未找到")
+            self.logger.bind(tag=TAG).error(f"Function '{name}' not found")
             return False
         self.function_registry.pop(name, None)
-        self.logger.bind(tag=TAG).info(f"函数 '{name}' 注销成功")
+        self.logger.bind(tag=TAG).info(f"Function '{name}' unregistered successfully")
         return True
 
     def get_function(self, name):

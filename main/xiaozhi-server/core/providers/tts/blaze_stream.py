@@ -76,7 +76,7 @@ class TTSProvider(TTSProviderBase):
             await asyncio.wait_for(ws.recv(), timeout=5.0)
 
             # Step 2: Authenticate
-            await ws.send(json.dumps({"token": self.api_key}))
+            await ws.send(json.dumps({"token": self.api_key, "strategy": "request"}))
             auth_msg = await asyncio.wait_for(ws.recv(), timeout=5.0)
             if "successful-authentication" not in auth_msg:
                 logger.bind(tag=TAG).error(f"Blaze TTS: auth failed: {auth_msg}")

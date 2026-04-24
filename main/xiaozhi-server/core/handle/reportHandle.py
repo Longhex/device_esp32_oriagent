@@ -47,7 +47,7 @@ async def report(conn: "ConnectionHandler", type, text, opus_data, report_time):
             report_time=report_time,
         )
     except Exception as e:
-        conn.logger.bind(tag=TAG).error(f"聊天记录上报失败: {e}")
+        conn.logger.bind(tag=TAG).error(f"Chat history reporting failed: {e}")
 
 
 def opus_to_wav(conn: "ConnectionHandler", opus_data):
@@ -70,7 +70,7 @@ def opus_to_wav(conn: "ConnectionHandler", opus_data):
                 pcm_frame = decoder.decode(opus_packet, 960)  # 960 samples = 60ms
                 pcm_data.append(pcm_frame)
             except opuslib_next.OpusError as e:
-                conn.logger.bind(tag=TAG).error(f"Opus解码错误: {e}", exc_info=True)
+                conn.logger.bind(tag=TAG).error(f"Opus decoding error: {e}", exc_info=True)
 
         if not pcm_data:
             raise ValueError("没有有效的PCM数据")
@@ -102,7 +102,7 @@ def opus_to_wav(conn: "ConnectionHandler", opus_data):
             try:
                 del decoder
             except Exception as e:
-                conn.logger.bind(tag=TAG).debug(f"释放decoder资源时出错: {e}")
+                conn.logger.bind(tag=TAG).debug(f"Error releasing decoder resources: {e}")
 
 
 def enqueue_tts_report(conn: "ConnectionHandler", text, opus_data):
@@ -122,15 +122,15 @@ def enqueue_tts_report(conn: "ConnectionHandler", text, opus_data):
         if conn.chat_history_conf == 2:
             conn.report_queue.put((2, text, opus_data, int(time.time())))
             conn.logger.bind(tag=TAG).debug(
-                f"TTS数据已加入上报队列: {conn.device_id}, 音频大小: {len(opus_data)} "
+                f"TTS data added to report queue: {conn.device_id}, audio size: {len(opus_data)}"
             )
         else:
             conn.report_queue.put((2, text, None, int(time.time())))
             conn.logger.bind(tag=TAG).debug(
-                f"TTS数据已加入上报队列: {conn.device_id}, 不上报音频"
+                f"TTS data added to report queue: {conn.device_id}, audio reporting disabled"
             )
     except Exception as e:
-        conn.logger.bind(tag=TAG).error(f"加入TTS上报队列失败: {text}, {e}")
+        conn.logger.bind(tag=TAG).error(f"Failed to add TTS to report queue: {text}, {e}")
 
 
 def enqueue_tool_report(conn: "ConnectionHandler", tool_name: str, tool_input: dict, tool_result: str = None, report_tool_call: bool = True):
@@ -169,7 +169,7 @@ def enqueue_tool_report(conn: "ConnectionHandler", tool_name: str, tool_input: d
             result_content = json.dumps([{"type": "tool_result", "text": result_display}], ensure_ascii=False)
             conn.report_queue.put((3, result_content, None, timestamp + 1))
     except Exception as e:
-        conn.logger.bind(tag=TAG).error(f"加入工具上报队列失败: {e}")
+        conn.logger.bind(tag=TAG).error(f"Failed to add tool report to queue: {e}")
 
 
 def enqueue_asr_report(conn: "ConnectionHandler", text, opus_data):
@@ -189,12 +189,12 @@ def enqueue_asr_report(conn: "ConnectionHandler", text, opus_data):
         if conn.chat_history_conf == 2:
             conn.report_queue.put((1, text, opus_data, int(time.time())))
             conn.logger.bind(tag=TAG).debug(
-                f"ASR数据已加入上报队列: {conn.device_id}, 音频大小: {len(opus_data)} "
+                f"ASR data added to report queue: {conn.device_id}, audio size: {len(opus_data)}"
             )
         else:
             conn.report_queue.put((1, text, None, int(time.time())))
             conn.logger.bind(tag=TAG).debug(
-                f"ASR数据已加入上报队列: {conn.device_id}, 不上报音频"
+                f"ASR data added to report queue: {conn.device_id}, audio reporting disabled"
             )
     except Exception as e:
-        conn.logger.bind(tag=TAG).debug(f"加入ASR上报队列失败: {text}, {e}")
+        conn.logger.bind(tag=TAG).debug(f"Failed to add ASR to report queue: {text}, {e}")

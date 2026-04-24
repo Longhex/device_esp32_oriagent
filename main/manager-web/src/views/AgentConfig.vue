@@ -68,11 +68,14 @@
           :firmware-types="firmwareTypes"
           @refresh="fetchDevices"
           @add-device="showAddDeviceDialog = true"
+          @manual-add="showManualAddDeviceDialog = true"
         />
       </div>
     </div>
 
     <!-- Dialogs -->
+    <add-device-dialog :visible.sync="showAddDeviceDialog" :agent-id="agentId" @refresh="fetchDevices" />
+    <manual-add-device-dialog :visible.sync="showManualAddDeviceDialog" :agent-id="agentId" @refresh="fetchDevices" />
     <function-dialog 
         v-model="showFunctionDialog" 
         :functions="currentFunctions" 
@@ -99,13 +102,15 @@ import ChatHistorySection from "@/components/ChatHistorySection.vue";
 import FunctionDialog from "@/components/FunctionDialog.vue";
 import ContextProviderDialog from "@/components/ContextProviderDialog.vue";
 import AgentConfigTabs from "@/components/AgentConfigTabs.vue";
+import AddDeviceDialog from "@/components/AddDeviceDialog.vue";
+import ManualAddDeviceDialog from "@/components/ManualAddDeviceDialog.vue";
 
 export default {
   name: "AgentConfig",
   components: { 
     VersionFooter, RoleConfigSection, DeviceManagementSection, 
     ChatHistorySection, FunctionDialog, ContextProviderDialog,
-    AgentConfigTabs
+    AgentConfigTabs, AddDeviceDialog, ManualAddDeviceDialog
   },
   data() {
     return {
@@ -133,6 +138,8 @@ export default {
       // Dialog states
       showFunctionDialog: false,
       showContextProviderDialog: false,
+      showAddDeviceDialog: false,
+      showManualAddDeviceDialog: false,
       currentFunctions: [],
       allFunctions: [],
       currentContextProviders: [],

@@ -56,7 +56,7 @@ async def startToChat(conn: "ConnectionHandler", text):
                 language_tag = data.get("language")
                 if "speaker" in data:
                     speaker_name = data["speaker"]
-                    conn.logger.bind(tag=TAG).info(f"解析到说话人信息: {speaker_name}")
+                    conn.logger.bind(tag=TAG).info(f"Parsed speaker info: {speaker_name}")
     except (json.JSONDecodeError, KeyError):
         # 如果解析失败，继续使用原始文本
         pass
@@ -112,19 +112,19 @@ async def no_voice_close_connect(conn: "ConnectionHandler", have_voice):
             conn.client_abort = False
             end_prompt = conn.config.get("end_prompt", {})
             if end_prompt and end_prompt.get("enable", True) is False:
-                conn.logger.bind(tag=TAG).info("结束对话，无需发送结束提示语")
+                conn.logger.bind(tag=TAG).info("Dialogue ended, no need to send end prompt")
                 await conn.close()
                 return
             prompt = end_prompt.get("prompt")
             if not prompt:
-                prompt = "请你以```时间过得真快```未来头，用富有感情、依依不舍的话来结束这场对话吧。！"
+                prompt = "Hãy bắt đầu bằng câu ```Thời gian trôi thật nhanh```, sau đó dùng những lời lẽ đầy tình cảm và lưu luyến để kết thúc cuộc trò chuyện này nhé!"
             await startToChat(conn, prompt)
 
 
 async def max_out_size(conn: "ConnectionHandler"):
     # 播放超出最大输出字数的提示
     conn.client_abort = False
-    text = "不好意思，我现在有点事情要忙，明天这个时候我们再聊，约好了哦！明天不见不散，拜拜！"
+    text = "Xin lỗi nhé, hiện tại tôi hơi bận một chút, chúng ta sẽ trò chuyện tiếp vào giờ này ngày mai nhé, đã hẹn rồi đó! Mai gặp lại nha, tạm biệt!"
     await send_stt_message(conn, text)
     file_path = "config/assets/max_output_size.wav"
     opus_packets = await audio_to_data(file_path)
@@ -136,12 +136,12 @@ async def check_bind_device(conn: "ConnectionHandler"):
     if conn.bind_code:
         # 确保bind_code是6位数字
         if len(conn.bind_code) != 6:
-            conn.logger.bind(tag=TAG).error(f"无效的绑定码格式: {conn.bind_code}")
-            text = "绑定码格式错误，请检查配置。"
+            conn.logger.bind(tag=TAG).error(f"Invalid binding code format: {conn.bind_code}")
+            text = "Định dạng mã liên kết bị lỗi, vui lòng kiểm tra lại cấu hình."
             await send_stt_message(conn, text)
             return
 
-        text = f"请登录控制面板，输入{conn.bind_code}，绑定设备。"
+        text = f"Vui lòng đăng nhập vào trang quản lý, nhập mã {conn.bind_code} để liên kết thiết bị."
         await send_stt_message(conn, text)
 
         # 播放提示音
@@ -157,13 +157,13 @@ async def check_bind_device(conn: "ConnectionHandler"):
                 num_packets = await audio_to_data(num_path)
                 conn.tts.tts_audio_queue.put((SentenceType.MIDDLE, num_packets, None))
             except Exception as e:
-                conn.logger.bind(tag=TAG).error(f"播放数字音频失败: {e}")
+                conn.logger.bind(tag=TAG).error(f"Failed to play numeric audio: {e}")
                 continue
         conn.tts.tts_audio_queue.put((SentenceType.LAST, [], None))
     else:
         # 播放未绑定提示
         conn.client_abort = False
-        text = f"没有找到该设备的版本信息，请正确配置 OTA地址，然后重新编译固件。"
+        text = f"Không tìm thấy thông tin phiên bản của thiết bị, vui lòng cấu hình đúng địa chỉ OTA và biên dịch lại firmware."
         await send_stt_message(conn, text)
         music_path = "config/assets/bind_not_found.wav"
         opus_packets = await audio_to_data(music_path)

@@ -20,15 +20,15 @@ TAG = __name__
 WAKEUP_CONFIG = {
     "refresh_time": 10,
     "responses": [
-        "我一直都在呢，您请说。",
-        "在的呢，请随时吩咐我。",
-        "来啦来啦，请告诉我吧。",
-        "您请说，我正听着。",
-        "请您讲话，我准备好了。",
-        "请您说出指令吧。",
-        "我认真听着呢，请讲。",
-        "请问您需要什么帮助？",
-        "我在这里，等候您的指令。",
+        "Tôi luôn ở đây, bạn nói đi ạ.",
+        "Có mặt đây ạ, bạn cứ dặn dò nhé.",
+        "Đến đây đến đây, bạn nói cho tôi biết đi.",
+        "Bạn nói đi, tôi đang nghe đây ạ.",
+        "Bạn cứ nói đi, tôi đã chuẩn bị sẵn sàng rồi.",
+        "Mời bạn đưa ra chỉ dẫn ạ.",
+        "Tôi đang chăm chú lắng nghe đây, bạn nói đi.",
+        "Tôi có thể giúp gì được cho bạn ạ?",
+        "Tôi ở đây, đợi chỉ dẫn từ bạn.",
     ],
 }
 
@@ -44,15 +44,15 @@ async def handleHelloMessage(conn: "ConnectionHandler", msg_json):
     audio_params = msg_json.get("audio_params")
     if audio_params:
         format = audio_params.get("format")
-        conn.logger.bind(tag=TAG).debug(f"客户端音频格式: {format}")
+        conn.logger.bind(tag=TAG).debug(f"Client audio format: {format}")
         conn.audio_format = format
         conn.welcome_msg["audio_params"] = audio_params
     features = msg_json.get("features")
     if features:
-        conn.logger.bind(tag=TAG).debug(f"客户端特性: {features}")
+        conn.logger.bind(tag=TAG).debug(f"Client features: {features}")
         conn.features = features
         if features.get("mcp"):
-            conn.logger.bind(tag=TAG).debug("客户端支持MCP")
+            conn.logger.bind(tag=TAG).debug("Client supports MCP")
             conn.mcp_client = MCPClient()
             # 发送初始化
             asyncio.create_task(send_mcp_initialize_message(conn))
@@ -96,7 +96,7 @@ async def checkWakeupWords(conn: "ConnectionHandler", text):
             "voice": "default",
             "file_path": "config/assets/wakeup_words_short.wav",
             "time": 0,
-            "text": "我在这里哦！",
+            "text": "Tôi ở đây nè!",
         }
 
     # 获取音频数据
@@ -107,7 +107,7 @@ async def checkWakeupWords(conn: "ConnectionHandler", text):
     # 将唤醒词回复视为新会话，生成新的 sentence_id，确保流控器重置
     conn.sentence_id = str(uuid.uuid4().hex)
 
-    conn.logger.bind(tag=TAG).info(f"播放唤醒词回复: {response.get('text')}")
+    conn.logger.bind(tag=TAG).info(f"Playing wakeup response: {response.get('text')}")
     await sendAudioMessage(conn, SentenceType.FIRST, opus_packets, response.get("text"))
     await sendAudioMessage(conn, SentenceType.LAST, [], None)
 

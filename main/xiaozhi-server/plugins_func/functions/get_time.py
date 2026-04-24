@@ -7,21 +7,21 @@ get_lunar_function_desc = {
     "function": {
         "name": "get_lunar",
         "description": (
-            "用于具体日期的阴历/农历和黄历信息。"
-            "用户可以指定查询内容，如：阴历日期、天干地支、节气、生肖、星座、八字、宜忌等。"
-            "如果没有指定查询内容，则默认查询干支年和农历日期。"
-            "对于'今天农历是多少'、'今天农历日期'这样的基本查询，请直接使用context中的信息，不要调用此工具。"
+            "Dùng để lấy thông tin âm lịch và hoàng đạo cho một ngày cụ thể."
+            "Người dùng có thể chỉ định nội dung truy vấn, như: ngày âm lịch, thiên can địa chi, tiết khí, con giáp, cung hoàng đạo, bát tự, giờ hoàng đạo, v.v."
+            "Nếu không chỉ định nội dung truy vấn, mặc định sẽ truy vấn can chi năm và ngày âm lịch."
+            "Đối với các câu hỏi cơ bản như 'hôm nay là ngày bao nhiêu âm', 'ngày âm hôm nay', vui lòng sử dụng thông tin trong ngữ cảnh, đừng gọi công cụ này."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "date": {
                     "type": "string",
-                    "description": "要查询的日期，格式为YYYY-MM-DD，例如2024-01-01。如果不提供，则使用当前日期",
+                    "description": "Ngày cần truy vấn, định dạng YYYY-MM-DD, ví dụ: 2024-01-01. Nếu không cung cấp, mặc định dùng ngày hiện tại",
                 },
                 "query": {
                     "type": "string",
-                    "description": "要查询的内容，例如阴历日期、天干地支、节日、节气、生肖、星座、八字、宜忌等",
+                    "description": "Nội dung cần truy vấn, ví dụ: ngày âm lịch, thiên can địa chi, ngày lễ, tiết khí, con giáp, cung hoàng đạo, bát tự, v.v.",
                 },
             },
             "required": [],
@@ -44,7 +44,7 @@ def get_lunar(date=None, query=None):
         except ValueError:
             return ActionResponse(
                 Action.REQLLM,
-                f"日期格式错误，请使用YYYY-MM-DD格式，例如：2024-01-01",
+                f"Định dạng ngày sai, vui lòng sử dụng YYYY-MM-DD, ví dụ: 2024-01-01",
                 None,
             )
     else:
@@ -54,29 +54,29 @@ def get_lunar(date=None, query=None):
 
     # 如果 query 为 None，则使用默认文本
     if query is None:
-        query = "默认查询干支年和农历日期"
+        query = "Truy vấn can chi năm và ngày âm lịch mặc định"
 
-    # 尝试从缓存获取农历信息
+    # Thử lấy thông tin âm lịch từ bộ nhớ đệm
     lunar_cache_key = f"lunar_info_{current_date}"
     cached_lunar_info = cache_manager.get(CacheType.LUNAR, lunar_cache_key)
     if cached_lunar_info:
         return ActionResponse(Action.REQLLM, cached_lunar_info, None)
 
-    response_text = f"根据以下信息回应用户的查询请求，并提供与{query}相关的信息：\n"
+    response_text = f"Dựa trên thông tin sau để trả lời yêu cầu của người dùng, và cung cấp thông tin liên quan đến {query}：\n"
 
     lunar = cnlunar.Lunar(now, godType="8char")
     response_text += (
-        "农历信息：\n"
-        "%s年%s%s\n" % (lunar.lunarYearCn, lunar.lunarMonthCn[:-1], lunar.lunarDayCn)
-        + "干支: %s年 %s月 %s日\n" % (lunar.year8Char, lunar.month8Char, lunar.day8Char)
-        + "生肖: 属%s\n" % (lunar.chineseYearZodiac)
-        + "八字: %s\n"
+        "Thông tin âm lịch：\n"
+        "Năm %s Tháng %s Ngày %s\n" % (lunar.lunarYearCn, lunar.lunarMonthCn[:-1], lunar.lunarDayCn)
+        + "Can chi: Năm %s Tháng %s Ngày %s\n" % (lunar.year8Char, lunar.month8Char, lunar.day8Char)
+        + "Con giáp: Tuổi %s\n" % (lunar.chineseYearZodiac)
+        + "Bát tự: %s\n"
         % (
             " ".join(
                 [lunar.year8Char, lunar.month8Char, lunar.day8Char, lunar.twohour8Char]
             )
         )
-        + "今日节日: %s\n"
+        + "Lễ hội hôm nay: %s\n"
         % (
             ",".join(
                 filter(
@@ -89,36 +89,36 @@ def get_lunar(date=None, query=None):
                 )
             )
         )
-        + "今日节气: %s\n" % (lunar.todaySolarTerms)
-        + "下一节气: %s %s年%s月%s日\n"
+        + "Tiết khí hôm nay: %s\n" % (lunar.todaySolarTerms)
+        + "Tiết khí tiếp theo: %s Năm %s Tháng %s Ngày %s\n"
         % (
             lunar.nextSolarTerm,
             lunar.nextSolarTermYear,
             lunar.nextSolarTermDate[0],
             lunar.nextSolarTermDate[1],
         )
-        + "今年节气表: %s\n"
+        + "Bảng tiết khí năm nay: %s\n"
         % (
             ", ".join(
                 [
-                    f"{term}({date[0]}月{date[1]}日)"
+                    f"{term}(Tháng {date[0]} Ngày {date[1]})"
                     for term, date in lunar.thisYearSolarTermsDic.items()
                 ]
             )
         )
-        + "生肖冲煞: %s\n" % (lunar.chineseZodiacClash)
-        + "星座: %s\n" % (lunar.starZodiac)
-        + "纳音: %s\n" % lunar.get_nayin()
-        + "彭祖百忌: %s\n" % (lunar.get_pengTaboo(delimit=", "))
-        + "值日: %s执位\n" % lunar.get_today12DayOfficer()[0]
-        + "值神: %s(%s)\n"
+        + "Xung sát: %s\n" % (lunar.chineseZodiacClash)
+        + "Cung hoàng đạo: %s\n" % (lunar.starZodiac)
+        + "Nạp âm: %s\n" % lunar.get_nayin()
+        + "Bách kỵ: %s\n" % (lunar.get_pengTaboo(delimit=", "))
+        + "Trực: Trực %s\n" % lunar.get_today12DayOfficer()[0]
+        + "Thần: %s(%s)\n"
         % (lunar.get_today12DayOfficer()[1], lunar.get_today12DayOfficer()[2])
-        + "廿八宿: %s\n" % lunar.get_the28Stars()
-        + "吉神方位: %s\n" % " ".join(lunar.get_luckyGodsDirection())
-        + "今日胎神: %s\n" % lunar.get_fetalGod()
-        + "宜: %s\n" % "、".join(lunar.goodThing[:10])
-        + "忌: %s\n" % "、".join(lunar.badThing[:10])
-        + "(默认返回干支年和农历日期；仅在要求查询宜忌信息时才返回本日宜忌)"
+        + "Nhị thập bát tú: %s\n" % lunar.get_the28Stars()
+        + "Hướng cát thần: %s\n" % " ".join(lunar.get_luckyGodsDirection())
+        + "Thai thần hôm nay: %s\n" % lunar.get_fetalGod()
+        + "Nên làm: %s\n" % "、".join(lunar.goodThing[:10])
+        + "Kiêng kỵ: %s\n" % "、".join(lunar.badThing[:10])
+        + "(Mặc định trả về năm can chi và ngày âm lịch; chỉ khi yêu cầu thông tin nên làm/kiêng kỵ mới trả về chi tiết này)"
     )
 
     # 缓存农历信息

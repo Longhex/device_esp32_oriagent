@@ -9,7 +9,7 @@
         </div>
       </div>
 
-      <el-table ref="deviceTable" :data="paginatedDeviceList" class="transparent-table" v-loading="loading">
+      <el-table ref="deviceTable" :data="paginatedDeviceList" class="transparent-table" v-loading="loading" @selection-change="handleSelectionChange">
         <el-table-column :label="$t('modelConfig.select')" align="center" width="60" type="selection"></el-table-column>
         
         <el-table-column :label="$t('device.model')" prop="model" align="center">
@@ -60,6 +60,7 @@
       <div class="table_bottom">
         <div class="ctrl_btn">
           <el-button type="success" size="mini" @click="$emit('add-device')">{{ $t('device.bindWithCode') }}</el-button>
+          <el-button type="primary" size="mini" @click="$emit('manual-add')">{{ $t('device.manualAdd') }}</el-button>
           <el-button type="danger" size="mini" @click="deleteSelected">{{ $t('device.unbind') }}</el-button>
         </div>
         <el-pagination
@@ -91,7 +92,8 @@ export default {
       currentPage: 1,
       pageSize: 10,
       searchKeyword: "",
-      activeSearchKeyword: ""
+      activeSearchKeyword: "",
+      multipleSelection: []
     };
   },
   computed: {
@@ -131,16 +133,22 @@ export default {
           });
        });
     },
+    handleSelectionChange(val) {
+      this.multipleSelection = val;
+    },
     deleteSelected() {
-      const selected = this.deviceList.filter(d => d.selected);
-      if (selected.length === 0) return this.$message.warning(this.$t('device.selectAtLeastOne'));
-      this.$confirm(this.$t('device.confirmBatchUnbind').replace('{count}', selected.length), 'Warning', { type: 'warning' })
+      if (this.multipleSelection.length === 0) return this.$message.warning(this.$t('device.selectAtLeastOne'));
+      this.$confirm(this.$t('device.confirmBatchUnbind').replace('{count}', this.multipleSelection.length), 'Warning', { type: 'warning' })
       .then(() => {
-         selected.forEach(d => {
-            Api.device.unbindDevice(d.device_id, () => {});
+         const promises = this.multipleSelection.map(d => {
+            return new Promise(resolve => {
+               Api.device.unbindDevice(d.device_id, () => resolve());
+            });
          });
-         this.$message.success('Request sent');
-         setTimeout(() => this.$emit('refresh'), 1000);
+         Promise.all(promises).then(() => {
+            this.$message.success('Success');
+            this.$emit('refresh');
+         });
       });
     }
   }

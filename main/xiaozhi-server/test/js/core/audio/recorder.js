@@ -102,18 +102,18 @@ export class AudioRecorder {
                         this.processPCMBuffer(event.data.buffer);
                     }
                 };
-                log('使用AudioWorklet处理音频', 'success');
+                log('Sử dụng AudioWorklet để xử lý âm thanh', 'success');
                 const silent = this.audioContext.createGain();
                 silent.gain.value = 0;
                 audioProcessor.connect(silent);
                 silent.connect(this.audioContext.destination);
                 return { node: audioProcessor, type: 'worklet' };
             } else {
-                log('AudioWorklet不可用，使用ScriptProcessorNode作为后备方案', 'warning');
+                log('AudioWorklet không khả dụng, sử dụng ScriptProcessorNode làm phương án dự phòng', 'warning');
                 return this.createScriptProcessor();
             }
         } catch (error) {
-            log(`创建音频处理器失败: ${error.message}，尝试后备方案`, 'error');
+            log(`Khởi tạo bộ xử lý âm thanh thất bại: ${error.message}, đang thử phương án dự phòng`, 'error');
             return this.createScriptProcessor();
         }
     }
@@ -136,10 +136,10 @@ export class AudioRecorder {
             silent.gain.value = 0;
             scriptProcessor.connect(silent);
             silent.connect(this.audioContext.destination);
-            log('使用ScriptProcessorNode作为后备方案成功', 'warning');
+            log('Sử dụng ScriptProcessorNode làm phương án dự phòng thành công', 'warning');
             return { node: scriptProcessor, type: 'processor' };
         } catch (fallbackError) {
-            log(`后备方案也失败: ${fallbackError.message}`, 'error');
+            log(`Phương án dự phòng cũng thất bại: ${fallbackError.message}`, 'error');
             return null;
         }
     }
@@ -162,7 +162,7 @@ export class AudioRecorder {
     // Encode and send Opus data
     encodeAndSendOpus(pcmData = null) {
         if (!this.opusEncoder) {
-            log('Opus编码器未初始化', 'error');
+            log('Bộ mã hóa Opus chưa được khởi tạo', 'error');
             return;
         }
         try {
@@ -175,7 +175,7 @@ export class AudioRecorder {
                         try {
                             this.websocket.send(opusData.buffer);
                         } catch (error) {
-                            log(`WebSocket发送错误: ${error.message}`, 'error');
+                            log(`Lỗi gửi WebSocket: ${error.message}`, 'error');
                         }
                     }
                 } else {
@@ -195,7 +195,7 @@ export class AudioRecorder {
                 }
             }
         } catch (error) {
-            log(`Opus编码错误: ${error.message}`, 'error');
+            log(`Lỗi mã hóa Opus: ${error.message}`, 'error');
         }
     }
 
@@ -211,7 +211,7 @@ export class AudioRecorder {
                 const abortMessage = { session_id: wsHandler.currentSessionId, type: 'abort', reason: 'wake_word_detected' };
                 if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
                     this.websocket.send(JSON.stringify(abortMessage));
-                    log('已发送中止消息', 'info');
+                    log('Đã gửi tin nhắn hủy bỏ', 'info');
                 }
             }
             if (!this.initEncoder()) {
@@ -226,7 +226,7 @@ export class AudioRecorder {
             }
             const processorResult = await this.createAudioProcessor();
             if (!processorResult) {
-                log('无法创建音频处理器', 'error');
+                log('Không thể tạo bộ xử lý âm thanh', 'error');
                 return false;
             }
             this.audioProcessor = processorResult.node;
@@ -245,9 +245,9 @@ export class AudioRecorder {
             }
             // Send listening start message
             if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-                log(`已发送录音开始消息`, 'info');
+                log(`Đã gửi tin nhắn bắt đầu ghi âm`, 'info');
             } else {
-                log('WebSocket未连接，无法发送开始消息', 'error');
+                log('WebSocket chưa kết nối, không thể gửi tin nhắn bắt đầu', 'error');
                 return false;
             }
             // Start visualization
@@ -267,10 +267,10 @@ export class AudioRecorder {
                     this.onRecordingStart(recordingSeconds);
                 }
             }, 100);
-            log('已开始PCM直接录音', 'success');
+            log('Đã bắt đầu ghi âm PCM trực tiếp', 'success');
             return true;
         } catch (error) {
-            log(`直接录音启动错误: ${error.message}`, 'error');
+            log(`Lỗi khởi động ghi âm trực tiếp: ${error.message}`, 'error');
             this.isRecording = false;
             return false;
         }
@@ -319,15 +319,15 @@ export class AudioRecorder {
             if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
                 const emptyOpusFrame = new Uint8Array(0);
                 this.websocket.send(emptyOpusFrame);
-                log('已发送录音停止信号', 'info');
+                log('Đã gửi tín hiệu dừng ghi âm', 'info');
             }
             if (this.onRecordingStop) {
                 this.onRecordingStop();
             }
-            log('已停止PCM直接录音', 'success');
+            log('Đã dừng ghi âm PCM trực tiếp', 'success');
             return true;
         } catch (error) {
-            log(`直接录音停止错误: ${error.message}`, 'error');
+            log(`Lỗi dừng ghi âm trực tiếp: ${error.message}`, 'error');
             return false;
         }
     }
@@ -355,7 +355,7 @@ export function getAudioRecorder() {
 export async function checkMicrophoneAvailability() {
     // Check if browser supports getUserMedia API
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        log('浏览器不支持getUserMedia API', 'warning');
+        log('Trình duyệt không hỗ trợ getUserMedia API', 'warning');
         return false;
     }
     try {
@@ -363,10 +363,10 @@ export async function checkMicrophoneAvailability() {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000, channelCount: 1 } });
         // Immediately stop all tracks to release microphone
         stream.getTracks().forEach(track => track.stop());
-        log('麦克风可用性检查成功', 'success');
+        log('Kiểm tra tính khả dụng của micro thành công', 'success');
         return true;
     } catch (error) {
-        log(`麦克风不可用: ${error.message}`, 'warning');
+        log(`Micro không khả dụng: ${error.message}`, 'warning');
         return false;
     }
 }

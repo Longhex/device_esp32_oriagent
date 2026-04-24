@@ -78,12 +78,12 @@ async def main():
     read_config_from_api = config.get("read_config_from_api", False)
     port = int(config["server"].get("http_port", 8003))
     logger.bind(tag=TAG).info(
-        "OTA接口是\t\thttp://{}:{}/xiaozhi/ota/",
+        "OTA Interface:\t\thttp://{}:{}/xiaozhi/ota/",
         get_local_ip(),
         port,
     )
     logger.bind(tag=TAG).info(
-        "视觉分析接口是\thttp://{}:{}/mcp/vision/explain",
+        "Vision API:\thttp://{}:{}/mcp/vision/explain",
         get_local_ip(),
         port,
     )
@@ -91,13 +91,13 @@ async def main():
     if mcp_endpoint is not None and "你" not in mcp_endpoint:
         # 校验MCP接入点格式
         if validate_mcp_endpoint(mcp_endpoint):
-            logger.bind(tag=TAG).info("mcp接入点是\t{}", mcp_endpoint)
+            logger.bind(tag=TAG).info("MCP Endpoint:\t{}", mcp_endpoint)
             # 将mcp计入点地址转成调用点
             mcp_endpoint = mcp_endpoint.replace("/mcp/", "/call/")
             config["mcp_endpoint"] = mcp_endpoint
         else:
-            logger.bind(tag=TAG).error("mcp接入点不符合规范")
-            config["mcp_endpoint"] = "你的接入点 websocket地址"
+            logger.bind(tag=TAG).error("MCP endpoint format is invalid")
+            config["mcp_endpoint"] = "Your websocket address"
 
     # 获取WebSocket配置，使用安全的默认值
     websocket_port = 8000
@@ -106,16 +106,16 @@ async def main():
         websocket_port = int(server_config.get("port", 8000))
 
     logger.bind(tag=TAG).info(
-        "Websocket地址是\tws://{}:{}/xiaozhi/v1/",
+        "Websocket Address:\tws://{}:{}/xiaozhi/v1/",
         get_local_ip(),
         websocket_port,
     )
 
     logger.bind(tag=TAG).info(
-        "=======上面的地址是websocket协议地址，请勿用浏览器访问======="
+        "======= Above is the websocket address, do not visit with a browser ======="
     )
     logger.bind(tag=TAG).info(
-        "如想测试websocket请用谷歌浏览器打开test目录下的test_page.html"
+        "To test websocket, please open test/test_page.html in Chrome"
     )
     logger.bind(tag=TAG).info(
         "=============================================================\n"
@@ -124,7 +124,7 @@ async def main():
     try:
         await wait_for_exit()  # 阻塞直到收到退出信号
     except asyncio.CancelledError:
-        print("任务被取消，清理资源中...")
+        print("Task cancelled, cleaning up resources...")
     finally:
         # 停止全局GC管理器
         await gc_manager.stop()
@@ -141,11 +141,11 @@ async def main():
             timeout=3.0,
             return_when=asyncio.ALL_COMPLETED,
         )
-        print("服务器已关闭，程序退出。")
+        print("Server closed, program exiting.")
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("手动中断，程序终止。")
+        print("Manual interrupt, program terminated.")

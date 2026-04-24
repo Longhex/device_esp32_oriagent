@@ -56,7 +56,7 @@ async def check_direct_exit(conn: "ConnectionHandler", text):
     cmd_exit = conn.cmd_exit
     for cmd in cmd_exit:
         if text == cmd:
-            conn.logger.bind(tag=TAG).info(f"识别到明确的退出命令: {text}")
+            conn.logger.bind(tag=TAG).info(f"Recognized explicit exit command: {text}")
             await send_stt_message(conn, text)
             await conn.close()
             return True
@@ -66,7 +66,7 @@ async def check_direct_exit(conn: "ConnectionHandler", text):
 async def analyze_intent_with_llm(conn: "ConnectionHandler", text):
     """使用LLM分析用户意图"""
     if not hasattr(conn, "intent") or not conn.intent:
-        conn.logger.bind(tag=TAG).warning("意图识别服务未初始化")
+        conn.logger.bind(tag=TAG).warning("Intent recognition service not initialized")
         return None
 
     # 对话历史记录
@@ -75,7 +75,7 @@ async def analyze_intent_with_llm(conn: "ConnectionHandler", text):
         intent_result = await conn.intent.detect_intent(conn, dialogue.dialogue, text)
         return intent_result
     except Exception as e:
-        conn.logger.bind(tag=TAG).error(f"意图识别失败: {str(e)}")
+        conn.logger.bind(tag=TAG).error(f"Intent recognition failed: {str(e)}")
 
     return None
 
@@ -92,7 +92,7 @@ async def process_intent_result(
         if "function_call" in intent_data:
             # 直接从意图识别获取了function_call
             conn.logger.bind(tag=TAG).debug(
-                f"检测到function_call格式的意图结果: {intent_data['function_call']['name']}"
+                f"Detected function_call format intent result: {intent_data['function_call']['name']}"
             )
             function_name = intent_data["function_call"]["name"]
             if function_name == "continue_chat":
@@ -166,7 +166,7 @@ async def process_intent_result(
                         conn.loop,
                     ).result()
                 except Exception as e:
-                    conn.logger.bind(tag=TAG).error(f"工具调用失败: {e}")
+                    conn.logger.bind(tag=TAG).error(f"Tool call failed: {e}")
                     result = ActionResponse(
                         action=Action.ERROR, result=str(e), response=str(e)
                     )
@@ -207,7 +207,7 @@ async def process_intent_result(
             return True
         return False
     except json.JSONDecodeError as e:
-        conn.logger.bind(tag=TAG).error(f"处理意图结果时出错: {e}")
+        conn.logger.bind(tag=TAG).error(f"Error processing intent result: {e}")
         return False
 
 

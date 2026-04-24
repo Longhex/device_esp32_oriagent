@@ -94,25 +94,25 @@ GET_NEWS_FROM_NEWSNOW_FUNCTION_DESC = {
     "function": {
         "name": "get_news_from_newsnow",
         "description": (
-            "获取最新新闻，随机选择一条新闻进行播报。"
-            f"用户可以选择不同的新闻源，标准的名称是：{example_sources_str}"
-            "例如用户要求百度新闻，其实就是百度热搜。如果没有指定，默认从澎湃新闻获取。"
-            "用户可以要求获取详细内容，此时会获取新闻的详细内容。"
+            "Lấy tin tức mới nhất và chọn ngẫu nhiên một tin để thông báo."
+            f"Người dùng có thể chọn các nguồn tin tức khác nhau, tên tiêu chuẩn là: {example_sources_str}"
+            "Ví dụ nếu người dùng yêu cầu tin tức Baidu, thực chất là Baidu Hot Search. Nếu không chỉ định, mặc định lấy từ The Paper (Bành Phái)."
+            "Người dùng có thể yêu cầu lấy nội dung chi tiết, khi đó sẽ lấy nội dung chi tiết của tin tức."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "source": {
                     "type": "string",
-                    "description": f"新闻源的标准中文名称，例如{example_sources_str}等。可选参数，如果不提供则使用默认新闻源",
+                    "description": f"Tên tiếng Trung tiêu chuẩn của nguồn tin tức, ví dụ {example_sources_str}, v.v. Tham số tùy chọn, nếu không cung cấp sẽ dùng nguồn mặc định",
                 },
                 "detail": {
                     "type": "boolean",
-                    "description": "是否获取详细内容，默认为false。如果为true，则获取上一条新闻的详细内容",
+                    "description": "Có lấy nội dung chi tiết hay không, mặc định là false. Nếu là true, sẽ lấy nội dung chi tiết của tin tức trước đó",
                 },
                 "lang": {
                     "type": "string",
-                    "description": "返回用户使用的语言code，例如zh_CN/zh_HK/en_US/ja_JP等，默认zh_CN",
+                    "description": "Mã ngôn ngữ người dùng, ví dụ: zh_CN/vi_VN/en_US, mặc định vi_VN",
                 },
             },
             "required": ["lang"],
@@ -198,7 +198,7 @@ def get_news_from_newsnow(
             ):
                 return ActionResponse(
                     Action.REQLLM,
-                    "抱歉，没有找到最近查询的新闻，请先获取一条新闻。",
+                    "Rất tiếc, không tìm thấy tin tức đã truy vấn gần đây, vui lòng lấy một tin tức trước.",
                     None,
                 )
 
@@ -209,7 +209,7 @@ def get_news_from_newsnow(
 
             if not url or url == "#":
                 return ActionResponse(
-                    Action.REQLLM, "抱歉，该新闻没有可用的链接获取详细内容。", None
+                    Action.REQLLM, "Rất tiếc, tin tức này không có liên kết khả dụng để lấy nội dung chi tiết.", None
                 )
 
             logger.bind(tag=TAG).debug(
@@ -222,18 +222,18 @@ def get_news_from_newsnow(
             if not detail_content or detail_content == "无法获取详细内容":
                 return ActionResponse(
                     Action.REQLLM,
-                    f"抱歉，无法获取《{title}》的详细内容，可能是链接已失效或网站结构发生变化。",
+                    f"Rất tiếc, không thể lấy nội dung chi tiết của 《{title}》, có thể liên kết đã hết hạn hoặc cấu trúc trang web đã thay đổi.",
                     None,
                 )
 
             # 构建详情报告
             detail_report = (
-                f"根据下列数据，用{lang}回应用户的新闻详情查询请求：\n\n"
-                f"新闻标题: {title}\n"
-                # f"新闻来源: {source_name}\n"
-                f"详细内容: {detail_content}\n\n"
-                f"(请对上述新闻内容进行总结，提取关键信息，以自然、流畅的方式向用户播报，"
-                f"不要提及这是总结，就像是在讲述一个完整的新闻故事)"
+                f"Dựa trên dữ liệu sau, dùng ngôn ngữ {lang} để trả lời yêu cầu truy vấn chi tiết tin tức của người dùng：\n\n"
+                f"Tiêu đề tin tức: {title}\n"
+                # f"Nguồn tin tức: {source_name}\n"
+                f"Nội dung chi tiết: {detail_content}\n\n"
+                f"(Vui lòng tóm tắt nội dung tin tức trên, trích xuất các thông tin chính, thông báo cho người dùng một cách tự nhiên và trôi chảy, "
+                f"đừng đề cập rằng đây là bản tóm tắt, hãy giống như đang kể một câu chuyện tin tức hoàn chỉnh)"
             )
 
             return ActionResponse(Action.REQLLM, detail_report, None)
@@ -264,7 +264,7 @@ def get_news_from_newsnow(
         if not news_items:
             return ActionResponse(
                 Action.REQLLM,
-                f"抱歉，未能从{source}获取到新闻信息，请稍后再试或尝试其他新闻源。",
+                f"Rất tiếc, không thể lấy thông tin tin tức từ {source}, vui lòng thử lại sau hoặc thử nguồn tin tức khác.",
                 None,
             )
 
@@ -282,11 +282,11 @@ def get_news_from_newsnow(
 
         # 构建新闻报告
         news_report = (
-            f"根据下列数据，用{lang}回应用户的新闻查询请求：\n\n"
-            f"新闻标题: {selected_news['title']}\n"
-            # f"新闻来源: {source}\n"
-            f"(请以自然、流畅的方式向用户播报这条新闻标题，"
-            f"提示用户可以要求获取详细内容，此时会获取新闻的详细内容。)"
+            f"Dựa trên dữ liệu sau, dùng ngôn ngữ {lang} để trả lời yêu cầu truy vấn tin tức của người dùng：\n\n"
+            f"Tiêu đề tin tức: {selected_news['title']}\n"
+            # f"Nguồn tin tức: {source}\n"
+            f"(Vui lòng thông báo tiêu đề tin tức này cho người dùng một cách tự nhiên và trôi chảy, "
+            f"nhắc nhở người dùng có thể yêu cầu lấy nội dung chi tiết để biết thêm thông tin.)"
         )
 
         return ActionResponse(Action.REQLLM, news_report, None)
@@ -294,5 +294,5 @@ def get_news_from_newsnow(
     except Exception as e:
         logger.bind(tag=TAG).error(f"获取新闻出错: {e}")
         return ActionResponse(
-            Action.REQLLM, "抱歉，获取新闻时发生错误，请稍后再试。", None
+            Action.REQLLM, "Rất tiếc, đã xảy ra lỗi khi lấy tin tức, vui lòng thử lại sau.", None
         )

@@ -19,27 +19,27 @@ WEB_SEARCH_FUNCTION_DESC = {
     "function": {
         "name": "web_search",
         "description": (
-            "联网搜索实时信息。适合价格、新闻、人物职务、比赛结果、政策变动等需要最新事实的问题。"
-            "当用户的问题包含今天、最新、现在、实时、目前等时间敏感信息时优先使用。"
+            "Tìm kiếm thông tin thời gian thực trực tuyến. Thích hợp cho các câu hỏi cần sự thật mới nhất như giá cả, tin tức, chức vụ nhân vật, kết quả trận đấu, thay đổi chính sách, v.v."
+            "Ưu tiên sử dụng khi câu hỏi của người dùng chứa các thông tin nhạy cảm về thời gian như hôm nay, mới nhất, bây giờ, thời gian thực, hiện tại, v.v."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "要搜索的问题，例如：今日黄金价格、越南胡志明天气、越南国家主席是谁",
+                    "description": "Câu hỏi cần tìm kiếm, ví dụ: Giá vàng hôm nay, thời tiết TP.HCM, Chủ tịch nước Việt Nam là ai",
                 },
                 "count": {
                     "type": "integer",
-                    "description": "搜索结果数量，建议1到5，默认3",
+                    "description": "Số lượng kết quả tìm kiếm, gợi ý từ 1 đến 5, mặc định là 3",
                 },
                 "deep_search": {
                     "type": "boolean",
-                    "description": "是否读取正文并聚合多个来源，默认false。复杂问题可设为true。",
+                    "description": "Có đọc nội dung chi tiết và tổng hợp nhiều nguồn hay không, mặc định là false. Có thể đặt thành true cho các vấn đề phức tạp.",
                 },
                 "lang": {
                     "type": "string",
-                    "description": "用户语言code，例如zh_CN/vi_VN/en_US，默认zh_CN",
+                    "description": "Mã ngôn ngữ người dùng, ví dụ: zh_CN/vi_VN/en_US, mặc định vi_VN",
                 },
             },
             "required": ["query", "lang"],
@@ -76,10 +76,10 @@ def _fetch_page_excerpt(url: str, timeout: float, source_chars: int, proxy_url: 
             node.decompose()
         text = soup.get_text(separator="\n", strip=True)
         if not text:
-            return f"SOURCE: {url}\n[正文为空或无法解析]"
+            return f"SOURCE: {url}\n[Nội dung trống hoặc không thể phân tích]"
         return f"SOURCE: {url}\n{text[:source_chars]}..."
     except Exception as e:
-        return f"SOURCE: {url}\n[读取失败: {str(e)}]"
+        return f"SOURCE: {url}\n[Đọc thất bại: {str(e)}]"
 
 
 @register_function("web_search", WEB_SEARCH_FUNCTION_DESC, ToolType.SYSTEM_CTL)
@@ -88,11 +88,11 @@ def web_search(
     query: str,
     count: int = 3,
     deep_search: bool = False,
-    lang: str = "zh_CN",
+    lang: str = "vi_VN",
 ):
     query = (query or "").strip()
     if not query:
-        return ActionResponse(Action.ERROR, response="搜索关键词不能为空")
+        return ActionResponse(Action.ERROR, response="Từ khóa tìm kiếm không được để trống")
 
     plugin_config = conn.config.get("plugins", {}).get("web_search", {})
     region = plugin_config.get("region", "vn-vi")
@@ -118,21 +118,21 @@ def web_search(
                 )
             )
     except Exception as e:
-        return ActionResponse(Action.ERROR, response=f"联网搜索失败: {e}")
+        return ActionResponse(Action.ERROR, response=f"Tìm kiếm trực tuyến thất bại: {e}")
 
     if not results:
         return ActionResponse(
             Action.REQLLM,
-            f"没有搜索到与“{query}”相关的结果，请提醒用户换一个更具体的关键词再试。",
+            f"Không tìm thấy kết quả liên quan đến “{query}”, vui lòng nhắc người dùng thử lại với một từ khóa cụ thể hơn.",
             None,
         )
 
-    lines = ["### WEB SEARCH REPORT ###", f"query: {query}", f"lang: {lang}"]
+    lines = ["### BÁO CÁO TÌM KIẾM WEB ###", f"query: {query}", f"lang: {lang}"]
     for idx, item in enumerate(results, start=1):
-        lines.append(f"\n[{idx}] {item.get('title', '未知标题')}")
+        lines.append(f"\n[{idx}] {item.get('title', 'Tiêu đề không xác định')}")
         lines.append(f"URL: {item.get('href', '')}")
         if item.get("body"):
-            lines.append(f"摘要: {item.get('body')}")
+            lines.append(f"Tóm tắt: {item.get('body')}")
 
     if deep_search:
         lines.append("\n### DEEP SEARCH SOURCES ###")
@@ -145,11 +145,11 @@ def web_search(
     cache_manager.set(CacheType.INTENT, cache_key, report, namespace="web_search")
 
     prompt = (
-        f"请根据以下联网搜索结果，用{lang}回答用户的问题。\n"
-        f"用户问题：{query}\n\n"
+        f"Vui lòng trả lời câu hỏi của người dùng bằng ngôn ngữ {lang} dựa trên kết quả tìm kiếm trực tuyến sau đây.\n"
+        f"Câu hỏi của người dùng: {query}\n\n"
         f"{report}\n\n"
-        "要求：1. 先给结论；2. 明确说明是联网搜索结果；"
-        "3. 如果结果可能随时间变化，请提醒用户这是当前搜索到的信息；"
-        "4. 如果来源不一致，请指出差异。"
+        "Yêu cầu: 1. Đưa ra kết luận trước; 2. Nêu rõ đây là kết quả tìm kiếm trực tuyến;"
+        "3. Nếu kết quả có thể thay đổi theo thời gian, vui lòng nhắc người dùng đây là thông tin tìm kiếm được tại thời điểm hiện tại;"
+        "4. Nếu các nguồn không nhất quán, vui lòng chỉ ra sự khác biệt."
     )
     return ActionResponse(Action.REQLLM, prompt, None)

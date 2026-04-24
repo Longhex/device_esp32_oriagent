@@ -30,7 +30,7 @@ class App {
 
     // 初始化应用
     async init() {
-        log('正在初始化应用...', 'info');
+        log('Đang khởi tạo ứng dụng...', 'info');
         // 初始化UI控制器
         this.uiController = uiController;
         this.uiController.init();
@@ -53,7 +53,7 @@ class App {
         this.initCamera();
         // 关闭加载loading
         this.setModelLoadingStatus(false);
-        log('应用初始化完成', 'success');
+        log('Khởi tạo ứng dụng hoàn tất', 'success');
     }
 
     // 初始化Live2D
@@ -61,23 +61,23 @@ class App {
         try {
             // 检查Live2DManager是否已加载
             if (typeof window.Live2DManager === 'undefined') {
-                throw new Error('Live2DManager未加载，请检查脚本引入顺序');
+                throw new Error('Live2DManager chưa được tải, vui lòng kiểm tra thứ tự script');
             }
             this.live2dManager = new window.Live2DManager();
             await this.live2dManager.initializeLive2D();
             // 更新UI状态
             const live2dStatus = document.getElementById('live2dStatus');
             if (live2dStatus) {
-                live2dStatus.textContent = '● 已加载';
+                live2dStatus.textContent = '● Đã tải';
                 live2dStatus.className = 'status loaded';
             }
-            log('Live2D初始化完成', 'success');
+            log('Khởi tạo Live2D hoàn tất', 'success');
         } catch (error) {
-            log(`Live2D初始化失败: ${error.message}`, 'error');
+            log(`Khởi tạo Live2D thất bại: ${error.message}`, 'error');
             // 更新UI状态
             const live2dStatus = document.getElementById('live2dStatus');
             if (live2dStatus) {
-                live2dStatus.textContent = '● 加载失败';
+                live2dStatus.textContent = '● Tải thất bại';
                 live2dStatus.className = 'status error';
             }
         }
@@ -106,9 +106,9 @@ class App {
             if (this.uiController) {
                 this.uiController.updateMicrophoneAvailability(isAvailable, isHttp);
             }
-            log(`麦克风可用性检查完成: ${isAvailable ? '可用' : '不可用'}`, isAvailable ? 'success' : 'warning');
+            log(`Kiểm tra micro hoàn tất: ${isAvailable ? 'Khả dụng' : 'Không khả dụng'}`, isAvailable ? 'success' : 'warning');
         } catch (error) {
-            log(`检查麦克风可用性失败: ${error.message}`, 'error');
+            log(`Kiểm tra micro thất bại: ${error.message}`, 'error');
             // 默认设置为不可用
             window.microphoneAvailable = false;
             window.isHttpNonLocalhost = isHttpNonLocalhost();
@@ -121,7 +121,7 @@ class App {
     // 检查摄像头可用性
     checkCameraAvailability() {
         window.cameraAvailable = true;
-        log('摄像头可用性检查完成: 默认已绑定验证码', 'success');
+        log('Kiểm tra camera hoàn tất: Mặc định đã liên kết', 'success');
     }
 
     // 初始化摄像头
@@ -133,7 +133,7 @@ class App {
         const dialBtn = document.getElementById('dialBtn');
 
         if (!cameraContainer || !cameraVideo) {
-            log('摄像头元素未找到，跳过初始化', 'warning');
+            log('Không tìm thấy phần tử camera, bỏ qua khởi tạo', 'warning');
             return Promise.resolve(false);
         }
 
@@ -187,10 +187,10 @@ class App {
             window.startCamera = async () => {
                 try {
                     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                        log('浏览器不支持摄像头API', 'warning');
+                        log('Trình duyệt không hỗ trợ Camera API', 'warning');
                         return false;
                     }
-                    log('正在请求摄像头权限...', 'info');
+                    log('Đang yêu cầu quyền truy cập camera...', 'info');
                     this.cameraStream = await navigator.mediaDevices.getUserMedia({
                         video: { width: 320, height: 240, facingMode: this.currentFacingMode },
                         audio: false
@@ -210,16 +210,16 @@ class App {
                         cameraSwitch.classList.remove('active');
                         window.stopCamera();
                     }
-                    log('摄像头已启动', 'success');
+                    log('Camera đã khởi động', 'success');
                     return true;
                 } catch (error) {
-                    log(`启动摄像头失败: ${error.name} - ${error.message}`, 'error');
+                    log(`Khởi động camera thất bại: ${error.name} - ${error.message}`, 'error');
                     if (error.name === 'NotAllowedError') {
-                        log('摄像头权限被拒绝，请检查浏览器设置', 'warning');
+                        log('Quyền truy cập camera bị từ chối, vui lòng kiểm tra cài đặt trình duyệt', 'warning');
                     } else if (error.name === 'NotFoundError') {
-                        log('未找到摄像头设备', 'warning');
+                        log('Không tìm thấy thiết bị camera', 'warning');
                     } else if (error.name === 'NotReadableError') {
-                        log('摄像头已被其他程序占用', 'warning');
+                        log('Camera đang bị ứng dụng khác sử dụng', 'warning');
                     }
                     return false;
                 }
@@ -230,7 +230,7 @@ class App {
                     this.cameraStream.getTracks().forEach(track => track.stop());
                     this.cameraStream = null;
                     cameraVideo.srcObject = null;
-                    log('摄像头已关闭', 'info');
+                    log('Camera đã đóng', 'info');
                 }
             };
 
@@ -260,16 +260,16 @@ class App {
                 }
             };
 
-            window.takePhoto = (question = '描述一下看到的物品') => {
+            window.takePhoto = (question = 'Mô tả những gì bạn thấy') => {
                 return new Promise(async (resolve) => {
                     const canvas = document.createElement('canvas');
                     const video = cameraVideo;
 
                     if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-                        log('无法拍照：摄像头未就绪', 'warning');
+                        log('Không thể chụp ảnh: Camera chưa sẵn sàng', 'warning');
                         resolve({
                             success: false,
-                            error: '摄像头未就绪，请确保已连接且摄像头已启动'
+                            error: 'Camera chưa sẵn sàng, vui lòng đảm bảo đã kết nối và camera đã bật'
                         });
                         return;
                     }
@@ -280,7 +280,7 @@ class App {
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
                     const photoData = canvas.toDataURL('image/jpeg', 0.8);
-                    log(`拍照成功，图像数据长度: ${photoData.length}`, 'success');
+                    log(`Chụp ảnh thành công, độ dài dữ liệu: ${photoData.length}`, 'success');
 
                     try {
                         const xz_tester_vision = localStorage.getItem('xz_tester_vision');
@@ -290,15 +290,15 @@ class App {
                             try {
                                 visionInfo = JSON.parse(xz_tester_vision);
                             } catch (err) {
-                                throw new Error(`视觉配置解析失败`);
+                                throw new Error(`Phân tích cấu hình thị giác thất bại`);
                             }
 
                             const { url, token } = visionInfo || {};
                             if (!url || !token) {
-                                throw new Error('视觉分析失败：配置缺少接口地址(url)或令牌(token)');
+                                throw new Error('Phân tích thị giác thất bại: Cấu hình thiếu địa chỉ (url) hoặc token');
                             }
 
-                            log(`正在发送图片到视觉分析接口: ${url}`, 'info');
+                            log(`Đang gửi ảnh đến giao diện phân tích thị giác: ${url}`, 'info');
 
                             const deviceId = document.getElementById('deviceMac')?.value || '';
                             const clientId = document.getElementById('clientId')?.value || 'web_test_client';
@@ -318,11 +318,11 @@ class App {
                             });
 
                             if (!response.ok) {
-                                throw new Error(`HTTP error! status: ${response.status}`);
+                                throw new Error(`Lỗi HTTP! Trạng thái: ${response.status}`);
                             }
 
                             const analysisResult = await response.json();
-                            log(`视觉分析完成: ${JSON.stringify(analysisResult).substring(0, 200)}...`, 'success');
+                            log(`Phân tích thị giác hoàn tất: ${JSON.stringify(analysisResult).substring(0, 200)}...`, 'success');
 
                             resolve({
                                 success: true,
@@ -333,10 +333,10 @@ class App {
                                 vision_analysis: analysisResult
                             });
                         } else {
-                            log('未配置视觉分析服务', 'warning');
+                            log('Chưa cấu hình dịch vụ phân tích thị giác', 'warning');
                         }
                     } catch (error) {
-                        log(`视觉分析失败: ${error.message}`, 'error');
+                        log(`Phân tích thị giác thất bại: ${error.message}`, 'error');
                         resolve({
                             success: true,
                             message: question,
@@ -346,14 +346,14 @@ class App {
                             vision_analysis: {
                                 success: false,
                                 error: error.message,
-                                fallback: '无法连接到视觉分析服务'
+                                fallback: 'Không thể kết nối dịch vụ phân tích thị giác'
                             }
                         });
                     }
                 });
             };
 
-            log('摄像头初始化完成', 'success');
+            log('Khởi tạo camera hoàn tất', 'success');
             resolve(true);
         });
     }
