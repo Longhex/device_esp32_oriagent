@@ -207,7 +207,12 @@ $ori-green: #08c45b;
 $ori-light-green: #ecfccb;
 $ori-border: #f1f5f9;
 
-.role-config-section { padding: 0; }
+.role-config-section { 
+  padding: 0; 
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
 
 .card-style {
   background: white !important;
@@ -219,17 +224,20 @@ $ori-border: #f1f5f9;
 .dashboard-layout { 
   display: flex; 
   align-items: stretch;
-  height: 720px;
-  gap: 20px;
+  flex: 1;
+  min-height: 700px;
+  gap: 24px;
   
   @media (max-width: 1200px) { 
     flex-direction: column; 
-    height: auto;
+    min-height: auto;
+    gap: 32px;
   }
 }
 
 .config-panel {
-  flex: 0 0 520px; 
+  flex: 0 0 35%; 
+  min-width: 400px;
   display: flex; 
   flex-direction: column; 
   gap: 40px;
@@ -238,7 +246,9 @@ $ori-border: #f1f5f9;
   
   @media (max-width: 1200px) { 
     flex: none;
-    max-height: 500px;
+    width: 100%;
+    min-width: 0;
+    max-height: none; // Allow it to grow on mobile
   }
 }
 
@@ -370,7 +380,7 @@ $ori-border: #f1f5f9;
 
 /* Preview Panel */
 .preview-panel {
-  flex: 1; 
+  flex: 1; // Takes the remaining 65%
   display: flex; 
   flex-direction: column; 
   gap: 24px;

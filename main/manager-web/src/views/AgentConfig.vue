@@ -313,14 +313,19 @@ export default {
 }
 
 .sections-container { 
-  max-width: 1440px; 
+  max-width: 1800px; // Further increased for even larger screens
   width: 96%; 
   margin: 0 auto; 
-  padding: 24px 0 60px;
+  padding: 16px 0;
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .config-content-view { 
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
 }
 
