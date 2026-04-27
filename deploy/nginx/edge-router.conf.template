@@ -20,7 +20,7 @@ server {
     }
 
     location /xiaozhi/v1/ {
-        set $ws_upstream http://xiaozhi-server:8000;
+        set $ws_upstream http://xiaozhi-esp32-server:8000;
         proxy_pass $ws_upstream;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;
@@ -34,7 +34,7 @@ server {
     }
 
     location /xiaozhi/ota/ {
-        set $http_upstream http://xiaozhi-server:8003;
+        set $http_upstream http://xiaozhi-esp32-server-web:8003;
         proxy_pass $http_upstream;
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -43,7 +43,7 @@ server {
     }
 
     location /mcp/ {
-        set $http_upstream http://xiaozhi-server:8003;
+        set $http_upstream http://xiaozhi-esp32-server:8003;
         proxy_pass $http_upstream;
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -52,7 +52,7 @@ server {
     }
 
     location / {
-        set $web_upstream http://xiaozhi-web:8002;
+        set $web_upstream http://xiaozhi-esp32-server-web:8002;
         proxy_pass $web_upstream;
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;

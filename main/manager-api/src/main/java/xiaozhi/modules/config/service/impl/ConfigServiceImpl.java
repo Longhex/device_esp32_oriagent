@@ -32,6 +32,7 @@ import xiaozhi.modules.agent.service.AgentService;
 import xiaozhi.modules.agent.service.AgentTemplateService;
 import xiaozhi.modules.agent.vo.AgentVoicePrintVO;
 import xiaozhi.modules.config.service.ConfigService;
+import xiaozhi.modules.device.dto.DeviceReportReqDTO;
 import xiaozhi.modules.device.entity.DeviceEntity;
 import xiaozhi.modules.device.service.DeviceService;
 import xiaozhi.modules.model.entity.ModelConfigEntity;
@@ -122,24 +123,19 @@ public class ConfigServiceImpl implements ConfigService {
             return (Map<String, Object>) getConfig(true);
         }
 
-        AgentEntity agent = null;
         // 根据MAC地址查找设备
         DeviceEntity device = deviceService.getDeviceByMacAddress(macAddress);
         if (device == null) {
-            // 尝试作为 Agent ID 查找 (Live Test 模拟场景)
-            agent = agentService.getAgentById(macAddress);
-            if (agent == null) {
-                // 如果还不是Agent ID，则进入原有的注册绑定逻辑
-                String cachedCode = deviceService.geCodeByDeviceId(macAddress);
-                if (StringUtils.isNotBlank(cachedCode)) {
-                    throw new RenException(ErrorCode.OTA_DEVICE_NEED_BIND, cachedCode);
-                }
-                throw new RenException(ErrorCode.OTA_DEVICE_NOT_FOUND);
+            // 如果设备，去redis里看看有没有需要连接的设备
+            String cachedCode = deviceService.geCodeByDeviceId(macAddress);
+            if (StringUtils.isNotBlank(cachedCode)) {
+                throw new RenException(ErrorCode.OTA_DEVICE_NEED_BIND, cachedCode);
             }
-        } else {
-            // 获取智能体信息
-            agent = agentService.getAgentById(device.getAgentId());
+            throw new RenException(ErrorCode.OTA_DEVICE_NOT_FOUND);
         }
+
+        // 获取智能体信息
+        AgentEntity agent = agentService.getAgentById(device.getAgentId());
 
         if (agent == null) {
             throw new RenException(ErrorCode.AGENT_NOT_FOUND);
