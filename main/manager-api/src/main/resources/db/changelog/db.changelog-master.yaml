@@ -615,8 +615,22 @@ databaseChangeLog:
             path: classpath:db/changelog/202604231000.sql
   - changeSet:
       id: 202604231200
-      author: Antigravity
+      author: ngccminh
       changes:
         - sqlFile:
             encoding: utf8
             path: classpath:db/changelog/202604231200.sql
+  - changeSet:
+      id: 202604280920
+      author: ngccminh
+      changes:
+        - sqlFile:
+            encoding: utf8
+            path: classpath:db/changelog/202604280920.sql
+  - changeSet:
+      id: 202604281430
+      author: Antigravity
+      changes:
+        - sqlFile:
+            encoding: utf8
+            path: classpath:db/changelog/202604281430.sql
