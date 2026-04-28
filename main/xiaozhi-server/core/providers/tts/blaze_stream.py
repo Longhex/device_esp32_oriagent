@@ -166,6 +166,7 @@ class TTSProvider(TTSProviderBase):
                         asyncio.run_coroutine_threadsafe(
                             self.text_to_speak(remaining, None), self.conn.loop
                         ).result(timeout=20)
+                    self.tts_audio_queue.put((SentenceType.LAST, [], message.content_detail))
 
             except queue.Empty: continue
             except Exception as e:
