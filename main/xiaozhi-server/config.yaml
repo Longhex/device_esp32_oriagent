@@ -53,7 +53,7 @@ log:
 # Delete audio files after use
 delete_audio: true
 # Timeout for disconnecting if no voice input is received (seconds). Default is 2 minutes (120 seconds).
-close_connection_no_voice_time: 120
+close_connection_no_voice_time: 40
 # TTS request timeout (seconds)
 tts_timeout: 10
 # Enable wake word response cache acceleration

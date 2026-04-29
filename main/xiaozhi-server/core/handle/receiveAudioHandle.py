@@ -98,27 +98,7 @@ async def no_voice_close_connect(conn: "ConnectionHandler", have_voice):
     if have_voice:
         conn.last_activity_time = time.time() * 1000
         return
-    # 只有在已经初始化过时间戳的情况下才进行超时检查
-    if conn.last_activity_time > 0.0:
-        no_voice_time = time.time() * 1000 - conn.last_activity_time
-        close_connection_no_voice_time = int(
-            conn.config.get("close_connection_no_voice_time", 120)
-        )
-        if (
-            not conn.close_after_chat
-            and no_voice_time > 1000 * close_connection_no_voice_time
-        ):
-            conn.close_after_chat = True
-            conn.client_abort = False
-            end_prompt = conn.config.get("end_prompt", {})
-            if end_prompt and end_prompt.get("enable", True) is False:
-                conn.logger.bind(tag=TAG).info("Dialogue ended, no need to send end prompt")
-                await conn.close()
-                return
-            prompt = end_prompt.get("prompt")
-            if not prompt:
-                prompt = "Hãy bắt đầu bằng câu ```Thời gian trôi thật nhanh```, sau đó dùng những lời lẽ đầy tình cảm và lưu luyến để kết thúc cuộc trò chuyện này nhé!"
-            await startToChat(conn, prompt)
+    return
 
 
 async def max_out_size(conn: "ConnectionHandler"):

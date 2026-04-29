@@ -1519,31 +1519,52 @@ class ConnectionHandler:
             self.logger.bind(tag=TAG).error(f"Chat and close error: {str(e)}")
 
     async def _check_timeout(self):
-        """检查连接超时"""
+        """检查连接超时（Layer 1: 提示并准备关闭, Layer 2: 强制关闭）"""
         try:
             while not self.stop_event.is_set():
                 last_activity_time = self.last_activity_time
                 if self.need_bind:
                     last_activity_time = self.first_activity_time
 
-                # 检查是否超时（只有在时间戳已初始化的情况下）
                 if last_activity_time > 0.0:
                     current_time = time.time() * 1000
-                    if current_time - last_activity_time > self.timeout_seconds * 1000:
-                        if not self.stop_event.is_set():
-                            self.logger.bind(tag=TAG).info("连接超时，准备关闭")
-                            # 设置停止事件，防止重复处理
-                            self.stop_event.set()
-                            # 使用 try-except 包装关闭操作，确保不会因为异常而阻塞
-                            try:
-                                await self.close(self.websocket)
-                            except Exception as close_error:
-                                self.logger.bind(tag=TAG).error(
-                                    f"超时关闭连接时出错: {close_error}"
-                                )
+                    elapsed_ms = current_time - last_activity_time
+                    
+                    # 获取配置的超时时间
+                    close_connection_no_voice_time = int(self.config.get("close_connection_no_voice_time", 120))
+                    hard_timeout_seconds = close_connection_no_voice_time + 60
+                    
+                    # Layer 1: 触发“下班/再见”提示
+                    if not self.close_after_chat and elapsed_ms > close_connection_no_voice_time * 1000:
+                        self.logger.bind(tag=TAG).info(f"检测到 {close_connection_no_voice_time}s 无活动，准备触发结束语")
+                        self.close_after_chat = True
+                        self.client_abort = False
+                        
+                        end_prompt = self.config.get("end_prompt", {})
+                        if end_prompt and end_prompt.get("enable", True) is False:
+                            self.logger.bind(tag=TAG).info("配置已禁用结束语，直接关闭连接")
+                            await self.close(self.websocket)
+                            break
+                        
+                        prompt = end_prompt.get("prompt")
+                        if not prompt:
+                            prompt = "Kết thúc trò chuyện"
+                        
+                        # 异步提交聊天任务
+                        self.executor.submit(self.chat, prompt)
+                    
+                    # Layer 2: 强制关闭（防止 LLM 挂起或异常）
+                    if elapsed_ms > hard_timeout_seconds * 1000:
+                        self.logger.bind(tag=TAG).info(f"连接超过 {hard_timeout_seconds}s 无活动，强制关闭")
+                        self.stop_event.set()
+                        try:
+                            await self.close(self.websocket)
+                        except Exception as close_error:
+                            self.logger.bind(tag=TAG).error(f"超时关闭连接时出错: {close_error}")
                         break
-                # 每10秒检查一次，避免过于频繁
-                await asyncio.sleep(10)
+
+                # 每 5 秒检查一次，提高响应灵敏度
+                await asyncio.sleep(5)
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"超时检查任务出错: {e}")
         finally:
