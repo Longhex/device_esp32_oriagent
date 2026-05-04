@@ -55,7 +55,7 @@
 
       <!-- History Section -->
       <div v-if="activeTab === 'history'" class="config-content-view">
-        <ChatHistorySection :agent-id="agentId" :agent-name="agentForm.agentName" />
+        <ServerLogsSection />
       </div>
 
       <!-- Device Section -->
@@ -98,7 +98,7 @@ import Api from "@/apis/api";
 import VersionFooter from "@/components/VersionFooter.vue";
 import RoleConfigSection from "@/components/RoleConfigSection.vue";
 import DeviceManagementSection from "@/components/DeviceManagementSection.vue";
-import ChatHistorySection from "@/components/ChatHistorySection.vue";
+import ServerLogsSection from "@/components/ServerLogsSection.vue";
 import FunctionDialog from "@/components/FunctionDialog.vue";
 import ContextProviderDialog from "@/components/ContextProviderDialog.vue";
 import AgentConfigTabs from "@/components/AgentConfigTabs.vue";
@@ -109,7 +109,7 @@ export default {
   name: "AgentConfig",
   components: { 
     VersionFooter, RoleConfigSection, DeviceManagementSection, 
-    ChatHistorySection, FunctionDialog, ContextProviderDialog,
+    ServerLogsSection, FunctionDialog, ContextProviderDialog,
     AgentConfigTabs, AddDeviceDialog, ManualAddDeviceDialog
   },
   data() {

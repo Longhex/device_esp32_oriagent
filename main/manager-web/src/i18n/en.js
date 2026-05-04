@@ -757,7 +757,7 @@ export default {
   'roleConfig.reset': 'Reset',
   'roleConfig.tabSetup': 'Setup',
   'roleConfig.tabOverview': 'Overview',
-  'roleConfig.tabHistory': 'History',
+  'roleConfig.tabHistory': 'Server Logs',
   'roleConfig.tabDevice': 'Device',
   'roleConfig.agentName': 'Nickname',
   'roleConfig.roleTemplate': 'Template',

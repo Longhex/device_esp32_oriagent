@@ -320,12 +320,14 @@ ASR:
     api_key: "your_openai_apikey"
     base_url: https://api.openai.com/v1/audio/transcriptions
     model_name: gpt-4o-mini-transcribe
+    language: "vi"
     output_dir: tmp/
   GroqASR:
     type: openai
     api_key: "your_groq_apikey"
     base_url: https://api.groq.com/openai/v1/audio/transcriptions
     model_name: whisper-large-v3-turbo
+    language: "vi"
     output_dir: tmp/
   VoskASR:
     type: vosk

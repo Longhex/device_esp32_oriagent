@@ -165,6 +165,38 @@ export default {
                     this.sendWsServerAction(data, callback)
                 })
             }).send();
+    },
+    // 获取容器列表
+    getContainers(callback) {
+        RequestService.sendRequest()
+            .url(`${getServiceUrl()}/admin/server/containers`)
+            .method('GET')
+            .success((res) => {
+                RequestService.clearRequestTime()
+                callback(res)
+            })
+            .networkFail((err) => {
+                console.error('获取容器列表失败:', err)
+                RequestService.reAjaxFun(() => {
+                    this.getContainers(callback)
+                })
+            }).send();
+    },
+    // 获取服务器日志
+    getServerLogs(containerName, callback) {
+        RequestService.sendRequest()
+            .url(`${getServiceUrl()}/admin/server/logs`)
+            .method('GET')
+            .data({ containerName })
+            .success((res) => {
+                RequestService.clearRequestTime()
+                callback(res)
+            })
+            .networkFail((err) => {
+                console.error('获取服务器日志失败:', err)
+                RequestService.reAjaxFun(() => {
+                    this.getServerLogs(containerName, callback)
+                })
+            }).send();
     }
-
-}
+    }

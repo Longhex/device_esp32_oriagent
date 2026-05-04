@@ -12,6 +12,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.socket.WebSocketHttpHeaders;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,6 +71,88 @@ public class ServerSideManageController {
             return new Result<List<String>>().ok(Collections.emptyList());
         }
         return new Result<List<String>>().ok(Arrays.asList(wsText.split(";")));
+    }
+
+    @Operation(summary = "获取正在运行的容器列表")
+    @GetMapping("/containers")
+    @RequiresPermissions("sys:role:superAdmin")
+    public Result<List<String>> getContainers() {
+        try {
+            Process process = Runtime.getRuntime().exec(new String[]{"sh", "-c", "docker ps --format '{{.Names}}'"});
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            List<String> containers = new ArrayList<>();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                containers.add(line);
+            }
+            return new Result<List<String>>().ok(containers);
+        } catch (Exception e) {
+            return new Result<List<String>>().error("Failed to list containers: " + e.getMessage());
+        }
+    }
+
+    @Operation(summary = "获取服务器运行日志")
+    @GetMapping("/logs")
+    @RequiresPermissions("sys:role:superAdmin")
+    public Result<String> getServerLogs(String containerName) {
+        if (StringUtils.isBlank(containerName)) {
+            // Fallback to local API log if no container name provided
+            return readLocalLog();
+        }
+
+        try {
+            // Get last 1000 lines of logs for the specified container
+            String cmd = String.format("docker logs --tail 1000 %s", containerName);
+            Process process = Runtime.getRuntime().exec(new String[]{"sh", "-c", cmd});
+            
+            StringBuilder logs = new StringBuilder();
+            // Read output stream
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    logs.append(line).append("\n");
+                }
+            }
+            // Read error stream as well
+            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                String line;
+                while ((line = errorReader.readLine()) != null) {
+                    logs.append(line).append("\n");
+                }
+            }
+
+            return new Result<String>().ok(logs.toString());
+        } catch (Exception e) {
+            return new Result<String>().error("Failed to read docker logs: " + e.getMessage());
+        }
+    }
+
+    private Result<String> readLocalLog() {
+        String logPath = "logs/xiaozhi-esp32-api.log";
+        File logFile = new File(logPath);
+        if (!logFile.exists()) {
+            return new Result<String>().ok("Local log file not found.");
+        }
+        try {
+            List<String> lastLines = readLastLines(logFile, 1000);
+            return new Result<String>().ok(String.join("\n", lastLines));
+        } catch (IOException e) {
+            return new Result<String>().error("Failed to read local log: " + e.getMessage());
+        }
+    }
+
+    private List<String> readLastLines(File file, int numLines) throws IOException {
+        LinkedList<String> lines = new LinkedList<>();
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                lines.add(line);
+                if (lines.size() > numLines) {
+                    lines.removeFirst();
+                }
+            }
+        }
+        return lines;
     }
 
     @Operation(summary = "通知python服务端更新配置")

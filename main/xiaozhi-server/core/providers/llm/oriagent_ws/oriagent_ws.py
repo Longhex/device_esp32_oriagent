@@ -14,11 +14,21 @@ class LLMProvider(LLMProviderBase):
     is_dify_provider = True  # Flag to distinguish Dify-based providers
 
     def __init__(self, config):
-        # Configure API URL (priority: api_url > url > base_url)
         self.api_url = config.get("api_url") or config.get("url") or config.get("base_url")
         self.api_key = config.get("api_key")
         self.model_name = config.get("model_name", "oriagent-default")
         self.session_conversation_map = {}  # Map session IDs to Oriagent conversation IDs
+        self.client = httpx.Client(timeout=60.0) # Persistent client for connection reuse
+ 
+    def pre_warm(self):
+        """Pre-warm the connection to Oriagent API to reduce handshake latency."""
+        try:
+            logger.bind(tag=TAG).info("Pre-warming Oriagent LLM connection...")
+            # Perform a lightweight HEAD request or just ensure DNS/TCP is ready
+            # Note: We don't want to trigger a real chat, just warm the socket.
+            self.client.options(self.api_url) 
+        except Exception as e:
+            logger.bind(tag=TAG).warning(f"Oriagent pre-warm failed: {e}")
 
     def _mask_token(self, token):
         if not token or len(str(token)) < 10:
@@ -65,48 +75,47 @@ class LLMProvider(LLMProviderBase):
         )
 
         try:
-            with httpx.Client(timeout=60.0) as client:
-                with client.stream("POST", self.api_url, headers=headers, json=request_payload) as r:
-                    if r.status_code != 200:
-                        error_body = r.read()
-                        logger.bind(tag=TAG).error(f"Oriagent API Error (Status {r.status_code}): {error_body.decode()}")
-                        yield f" [HTTP Error {r.status_code}: {error_body.decode()[:100]}] "
-                        return
-
-                    for line in r.iter_lines():
-                        if line.startswith("data: "):
-                            try:
-                                data_str = line[6:]
-                                if data_str == "[DONE]":
-                                    break
-                                    
-                                event = json.loads(data_str)
-                                event_type = event.get("event")
+            with self.client.stream("POST", self.api_url, headers=headers, json=request_payload) as r:
+                if r.status_code != 200:
+                    error_body = r.read()
+                    logger.bind(tag=TAG).error(f"Oriagent API Error (Status {r.status_code}): {error_body.decode()}")
+                    yield f" [HTTP Error {r.status_code}: {error_body.decode()[:100]}] "
+                    return
+ 
+                for line in r.iter_lines():
+                    if line.startswith("data: "):
+                        try:
+                            data_str = line[6:]
+                            if data_str == "[DONE]":
+                                break
                                 
-                                # Enhanced Logging: Log all event types for observability
-                                logger.bind(tag=TAG).debug(f"Oriagent SSE Event: {event_type}")
-
-                                # Persist conversation_id for subsequent turns
-                                if not conversation_id and event.get("conversation_id"):
-                                    conversation_id = event.get("conversation_id")
-                                    self.session_conversation_map[session_id] = conversation_id
-                                    if callable(on_conversation_id):
-                                        on_conversation_id(conversation_id)
-                                
-                                # EVENT WHITELIST: Only yield actual text content (message or agent_message)
-                                # This blocks prompt leakage from agent_thought or other diagnostic events
-                                if event_type in ["message", "agent_message"] and event.get("answer"):
-                                    yield event["answer"]
-                                elif event_type == "message_end":
-                                    logger.bind(tag=TAG).debug(f"Oriagent message end. Total message tokens received.")
-                                    break
-                                elif event_type == "error":
-                                    error_msg = event.get("message", "Unknown Oriagent error")
-                                    logger.bind(tag=TAG).error(f"Oriagent API Internal Error: {error_msg}")
-                                    yield f" [LLM Error: {error_msg}] "
-                                    break
-                            except json.JSONDecodeError:
-                                continue
+                            event = json.loads(data_str)
+                            event_type = event.get("event")
+                            
+                            # Enhanced Logging: Log all event types for observability
+                            logger.bind(tag=TAG).debug(f"Oriagent SSE Event: {event_type}")
+ 
+                            # Persist conversation_id for subsequent turns
+                            if not conversation_id and event.get("conversation_id"):
+                                conversation_id = event.get("conversation_id")
+                                self.session_conversation_map[session_id] = conversation_id
+                                if callable(on_conversation_id):
+                                    on_conversation_id(conversation_id)
+                            
+                            # EVENT WHITELIST: Only yield actual text content (message or agent_message)
+                            # This blocks prompt leakage from agent_thought or other diagnostic events
+                            if event_type in ["message", "agent_message"] and event.get("answer"):
+                                yield event["answer"]
+                            elif event_type == "message_end":
+                                logger.bind(tag=TAG).debug(f"Oriagent message end. Total message tokens received.")
+                                break
+                            elif event_type == "error":
+                                error_msg = event.get("message", "Unknown Oriagent error")
+                                logger.bind(tag=TAG).error(f"Oriagent API Internal Error: {error_msg}")
+                                yield f" [LLM Error: {error_msg}] "
+                                break
+                        except json.JSONDecodeError:
+                            continue
         except Exception as e:
             logger.bind(tag=TAG).error(f"Failed to connect to Oriagent: {str(e)}")
             yield f" [System Error: Connection to Oriagent failed] "
@@ -118,3 +127,7 @@ class LLMProvider(LLMProviderBase):
         """
         for token in self.response(session_id, dialogue, **kwargs):
             yield token, None
+    def close(self):
+        """Clean up resources."""
+        if hasattr(self, "client"):
+            self.client.close()

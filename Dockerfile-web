@@ -20,10 +20,11 @@ FROM bellsoft/liberica-runtime-container:jre-21-glibc
 # 安装Nginx和字体库
 RUN apk update && \
     apk add --no-cache --no-scripts \
-        nginx \
-        bash \
-        fontconfig \
-        ttf-dejavu \
+    nginx \
+    bash \
+    fontconfig \
+    docker-cli \
+    ttf-dejavu \
     && rm -rf /var/cache/apk/* \
     && mkdir -p /run/nginx /var/log/nginx /var/tmp/nginx /etc/nginx/conf.d
 

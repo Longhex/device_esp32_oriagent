@@ -47,6 +47,15 @@ class ListenTextMessageHandler(TextMessageHandler):
         elif msg_json["state"] == "detect":
             conn.client_have_voice = False
             conn.reset_audio_states()
+            
+            # Pre-warm LLM and TTS connections as soon as we detect user is about to speak
+            if hasattr(conn.llm, "pre_warm"):
+                conn.executor.submit(conn.llm.pre_warm)
+            
+            if conn.tts and hasattr(conn.tts, "_pre_connect"):
+                # Use a wrapper to run the async pre_connect in the connection loop
+                asyncio.run_coroutine_threadsafe(conn.tts._pre_connect(), conn.loop)
+ 
             if "text" in msg_json:
                 conn.last_activity_time = time.time() * 1000
                 original_text = msg_json["text"]  # 保留原始文本

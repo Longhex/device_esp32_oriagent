@@ -757,7 +757,7 @@ export default {
   'roleConfig.reset': 'Đặt lại',
   'roleConfig.tabSetup': 'Cấu hình',
   'roleConfig.tabOverview': 'Tổng quan',
-  'roleConfig.tabHistory': 'Lịch sử',
+  'roleConfig.tabHistory': 'Nhật ký hệ thống',
   'roleConfig.tabDevice': 'Thiết bị',
   'roleConfig.agentName': 'Biệt danh',
   'roleConfig.roleTemplate': 'Mẫu',
