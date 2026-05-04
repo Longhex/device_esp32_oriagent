@@ -113,12 +113,18 @@ export default {
       Api.admin.getServerLogs(this.currentContainer, (res) => {
         this.loading = false;
         if (res.data && res.data.code === 0) {
-          this.logs = res.data.data;
+          // Clean ANSI codes for better readability
+          this.logs = this.filterAnsi(res.data.data);
           this.$nextTick(() => {
             this.scrollToBottom();
           });
         }
       });
+    },
+    filterAnsi(text) {
+      if (!text) return "";
+      // Regex to strip ANSI escape codes (color codes)
+      return text.replace(/\u001b\[[0-9;]*m/g, "");
     },
     scrollToBottom() {
       const container = this.$refs.logsContainer;
