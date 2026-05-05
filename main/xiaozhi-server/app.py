@@ -61,6 +61,10 @@ async def main():
     
     config["server"]["auth_key"] = auth_key
 
+    # BẮT MẠCH: In cấu hình Auth thực tế mà Server đang dùng
+    auth_info = config.get("server", {}).get("auth", {})
+    logger.bind(tag=TAG).info(f"=== AUTH CONFIG LOADED: enabled={auth_info.get('enabled')}, allowed_devices={auth_info.get('allowed_devices')} ===")
+
     # 添加 stdin 监控任务
     stdin_task = asyncio.create_task(monitor_stdin())
 
