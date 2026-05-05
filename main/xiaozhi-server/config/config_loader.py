@@ -85,9 +85,12 @@ async def get_config_from_api_async(config):
             "auth_key": local_server_config.get("auth_key", ""),
         }
         
-        # 合并 auth 配置：优先保留 API 的 enabled 状态
+        # 合并 auth 配置：如果本地配置显式关闭了 auth，则以本地为准
         local_auth_config = local_server_config.get("auth", {}) or {}
         api_auth_config = config_data.get("server", {}).get("auth", {}) or {}
+        
+        # 优先使用本地的 enabled 状态（如果本地设为 false，则强制关闭）
+        final_auth_enabled = local_auth_config.get("enabled", auth_enabled)
         
         # 深度合并 allowed_devices
         local_allowed = local_auth_config.get("allowed_devices") or []
@@ -97,7 +100,7 @@ async def get_config_from_api_async(config):
         combined_allowed = list(set(local_allowed + api_allowed))
         
         config_data["server"]["auth"] = {
-            "enabled": auth_enabled,
+            "enabled": final_auth_enabled,
             "allowed_devices": combined_allowed
         }
     # 如果服务器没有prompt_template，则从本地配置读取
