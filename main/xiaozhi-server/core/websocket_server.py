@@ -64,9 +64,13 @@ class WebSocketServer:
         self.auth_enable = auth_config.get("enabled", False)
         # Device whitelist
         self.allowed_devices = set(auth_config.get("allowed_devices", []))
-        secret_key = self.config["server"]["auth_key"]
+        secret_key = self.config["server"].get("auth_key")
+        if not secret_key:
+            secret_key = self.config.get("manager-api", {}).get("secret", "")
+            
         expire_seconds = auth_config.get("expire_seconds", None)
         self.auth = AuthManager(secret_key=secret_key, expire_seconds=expire_seconds)
+        self.logger.bind(tag=TAG).info(f"Auth initialized with secret: {secret_key[:4]}****{secret_key[-4:] if len(secret_key) > 8 else ''}")
 
     async def start(self):
         server_config = self.config["server"]
@@ -109,7 +113,8 @@ class WebSocketServer:
         # Authenticate first, then establish connection
         try:
             await self._handle_auth(websocket)
-        except AuthenticationError:
+        except AuthenticationError as e:
+            self.logger.bind(tag=TAG).error(f"Authentication failed for device {headers.get('device-id')}: {e}")
             await websocket.send("Authentication failed")
             await websocket.close()
             return
