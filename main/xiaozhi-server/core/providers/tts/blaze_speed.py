@@ -24,7 +24,7 @@ logger = setup_logging()
 # - Smart Segments expanded to 25 words to prevent mid-sentence cutting.
 # =============================================================================
 
-INITIAL_BUFFER_BYTES = 38400  # 38.4 KB ≈ 0.8s of audio at 24kHz/16bit/mono
+INITIAL_BUFFER_BYTES = 57600  # 57.6 KB ≈ 1.2s of audio at 24kHz/16bit/mono
 WAV_HEADER_SIZE = 44
 
 
@@ -47,8 +47,8 @@ class TTSProvider(TTSProviderBase):
         self.ws_url = f"wss://{domain}/v1/tts/realtime"
 
         # Parallel Management
-        self.ws_pool = [None, None]
-        self.ws_locks = [asyncio.Lock(), asyncio.Lock()]
+        self.ws_pool = [None, None, None, None]
+        self.ws_locks = [asyncio.Lock(), asyncio.Lock(), asyncio.Lock(), asyncio.Lock()]
         
         self.emoji_pattern = re.compile(r"[\U00010000-\U0010ffff]", flags=re.UNICODE)
 
@@ -101,8 +101,10 @@ class TTSProvider(TTSProviderBase):
 
     async def _playback_loop(self):
         """Worker tuần tự lấy Index -> Lấy Audio của Index đó -> Đẩy ra loa"""
-        initial_buffer = bytearray()
-        buffer_flushed = False # Chỉ đệm 0.5s ở câu ĐẦU TIÊN để siêu mượt
+        jitter_buffer = bytearray()
+        first_packet_sent = False
+        # 100ms buffer to prevent crackling (24000 samples/sec * 2 bytes/sample * 0.1 sec = 4800 bytes)
+        CONTINUOUS_JITTER_THRESHOLD = 4800 
         
         while self._playback_active:
             try:
@@ -111,10 +113,10 @@ class TTSProvider(TTSProviderBase):
                 
                 # Tín hiệu kết thúc lượt nói của AI
                 if idx == 'END_OF_SESSION':
-                    if initial_buffer:
-                        self.opus_encoder.encode_pcm_to_opus_stream(bytes(initial_buffer), False, self.handle_opus)
-                        initial_buffer.clear()
-                    buffer_flushed = False
+                    if jitter_buffer:
+                        self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer), False, self.handle_opus)
+                        jitter_buffer.clear()
+                    first_packet_sent = False
                     self.playback_queue.task_done()
                     continue
 
@@ -133,18 +135,29 @@ class TTSProvider(TTSProviderBase):
                     
                     pcm_chunk = await seg_queue.get()
                     if pcm_chunk == b'END_OF_SEGMENT':
+                        # Nếu kết thúc đoạn (segment) mà vẫn chưa gửi được gói đầu tiên (do chưa đủ threshold),
+                        # thì bắt buộc phải gửi ngay để tránh lag cho các câu ngắn.
+                        if not first_packet_sent and jitter_buffer:
+                            self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer), False, self.handle_opus)
+                            jitter_buffer.clear()
+                            first_packet_sent = True 
                         seg_queue.task_done()
                         break
                     
-                    # 3. Quản lý Jitter Buffer cho câu đầu tiên
-                    if not buffer_flushed:
-                        initial_buffer.extend(pcm_chunk)
-                        if len(initial_buffer) >= INITIAL_BUFFER_BYTES:
-                            self.opus_encoder.encode_pcm_to_opus_stream(bytes(initial_buffer), False, self.handle_opus)
-                            initial_buffer.clear()
-                            buffer_flushed = True
+                    # 3. Quản lý Jitter Buffer
+                    jitter_buffer.extend(pcm_chunk)
+                    
+                    # Cấp độ 1: Đệm lớn cho khởi đầu siêu mượt (0.8s)
+                    if not first_packet_sent:
+                        if len(jitter_buffer) >= INITIAL_BUFFER_BYTES:
+                            self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer), False, self.handle_opus)
+                            jitter_buffer.clear()
+                            first_packet_sent = True
                     else:
-                        self.opus_encoder.encode_pcm_to_opus_stream(pcm_chunk, False, self.handle_opus)
+                        # Cấp độ 2: Luôn giữ đệm 100ms cho các đoạn tiếp theo để chống rè
+                        if len(jitter_buffer) >= CONTINUOUS_JITTER_THRESHOLD:
+                            self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer), False, self.handle_opus)
+                            jitter_buffer.clear()
                     
                     seg_queue.task_done()
 
@@ -171,7 +184,7 @@ class TTSProvider(TTSProviderBase):
     # =========================================================================
     async def _fetch_segment(self, idx, text, is_last=False):
         """Tải Audio từ Blaze và tống vào Hàng đợi riêng của từng Index"""
-        pool_idx = idx % 2
+        pool_idx = idx % 4
         seg_queue = self.segment_queues[idx]
 
         # Tiền xử lý
@@ -196,7 +209,8 @@ class TTSProvider(TTSProviderBase):
             req = {
                 "query": text, "normalization": "basic", "language": "vi",
                 "audio_format": self.audio_format, "audio_quality": self.audio_quality,
-                "audio_speed": self.audio_speed, "speaker_id": self.speaker_id, "model": self.model
+                "audio_speed": self.audio_speed, "speaker_id": self.speaker_id, "model": self.model,
+                "sample_rate": self.sample_rate
             }
             logger.bind(tag=TAG).info(f"Blaze WS[{pool_idx}] FETCHING [Idx:{idx}]: {text[:40]}")
             

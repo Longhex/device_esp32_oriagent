@@ -64,6 +64,8 @@ class WebSocketServer:
         self.auth_enable = auth_config.get("enabled", False)
         # Device whitelist
         self.allowed_devices = set(auth_config.get("allowed_devices", []))
+        self.allowed_devices.add("browser_test") # Vé ưu tiên cho trình duyệt test
+
         secret_key = self.config["server"].get("auth_key")
         if not secret_key:
             secret_key = self.config.get("manager-api", {}).get("secret", "")
