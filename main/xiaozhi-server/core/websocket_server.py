@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import json
 
 import websockets
 from config.logger import setup_logging
@@ -79,8 +80,12 @@ class WebSocketServer:
             await asyncio.Future()
 
     async def _handle_connection(self, websocket: websockets.ServerConnection):
+        """Handle new connections, creating a separate ConnectionHandler each time"""
         headers = dict(websocket.request.headers)
-        if headers.get("device-id", None) is None:
+        self.logger.bind(tag=TAG).debug(f"New connection. Headers: {headers}")
+
+        device_id = headers.get("device-id", None)
+        if device_id is None:
             # 尝试从 URL 的查询参数中获取 device-id
             from urllib.parse import parse_qs, urlparse
 
@@ -93,11 +98,17 @@ class WebSocketServer:
             parsed_url = urlparse(request_path)
             query_params = parse_qs(parsed_url.query)
             if "device-id" not in query_params:
-                await websocket.send("Port is working. To test connection, please use test_page.html")
+                # THAY ĐỔI: Gửi JSON thay vì Plain Text
+                error_msg = json.dumps({
+                    "type": "error", 
+                    "message": "Missing device-id. Please use test_page.html or provide device-id header"
+                })
+                await websocket.send(error_msg)
                 await websocket.close()
                 return
             else:
-                websocket.request.headers["device-id"] = query_params["device-id"][0]
+                device_id = query_params["device-id"][0]
+                websocket.request.headers["device-id"] = device_id
             if "client-id" in query_params:
                 websocket.request.headers["client-id"] = query_params["client-id"][0]
             if "authorization" in query_params:
@@ -105,12 +116,17 @@ class WebSocketServer:
                     "authorization"
                 ][0]
 
-        """Handle new connections, creating a separate ConnectionHandler each time"""
         # Authenticate first, then establish connection
+        headers = dict(websocket.request.headers)
+        device_id = headers.get("device-id", "unknown")
+        client_id = headers.get("client-id", "unknown")
+        
         try:
             await self._handle_auth(websocket)
-        except AuthenticationError:
-            await websocket.send("Authentication failed")
+        except AuthenticationError as e:
+            self.logger.bind(tag=TAG).error(f"Auth failed for device {device_id}: {e}")
+            # Send JSON error to prevent ESP32 "Missing message type" crash
+            await websocket.send(json.dumps({"type": "error", "message": f"Auth failed: {e}"}))
             await websocket.close()
             return
         # Pass the current server instance when creating ConnectionHandler
