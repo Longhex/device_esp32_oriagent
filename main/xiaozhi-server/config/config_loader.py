@@ -69,17 +69,29 @@ async def get_config_from_api_async(config):
         "secret": config["manager-api"].get("secret", ""),
     }
     auth_enabled = config_data.get("server", {}).get("auth", {}).get("enabled", False)
-    # server的配置以本地为准
-    if config.get("server"):
+    # server的配置以本地为准，但保留 API 返回的 auth 状态
+    local_server_config = config.get("server", {})
+    if local_server_config:
+        # 提取 API 返回 bi-direction 的 auth 配置
+        api_auth_config = config_data.get("server", {}).get("auth", {})
+        
+        # 构建新的 server 配置
         config_data["server"] = {
-            "ip": config["server"].get("ip", ""),
-            "port": config["server"].get("port", ""),
-            "http_port": config["server"].get("http_port", ""),
-            "websocket": config["server"].get("websocket", ""),
-            "vision_explain": config["server"].get("vision_explain", ""),
-            "auth_key": config["server"].get("auth_key", ""),
+            "ip": local_server_config.get("ip", ""),
+            "port": local_server_config.get("port", ""),
+            "http_port": local_server_config.get("http_port", ""),
+            "websocket": local_server_config.get("websocket", ""),
+            "vision_explain": local_server_config.get("vision_explain", ""),
+            "auth_key": local_server_config.get("auth_key", ""),
         }
-    config_data["server"]["auth"] = {"enabled": auth_enabled}
+        
+        # 合并 auth 配置：优先保留 API 的 enabled 状态，但保留本地 hoặc API 的 allowed_devices
+        local_auth_config = local_server_config.get("auth", {})
+        combined_auth = api_auth_config.copy()
+        combined_auth.update(local_auth_config)
+        combined_auth["enabled"] = auth_enabled # 强制使用 API 的 enabled 状态
+        
+        config_data["server"]["auth"] = combined_auth
     # 如果服务器没有prompt_template，则从本地配置读取
     if not config_data.get("prompt_template"):
         config_data["prompt_template"] = config.get("prompt_template")
