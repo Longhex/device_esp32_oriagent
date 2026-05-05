@@ -215,6 +215,32 @@ class ConnectionHandler:
         # 初始化提示词管理器
         self.prompt_manager = PromptManager(self.config, self.logger)
 
+        # --- Latency Tracking ---
+        self.latency_stats = {
+            "asr_end": 0,
+            "llm_start": 0,
+            "llm_first_token": 0,
+            "llm_end": 0,
+            "tts_start": 0
+        }
+
+    def _log_latency(self, stage: str, msg: str = ""):
+        """Helper to log latency metrics"""
+        now = time.time()
+        self.latency_stats[stage] = now
+        
+        if stage == "llm_start":
+            self.logger.bind(tag=TAG).info(f"[LATENCY] LLM Request Started")
+        elif stage == "llm_first_token":
+            ttfb = (now - self.latency_stats["llm_start"]) * 1000
+            self.logger.bind(tag=TAG).info(f"[LATENCY] LLM First Token received in {ttfb:.2f}ms")
+        elif stage == "llm_end":
+            total_llm = (now - self.latency_stats["llm_start"]) * 1000
+            self.logger.bind(tag=TAG).info(f"[LATENCY] LLM Response Completed in {total_llm:.2f}ms")
+        elif stage == "tts_start":
+            from_llm_start = (now - self.latency_stats["llm_start"]) * 1000
+            self.logger.bind(tag=TAG).info(f"[LATENCY] TTS Processing Started in {from_llm_start:.2f}ms since LLM start")
+
     def _is_dify_llm(self) -> bool:
         """Check if current LLM is a Dify-based provider (Oriagent)"""
         return getattr(self.llm, "is_dify_provider", False)
@@ -1039,7 +1065,9 @@ class ConnectionHandler:
                         memory_str, self.config.get("voiceprint", {})
                     ),
                 )
-            
+
+
+
             # Log current active conversation ID for debugging
             if self._is_dify_llm() and self.oriagent_conversation_id:
                 self.logger.bind(tag=TAG).debug(f"Using Oriagent Conversation ID: {self.oriagent_conversation_id}")
@@ -1054,6 +1082,8 @@ class ConnectionHandler:
         content_arguments = ""
         self.client_abort = False
         emotion_flag = True
+        first_token_flag = True
+        self._log_latency("llm_start")
         try:
             for response in llm_responses:
                 if self.client_abort:
@@ -1084,8 +1114,15 @@ class ConnectionHandler:
                     emotion_flag = False
 
                 if content is not None and len(content) > 0:
+                    if first_token_flag:
+                        self._log_latency("llm_first_token")
+                        first_token_flag = False
+
                     if not tool_call_flag:
                         response_message.append(content)
+                        if self.latency_stats["tts_start"] == 0:
+                             self._log_latency("tts_start")
+                             
                         self.tts.tts_text_queue.put(
                             TTSMessageDTO(
                                 sentence_id=self.sentence_id,
@@ -1094,6 +1131,8 @@ class ConnectionHandler:
                                 content_detail=content,
                             )
                         )
+            
+            self._log_latency("llm_end")
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"LLM stream processing error: {e}")
             self.tts.tts_text_queue.put(

@@ -57,6 +57,7 @@ class ListenTextMessageHandler(TextMessageHandler):
                 asyncio.run_coroutine_threadsafe(conn.tts._pre_connect(), conn.loop)
  
             if "text" in msg_json:
+                conn.logger.bind(tag=TAG).info(f"[LATENCY] ASR Result received: {msg_json['text']}")
                 conn.last_activity_time = time.time() * 1000
                 original_text = msg_json["text"]  # 保留原始文本
                 filtered_len, filtered_text = remove_punctuation_and_length(
