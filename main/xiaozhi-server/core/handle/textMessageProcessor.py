@@ -25,7 +25,15 @@ class TextMessageProcessor:
                 message_type = msg_json.get("type")
 
                 # 记录日志
-                conn.logger.bind(tag=TAG).info(f"收到{message_type}消息：{message}")
+                try:
+                    from core.utils.util import recursive_json_prettify
+                    pretty_obj = recursive_json_prettify(msg_json)
+                    pretty_msg = json.dumps(pretty_obj, indent=2, ensure_ascii=False)
+                    # Unescape for terminal rendering
+                    pretty_msg = pretty_msg.replace("\\n", "\n").replace('\\"', '"')
+                    conn.logger.bind(tag=TAG).info(f"收到 {message_type} 消息：\n{pretty_msg}")
+                except:
+                    conn.logger.bind(tag=TAG).info(f"收到{message_type}消息：{message}")
 
                 # 获取并执行处理器
                 handler = self.registry.get_handler(message_type)

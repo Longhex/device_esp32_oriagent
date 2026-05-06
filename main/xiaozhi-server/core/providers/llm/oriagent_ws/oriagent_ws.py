@@ -97,6 +97,21 @@ class LLMProvider(LLMProviderBase):
                                 # This blocks prompt leakage from agent_thought or other diagnostic events
                                 if event_type in ["message", "agent_message"] and event.get("answer"):
                                     yield event["answer"]
+                                # CATCH TOOL OUTPUT (Observation from agent_thought)
+                                elif event_type == "agent_thought" and event.get("observation"):
+                                    obs = event["observation"]
+                                    try:
+                                        # Parse and prettify JSON for log readability
+                                        from core.utils.util import recursive_json_prettify
+                                        parsed = json.loads(obs) if isinstance(obs, str) else obs
+                                        pretty_obj = recursive_json_prettify(parsed)
+                                        pretty_json = json.dumps(pretty_obj, indent=2, ensure_ascii=False)
+                                        # Unescape for terminal rendering
+                                        pretty_json = pretty_json.replace("\\n", "\n").replace('\\"', '"')
+                                        logger.bind(tag=TAG).info(f"\n{'='*20} ORIAGENT TOOL OUTPUT {'='*20}\n{pretty_json}\n{'='*62}")
+                                    except:
+                                        logger.bind(tag=TAG).info(f"ORIAGENT TOOL RETURN: {obs}")
+                                    yield obs
                                 elif event_type == "message_end":
                                     logger.bind(tag=TAG).debug(f"Oriagent message end. Total message tokens received.")
                                     break

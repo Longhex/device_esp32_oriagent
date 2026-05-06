@@ -1099,6 +1099,44 @@ class ConnectionHandler:
 
                 if content is not None and len(content) > 0:
                     if not tool_call_flag:
+                        # MCP Interceptor: Check if content contains MCP JSON or UI signal
+                        if '"type": "mcp"' in content or '% self_' in content or '% self.' in content:
+                            self.logger.bind(tag=TAG).info("Detected MCP/UI payload. Intercepting and skipping TTS.")
+                            try:
+                                # Extract inner content if it's a Dify tool wrapper
+                                if content.strip().startswith('{'):
+                                    try:
+                                        data = json.loads(content)
+                                        if isinstance(data, dict) and len(data) == 1:
+                                            content = list(data.values())[0]
+                                    except: pass
+                                
+                                # Send to device via websocket (running in thread, need threadsafe loop call)
+                                async def _forward_mcp(mcp_text):
+                                    if self.websocket:
+                                        for line in mcp_text.split('\n'):
+                                            line = line.strip()
+                                            if not line: continue
+                                            if line.startswith('{'):
+                                                try:
+                                                    mcp_msg = json.loads(line)
+                                                    mcp_msg['session_id'] = self.session_id
+                                                    await self.websocket.send(json.dumps(mcp_msg))
+                                                    self.logger.bind(tag=TAG).info("MCP command sent to device.")
+                                                except: pass
+                                            elif line.startswith('%'):
+                                                # Forward UI signal as stt type for display
+                                                await self.websocket.send(json.dumps({
+                                                    "type": "stt",
+                                                    "text": line,
+                                                    "session_id": self.session_id
+                                                }))
+                                
+                                asyncio.run_coroutine_threadsafe(_forward_mcp(content), self.loop)
+                                continue # Skip TTS push
+                            except Exception as e:
+                                self.logger.bind(tag=TAG).error(f"MCP Interceptor failure: {e}")
+
                         response_message.append(content)
                         self.tts.tts_text_queue.put(
                             TTSMessageDTO(

@@ -62,7 +62,7 @@
         "mockResponse": {
             "success": true,
             "volume": "${volume}",
-            "message": "音量已设置为 ${volume}"
+            "message": "The volume is set to ${volume}"
         }
     },
     {

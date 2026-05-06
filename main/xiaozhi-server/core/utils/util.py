@@ -598,12 +598,39 @@ def validate_mcp_endpoint(mcp_endpoint: str) -> bool:
     return True
 
 def get_system_error_response(config: dict) -> str:
-    """获取系统错误时的回复
+    """Get system error response.
 
     Args:
-        config: 配置字典
-
+        config: Configuration dictionary
     Returns:
-        str: 系统错误时的回复
+        str: Error response text
     """
     return config.get("system_error_response", "主人，小智现在有点忙，我们稍后再试吧。")
+
+def recursive_json_prettify(data):
+    """Recursively prettify JSON strings within data for log output."""
+    if isinstance(data, dict):
+        return {k: recursive_json_prettify(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [recursive_json_prettify(i) for i in data]
+    elif isinstance(data, str):
+        trimmed = data.strip()
+        # Special handling for Oriagent tool output: % signal\nJSON
+        if trimmed.startswith('%') and '\n' in trimmed:
+            parts = trimmed.split('\n', 1)
+            try:
+                inner = json.loads(parts[1])
+                return f"{parts[0]}\n{json.dumps(recursive_json_prettify(inner), indent=2, ensure_ascii=False)}"
+            except:
+                return data
+        
+        # Try to parse pure JSON string
+        if (trimmed.startswith('{') and trimmed.endswith('}')) or (
+            trimmed.startswith('[') and trimmed.endswith(']')
+        ):
+            try:
+                parsed = json.loads(trimmed)
+                return recursive_json_prettify(parsed)
+            except:
+                return data
+    return data
