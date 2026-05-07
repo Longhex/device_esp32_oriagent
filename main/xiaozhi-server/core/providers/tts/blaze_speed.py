@@ -162,10 +162,14 @@ class TTSProvider(TTSProviderBase):
                 self.playback_queue.task_done()
 
             except asyncio.CancelledError:
+                self._playback_active = False
                 break
             except Exception as e:
-                logger.bind(tag=TAG).error(f"Playback Loop Error: {e}")
-                await asyncio.sleep(0.5)
+                if self._playback_active:
+                    logger.bind(tag=TAG).error(f"Playback Loop Error: {e}")
+                    await asyncio.sleep(0.5)
+                else:
+                    break
 
     def _empty_queues(self):
         if self.playback_queue:
@@ -225,6 +229,9 @@ class TTSProvider(TTSProviderBase):
                         data = json.loads(message)
                         if data.get("type") == "finished-byte-stream":
                             break
+            except websockets.exceptions.ConnectionClosed:
+                logger.bind(tag=TAG).debug(f"Blaze WS[{pool_idx}] closed gracefully.")
+                self.ws_pool[pool_idx] = None
             except Exception as e:
                 logger.bind(tag=TAG).error(f"Blaze WS[{pool_idx}] Fetch Error: {e}")
                 self.ws_pool[pool_idx] = None
@@ -338,9 +345,10 @@ class TTSProvider(TTSProviderBase):
 
         future = asyncio.run_coroutine_threadsafe(wait_loop(), self.conn.loop)
         try:
-            future.result(timeout=60)
-        except:
-            logger.bind(tag=TAG).warning("Blaze Speed TTS: Wait loop timeout!")
+            future.result(timeout=10) # Reduced from 60 to 10
+        except Exception:
+            if self._playback_active and not self.conn.stop_event.is_set():
+                logger.bind(tag=TAG).warning("Blaze Speed TTS: Wait loop timeout!")
 
         self.tts_audio_queue.put((SentenceType.LAST, [], content_detail))
 
