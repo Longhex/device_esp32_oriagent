@@ -111,7 +111,13 @@ class LLMProvider(LLMProviderBase):
                                         logger.bind(tag=TAG).info(f"\n{'='*20} ORIAGENT TOOL OUTPUT {'='*20}\n{pretty_json}\n{'='*62}")
                                     except:
                                         logger.bind(tag=TAG).info(f"ORIAGENT TOOL RETURN: {obs}")
-                                    yield obs
+                                    
+                                    # Filter: only yield hardware-related tool results to be processed by interceptor
+                                    obs_str = str(obs).strip()
+                                    if obs_str.startswith('%') or '"type": "mcp"' in obs_str:
+                                        yield obs
+                                    else:
+                                        logger.bind(tag=TAG).debug(f"Skipping internal tool observation: {obs_str[:50]}...")
                                 elif event_type == "message_end":
                                     logger.bind(tag=TAG).debug(f"Oriagent message end. Total message tokens received.")
                                     break
