@@ -1098,10 +1098,15 @@ class ConnectionHandler:
                                                 combined_values.append(json.dumps(val, ensure_ascii=False))
                                         
                                         if combined_values:
-                                            # Replace content with the unwrapped values for subsequent checks
                                             content = "\n".join(combined_values)
                                             trimmed_content = content.strip()
-                                            data = None # Trigger re-check of content
+                                            
+                                            # If after unwrapping we have a hardware command, mark it for forwarding
+                                            if trimmed_content.startswith('%') or '"type": "mcp"' in content:
+                                                is_json_payload = True
+                                                data = None # Prevent redundant processing in the next block
+                                            else:
+                                                data = None # Trigger re-check of content for normal text
                                     
                                     # Forward if it's a recognized Odevice command (either direct or unwrapped)
                                     if isinstance(data, dict) and any(k in data for k in ("type", "method", "payload")):
