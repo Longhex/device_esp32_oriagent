@@ -100,6 +100,18 @@ class MCPClient:
                 self.call_results.pop(id)
 
 
+def is_websocket_closed(websocket) -> bool:
+    """Robust check for websocket connection state"""
+    if not websocket:
+        return True
+    if hasattr(websocket, 'closed'):
+        return websocket.closed
+    if hasattr(websocket, 'open'):
+        return not websocket.open
+    # If we cannot determine state, assume it might be open
+    return False
+
+
 async def send_mcp_message(conn: "ConnectionHandler", payload: dict):
     """Helper to send MCP messages, encapsulating common logic."""
     if not conn.features.get("mcp"):
@@ -109,18 +121,7 @@ async def send_mcp_message(conn: "ConnectionHandler", payload: dict):
     message = json.dumps({"type": "mcp", "payload": payload})
 
     try:
-        # Robust check for websocket connection state
-        is_ws_closed = True
-        if conn.websocket:
-            if hasattr(conn.websocket, 'closed'):
-                is_ws_closed = conn.websocket.closed
-            elif hasattr(conn.websocket, 'open'):
-                is_ws_closed = not conn.websocket.open
-            else:
-                # If we cannot determine state, assume it might be open
-                is_ws_closed = False
-
-        if not conn.websocket or is_ws_closed:
+        if is_websocket_closed(conn.websocket):
             logger.bind(tag=TAG).debug("Connection closed or unavailable, stopping MCP message send")
             return
         await conn.websocket.send(message)
@@ -163,7 +164,7 @@ async def handle_mcp_message(
                 )
 
             await asyncio.sleep(1)
-            if not conn.websocket or conn.websocket.closed:
+            if is_websocket_closed(conn.websocket):
                 logger.bind(tag=TAG).debug("Connection closed, canceling tool list request")
                 return
             logger.bind(tag=TAG).debug("Initialization complete, requesting MCP tool list")

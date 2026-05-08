@@ -1086,7 +1086,24 @@ class ConnectionHandler:
                             if json_str and content.strip().startswith(json_str.strip()):
                                 try:
                                     data = json.loads(json_str)
-                                    # Forward if it's a recognized Odevice command
+                                    
+                                    # ORIAGENT/DIFY UNWRAPPER: If this is a tool result map, extract the values
+                                    if isinstance(data, dict) and not any(k in data for k in ("type", "method", "payload")):
+                                        # It's likely a tool result map like {"tool_name": "result_string"}
+                                        combined_values = []
+                                        for val in data.values():
+                                            if isinstance(val, str):
+                                                combined_values.append(val)
+                                            elif isinstance(val, (dict, list)):
+                                                combined_values.append(json.dumps(val, ensure_ascii=False))
+                                        
+                                        if combined_values:
+                                            # Replace content with the unwrapped values for subsequent checks
+                                            content = "\n".join(combined_values)
+                                            trimmed_content = content.strip()
+                                            data = None # Trigger re-check of content
+                                    
+                                    # Forward if it's a recognized Odevice command (either direct or unwrapped)
                                     if isinstance(data, dict) and any(k in data for k in ("type", "method", "payload")):
                                         async def _forward_mcp(msg_str):
                                             if self.websocket:
@@ -1097,19 +1114,20 @@ class ConnectionHandler:
                                                 except: pass
                                         asyncio.run_coroutine_threadsafe(_forward_mcp(json_str), self.loop)
                                     
-                                    # Separate the JSON from any following text
-                                    remainder = content.replace(json_str, "", 1).strip()
-                                    if not remainder:
-                                        # Whole token was JSON, skip TTS
-                                        continue
-                                    else:
-                                        # Token had text after JSON, process remainder as regular text
-                                        content = remainder
-                                        trimmed_content = content.strip()
+                                    # Separate the JSON from any following text (if we didn't unwrap)
+                                    if data is not None:
+                                        remainder = content.replace(json_str, "", 1).strip()
+                                        if not remainder:
+                                            # Whole token was JSON, skip TTS
+                                            continue
+                                        else:
+                                            # Token had text after JSON, process remainder as regular text
+                                            content = remainder
+                                            trimmed_content = content.strip()
                                 except:
                                     pass # Not valid JSON, process as regular text
                         
-                        # Secondary check for legacy signals or escaped JSON
+                        # Secondary check for legacy signals or escaped JSON (handles unwrapped content too)
                         if '"type": "mcp"' in content or trimmed_content.startswith('%'):
                             is_json_payload = True
 
