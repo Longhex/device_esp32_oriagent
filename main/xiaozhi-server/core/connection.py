@@ -1385,7 +1385,17 @@ class ConnectionHandler:
                         )
                     )
 
-            self.chat(None, depth=depth + 1)
+            if not self._should_skip_recursive_chat():
+                self.chat(None, depth=depth + 1)
+            else:
+                self.logger.bind(tag=TAG).debug("Skipping recursive chat in Oriagent mode to prevent loops.")
+
+    def _should_skip_recursive_chat(self) -> bool:
+        """
+        In Oriagent mode, tool execution results are often handled via text interceptor
+        or internal Dify logic. Avoid double-reporting to prevent loops.
+        """
+        return self._is_dify_llm()
 
     def _report_worker(self):
         """聊天记录上报工作线程"""
