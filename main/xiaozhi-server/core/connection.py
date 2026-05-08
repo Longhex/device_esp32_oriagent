@@ -1104,6 +1104,17 @@ class ConnectionHandler:
                                             # If after unwrapping we have a hardware command, process and skip TTS immediately
                                             if trimmed_content.startswith('%') or '"type": "mcp"' in content:
                                                 self.logger.bind(tag=TAG).info(f"Detected ORIAGENT/DIFY payload (Unwrapped): {trimmed_content[:50]}... Skipping TTS.")
+                                                
+                                                # SPECIAL CASE: Handle Exit Intent locally to disconnect
+                                                if "handle_exit_intent" in trimmed_content:
+                                                    self.logger.bind(tag=TAG).info("Exit intent detected from Oriagent. Scheduling connection close.")
+                                                    async def _delayed_close():
+                                                        await asyncio.sleep(5) # Give some time for the final TTS to play
+                                                        await self.close()
+                                                    asyncio.run_coroutine_threadsafe(_delayed_close(), self.loop)
+                                                    is_json_payload = True
+                                                    continue
+
                                                 # Send to device via websocket for UI/Logic handling
                                                 async def _forward_unwrapped(payload_text):
                                                     if self.websocket:
