@@ -118,8 +118,12 @@ class UnifiedToolHandler:
             self.logger.error(f"初始化Home Assistant失败: {e}")
 
     def get_functions(self) -> List[Dict[str, Any]]:
-        """获取所有工具的函数描述"""
-        return self.tool_manager.get_function_descriptions()
+        """获取所有工具의 函数描述（带缓存）"""
+        if hasattr(self, "_cached_functions") and self._cached_functions:
+            return self._cached_functions
+        
+        self._cached_functions = self.tool_manager.get_function_descriptions()
+        return self._cached_functions
 
     def current_support_functions(self) -> List[str]:
         """获取当前支持的函数名称列表"""
@@ -129,6 +133,7 @@ class UnifiedToolHandler:
 
     def upload_functions_desc(self):
         """刷新函数描述列表"""
+        self._cached_functions = None
         self.tool_manager.refresh_tools()
         self.logger.info("函数描述列表已刷新")
 

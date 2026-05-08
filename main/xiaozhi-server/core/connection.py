@@ -1022,12 +1022,6 @@ class ConnectionHandler:
                 )
             elif self._is_dify_llm():
                 # Oriagent text-only mode
-                available_tools = self.get_available_tool_names()
-                self.logger.bind(tag=TAG).debug(
-                    f"Oriagent mode active. Dynamic tools disabled. "
-                    f"Gateway available={self.has_device_gateway_tools()}. "
-                    f"Available runtime tools: {available_tools}"
-                )
                 llm_responses = self.llm.response(
                     self.session_id,
                     self.dialogue.get_llm_dialogue_with_memory(
@@ -1036,24 +1030,6 @@ class ConnectionHandler:
                     conversation_id=self.oriagent_conversation_id,
                     on_conversation_id=self._on_oriagent_conversation_id,
                 )
-            elif self.intent_type == "function_call" and functions is not None:
-                llm_responses = self.llm.response_with_functions(
-                    self.session_id,
-                    self.dialogue.get_llm_dialogue_with_memory(
-                        memory_str, self.config.get("voiceprint", {})
-                    ),
-                    functions=functions,
-                )
-            else:
-                llm_responses = self.llm.response(
-                    self.session_id,
-                    self.dialogue.get_llm_dialogue_with_memory(
-                        memory_str, self.config.get("voiceprint", {})
-                    ),
-                )
-            
-            # Log current active conversation ID for debugging
-            if self._is_dify_llm() and self.oriagent_conversation_id:
                 self.logger.bind(tag=TAG).debug(f"Using Oriagent Conversation ID: {self.oriagent_conversation_id}")
                 
         except Exception as e:
@@ -1099,43 +1075,73 @@ class ConnectionHandler:
 
                 if content is not None and len(content) > 0:
                     if not tool_call_flag:
-                        # MCP Interceptor: Check if content contains MCP JSON or UI signal
-                        if '"type": "mcp"' in content or '% self_' in content or '% self.' in content:
-                            self.logger.bind(tag=TAG).info("Detected MCP/UI payload. Intercepting and skipping TTS.")
+                        # Improved Interceptor: Catch any JSON tool output or MCP signal to skip TTS
+                        is_json_payload = False
+                        trimmed_content = content.strip()
+                        
+                        # Use robust extraction to handle tokens containing both JSON and Text (common in Dify/Oriagent)
+                        if trimmed_content.startswith('{'):
+                            from core.utils.util import extract_json_from_string
+                            json_str = extract_json_from_string(content)
+                            if json_str and content.strip().startswith(json_str.strip()):
+                                try:
+                                    data = json.loads(json_str)
+                                    # Forward if it's a recognized Odevice command
+                                    if isinstance(data, dict) and any(k in data for k in ("type", "method", "payload")):
+                                        async def _forward_mcp(msg_str):
+                                            if self.websocket:
+                                                try:
+                                                    mcp_msg = json.loads(msg_str)
+                                                    mcp_msg['session_id'] = self.session_id
+                                                    await self.websocket.send(json.dumps(mcp_msg))
+                                                except: pass
+                                        asyncio.run_coroutine_threadsafe(_forward_mcp(json_str), self.loop)
+                                    
+                                    # Separate the JSON from any following text
+                                    remainder = content.replace(json_str, "", 1).strip()
+                                    if not remainder:
+                                        # Whole token was JSON, skip TTS
+                                        continue
+                                    else:
+                                        # Token had text after JSON, process remainder as regular text
+                                        content = remainder
+                                        trimmed_content = content.strip()
+                                except:
+                                    pass # Not valid JSON, process as regular text
+                        
+                        # Secondary check for legacy signals or escaped JSON
+                        if '"type": "mcp"' in content or trimmed_content.startswith('%'):
+                            is_json_payload = True
+
+                        if is_json_payload:
+                            self.logger.bind(tag=TAG).info(f"Detected System/Tool payload: {trimmed_content[:50]}... Skipping TTS.")
                             try:
-                                # Extract inner content if it's a Dify tool wrapper
-                                if content.strip().startswith('{'):
-                                    try:
-                                        data = json.loads(content)
-                                        if isinstance(data, dict) and len(data) == 1:
-                                            content = list(data.values())[0]
-                                    except: pass
-                                
-                                # Send to device via websocket (running in thread, need threadsafe loop call)
-                                async def _forward_mcp(mcp_text):
+                                # Send to device via websocket for UI/Logic handling
+                                async def _forward_system_msg(payload_text):
                                     if self.websocket:
-                                        for line in mcp_text.split('\n'):
+                                        for line in payload_text.split('\n'):
                                             line = line.strip()
                                             if not line: continue
                                             if line.startswith('{'):
                                                 try:
                                                     mcp_msg = json.loads(line)
                                                     mcp_msg['session_id'] = self.session_id
-                                                    await self.websocket.send(json.dumps(mcp_msg))
-                                                    self.logger.bind(tag=TAG).info("MCP command sent to device.")
+                                                    # Double-check: Only forward if it's an actual command
+                                                    is_command = any(k in mcp_msg for k in ("type", "method", "payload"))
+                                                    if is_command:
+                                                        await self.websocket.send(json.dumps(mcp_msg))
                                                 except: pass
                                             elif line.startswith('%'):
-                                                # Forward UI signal as stt type for display
                                                 await self.websocket.send(json.dumps({
                                                     "type": "stt",
                                                     "text": line,
                                                     "session_id": self.session_id
                                                 }))
                                 
-                                asyncio.run_coroutine_threadsafe(_forward_mcp(content), self.loop)
+                                asyncio.run_coroutine_threadsafe(_forward_system_msg(content), self.loop)
                                 continue # Skip TTS push
                             except Exception as e:
-                                self.logger.bind(tag=TAG).error(f"MCP Interceptor failure: {e}")
+                                self.logger.bind(tag=TAG).error(f"System Interceptor failure: {e}")
 
                         response_message.append(content)
                         self.tts.tts_text_queue.put(

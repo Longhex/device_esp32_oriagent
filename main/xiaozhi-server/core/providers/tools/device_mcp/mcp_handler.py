@@ -109,8 +109,19 @@ async def send_mcp_message(conn: "ConnectionHandler", payload: dict):
     message = json.dumps({"type": "mcp", "payload": payload})
 
     try:
-        if not conn.websocket or conn.websocket.closed:
-            logger.bind(tag=TAG).debug("Connection closed, stopping MCP message send")
+        # Robust check for websocket connection state
+        is_ws_closed = True
+        if conn.websocket:
+            if hasattr(conn.websocket, 'closed'):
+                is_ws_closed = conn.websocket.closed
+            elif hasattr(conn.websocket, 'open'):
+                is_ws_closed = not conn.websocket.open
+            else:
+                # If we cannot determine state, assume it might be open
+                is_ws_closed = False
+
+        if not conn.websocket or is_ws_closed:
+            logger.bind(tag=TAG).debug("Connection closed or unavailable, stopping MCP message send")
             return
         await conn.websocket.send(message)
         logger.bind(tag=TAG).debug(f"Successfully sent MCP message: {message}")
