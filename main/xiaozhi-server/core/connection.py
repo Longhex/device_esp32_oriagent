@@ -1101,12 +1101,34 @@ class ConnectionHandler:
                                             content = "\n".join(combined_values)
                                             trimmed_content = content.strip()
                                             
-                                            # If after unwrapping we have a hardware command, mark it for forwarding
+                                            # If after unwrapping we have a hardware command, process and skip TTS immediately
                                             if trimmed_content.startswith('%') or '"type": "mcp"' in content:
-                                                is_json_payload = True
-                                                data = None # Prevent redundant processing in the next block
-                                            else:
-                                                data = None # Trigger re-check of content for normal text
+                                                self.logger.bind(tag=TAG).info(f"Detected ORIAGENT/DIFY payload (Unwrapped): {trimmed_content[:50]}... Skipping TTS.")
+                                                # Send to device via websocket for UI/Logic handling
+                                                async def _forward_unwrapped(payload_text):
+                                                    if self.websocket:
+                                                        for line in payload_text.split('\n'):
+                                                            line = line.strip()
+                                                            if not line: continue
+                                                            if line.startswith('{'):
+                                                                try:
+                                                                    mcp_msg = json.loads(line)
+                                                                    mcp_msg['session_id'] = self.session_id
+                                                                    if any(k in mcp_msg for k in ("type", "method", "payload")):
+                                                                        await self.websocket.send(json.dumps(mcp_msg))
+                                                                except: pass
+                                                            elif line.startswith('%'):
+                                                                await self.websocket.send(json.dumps({
+                                                                    "type": "stt",
+                                                                    "text": line,
+                                                                    "session_id": self.session_id
+                                                                }))
+                                                
+                                                asyncio.run_coroutine_threadsafe(_forward_unwrapped(content), self.loop)
+                                                is_json_payload = True # Mark for skipping TTS recorder
+                                                continue # Skip further processing for this token
+                                                
+                                            data = None # Trigger re-check of content for normal text
                                     
                                     # Forward if it's a recognized Odevice command (either direct or unwrapped)
                                     if isinstance(data, dict) and any(k in data for k in ("type", "method", "payload")):
