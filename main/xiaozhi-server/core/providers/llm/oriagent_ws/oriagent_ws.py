@@ -112,24 +112,13 @@ class LLMProvider(LLMProviderBase):
                                     except:
                                         logger.bind(tag=TAG).info(f"ORIAGENT TOOL RETURN: {obs}")
                                     
-                                    # Filter: only yield hardware-related tool results to be processed by interceptor
-                                    obs_str = str(obs).strip()
-                                    is_hardware_cmd = False
-                                    
-                                    if isinstance(obs, str) and (obs.startswith('%') or '"type": "mcp"' in obs):
-                                        is_hardware_cmd = True
-                                    elif isinstance(obs, dict):
-                                        # Check if any value in the dict is a hardware command
-                                        obs_json = json.dumps(obs, ensure_ascii=False)
-                                        if '%' in obs_json or '"type": "mcp"' in obs_json:
-                                            is_hardware_cmd = True
-                                            obs_str = obs_json # Yield as JSON string for interceptor
-                                    
-                                    if is_hardware_cmd:
-                                        logger.bind(tag=TAG).info(f"ORIAGENT TOOL YIELDING: {obs_str[:100]}...")
-                                        yield obs_str # Yield to connection.py for unwrapping
+                                    # ULTIMATE FIX: Yield everything that looks like a command immediately
+                                    obs_json = json.dumps(obs, ensure_ascii=False)
+                                    if '%' in obs_json or '"type": "mcp"' in obs_json:
+                                        logger.bind(tag=TAG).info(f"!!! CRITICAL ORIAGENT YIELD !!! -> {obs_json[:100]}")
+                                        yield obs_json
                                     else:
-                                        logger.bind(tag=TAG).debug(f"Skipping internal tool observation: {obs_str[:50]}...")
+                                        logger.bind(tag=TAG).debug(f"Skipping internal tool observation: {obs_json[:50]}...")
                                 elif event_type == "message_end":
                                     logger.bind(tag=TAG).debug(f"Oriagent message end. Total message tokens received.")
                                     break
