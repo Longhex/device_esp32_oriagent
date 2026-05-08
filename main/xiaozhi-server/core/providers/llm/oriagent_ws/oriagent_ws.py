@@ -112,13 +112,23 @@ class LLMProvider(LLMProviderBase):
                                     except:
                                         logger.bind(tag=TAG).info(f"ORIAGENT TOOL RETURN: {obs}")
                                     
-                                    # ULTIMATE FIX: Yield everything that looks like a command immediately
-                                    obs_json = json.dumps(obs, ensure_ascii=False)
-                                    if '%' in obs_json or '"type": "mcp"' in obs_json:
-                                        logger.bind(tag=TAG).info(f"!!! CRITICAL ORIAGENT YIELD !!! -> {obs_json[:100]}")
-                                        yield obs_json
+                                    # ULTIMATE FIX: Yield hardware commands without double-encoding
+                                    is_hardware = False
+                                    final_obs = obs
+                                    if isinstance(obs, str):
+                                        if '%' in obs or '"type": "mcp"' in obs:
+                                            is_hardware = True
+                                    elif isinstance(obs, dict):
+                                        obs_json = json.dumps(obs, ensure_ascii=False)
+                                        if '%' in obs_json or '"type": "mcp"' in obs_json:
+                                            is_hardware = True
+                                            final_obs = obs_json
+                                            
+                                    if is_hardware:
+                                        logger.bind(tag=TAG).info(f"!!! CRITICAL ORIAGENT YIELD !!! -> {str(final_obs)[:100]}")
+                                        yield final_obs
                                     else:
-                                        logger.bind(tag=TAG).debug(f"Skipping internal tool observation: {obs_json[:50]}...")
+                                        logger.bind(tag=TAG).debug(f"Skipping internal tool observation")
                                 elif event_type == "message_end":
                                     logger.bind(tag=TAG).debug(f"Oriagent message end. Total message tokens received.")
                                     break
