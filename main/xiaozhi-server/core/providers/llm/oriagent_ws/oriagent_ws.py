@@ -115,7 +115,12 @@ class LLMProvider(LLMProviderBase):
                                     # Filter: only yield hardware-related tool results to be processed by interceptor
                                     obs_str = str(obs).strip()
                                     if obs_str.startswith('%') or '"type": "mcp"' in obs_str:
-                                        yield obs
+                                        # Ensure we yield a string (if it's a dict, convert to JSON string)
+                                        # This prevents AttributeError in connection.py's strip()
+                                        if isinstance(obs, (dict, list)):
+                                            yield json.dumps(obs, ensure_ascii=False)
+                                        else:
+                                            yield str(obs)
                                     else:
                                         logger.bind(tag=TAG).debug(f"Skipping internal tool observation: {obs_str[:50]}...")
                                 elif event_type == "message_end":
