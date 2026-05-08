@@ -58,6 +58,7 @@ class TTSProvider(TTSProviderBase):
         self.segment_queues = {}
         self.playback_task = None
         self._playback_active = False
+        self.pending_tasks = set()
 
     async def _ensure_connection(self, pool_idx):
         ws = self.ws_pool[pool_idx]
@@ -97,6 +98,8 @@ class TTSProvider(TTSProviderBase):
             self.playback_queue = asyncio.Queue()
             self._playback_active = True
             self.playback_task = self.conn.loop.create_task(self._playback_loop())
+            self.pending_tasks.add(self.playback_task)
+            self.playback_task.add_done_callback(lambda t: self.pending_tasks.discard(t))
 
     async def _playback_loop(self):
         jitter_buffer = bytearray()
@@ -340,12 +343,19 @@ class TTSProvider(TTSProviderBase):
         async def wait_loop():
             if self.playback_queue:
                 await self.playback_queue.put('END_OF_SESSION')
-                await self.playback_queue.join()
+                try:
+                    await asyncio.wait_for(self.playback_queue.join(), timeout=5.0)
+                except asyncio.TimeoutError:
+                    logger.bind(tag=TAG).warning("Blaze Speed TTS: playback_queue.join() timeout!")
                 await asyncio.sleep(0.5)
 
-        future = asyncio.run_coroutine_threadsafe(wait_loop(), self.conn.loop)
+        task = self.conn.loop.create_task(wait_loop())
+        self.pending_tasks.add(task)
+        task.add_done_callback(lambda t: self.pending_tasks.discard(t))
+
+        future = asyncio.run_coroutine_threadsafe(asyncio.wait_for(task, timeout=10.0), self.conn.loop)
         try:
-            future.result(timeout=10) # Reduced from 60 to 10
+            future.result(timeout=12) 
         except Exception:
             if self._playback_active and not self.conn.stop_event.is_set():
                 logger.bind(tag=TAG).warning("Blaze Speed TTS: Wait loop timeout!")
@@ -360,7 +370,12 @@ class TTSProvider(TTSProviderBase):
 
     async def close(self):
         self._playback_active = False
-        if self.playback_task: self.playback_task.cancel()
+        # Cancel all tracked pending tasks
+        for task in list(self.pending_tasks):
+            if not task.done():
+                task.cancel()
+        self.pending_tasks.clear()
+
         for ws in self.ws_pool:
             if ws:
                 try: await ws.close()

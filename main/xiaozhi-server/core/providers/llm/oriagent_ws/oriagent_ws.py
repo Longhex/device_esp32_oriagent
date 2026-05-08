@@ -64,6 +64,9 @@ class LLMProvider(LLMProviderBase):
             f"Calling Oriagent API | URL: {self.api_url} | ConvID: {conversation_id or 'New'}"
         )
 
+        # Track last yielded hardware observation to prevent duplicates within the same stream
+        last_hardware_obs = None
+
         try:
             with httpx.Client(timeout=60.0) as client:
                 with client.stream("POST", self.api_url, headers=headers, json=request_payload) as r:
@@ -125,8 +128,13 @@ class LLMProvider(LLMProviderBase):
                                             final_obs = obs_json
                                             
                                     if is_hardware:
-                                        logger.bind(tag=TAG).info(f"!!! CRITICAL ORIAGENT YIELD !!! -> {str(final_obs)[:100]}")
-                                        yield final_obs
+                                        # Deduplicate: Only yield if this is a NEW hardware command in this stream
+                                        if final_obs != last_hardware_obs:
+                                            last_hardware_obs = final_obs
+                                            logger.bind(tag=TAG).info(f"!!! CRITICAL ORIAGENT YIELD !!! -> {str(final_obs)[:100]}")
+                                            yield final_obs
+                                        else:
+                                            logger.bind(tag=TAG).debug("Skipping duplicate hardware observation in stream")
                                     else:
                                         logger.bind(tag=TAG).debug(f"Skipping internal tool observation")
                                 elif event_type == "message_end":
