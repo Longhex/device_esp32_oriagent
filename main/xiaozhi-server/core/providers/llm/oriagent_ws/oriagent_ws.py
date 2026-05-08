@@ -114,13 +114,20 @@ class LLMProvider(LLMProviderBase):
                                     
                                     # Filter: only yield hardware-related tool results to be processed by interceptor
                                     obs_str = str(obs).strip()
-                                    if obs_str.startswith('%') or '"type": "mcp"' in obs_str:
-                                        # Ensure we yield a string (if it's a dict, convert to JSON string)
-                                        # This prevents AttributeError in connection.py's strip()
-                                        if isinstance(obs, (dict, list)):
-                                            yield json.dumps(obs, ensure_ascii=False)
-                                        else:
-                                            yield str(obs)
+                                    is_hardware_cmd = False
+                                    
+                                    if isinstance(obs, str) and (obs.startswith('%') or '"type": "mcp"' in obs):
+                                        is_hardware_cmd = True
+                                    elif isinstance(obs, dict):
+                                        # Check if any value in the dict is a hardware command
+                                        obs_json = json.dumps(obs, ensure_ascii=False)
+                                        if '%' in obs_json or '"type": "mcp"' in obs_json:
+                                            is_hardware_cmd = True
+                                            obs_str = obs_json # Yield as JSON string for interceptor
+                                    
+                                    if is_hardware_cmd:
+                                        logger.bind(tag=TAG).info(f"ORIAGENT TOOL YIELDING: {obs_str[:100]}...")
+                                        yield obs_str # Yield to connection.py for unwrapping
                                     else:
                                         logger.bind(tag=TAG).debug(f"Skipping internal tool observation: {obs_str[:50]}...")
                                 elif event_type == "message_end":
