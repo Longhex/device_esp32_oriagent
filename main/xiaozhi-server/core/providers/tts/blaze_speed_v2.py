@@ -18,10 +18,10 @@ logger = setup_logging()
 # V2 BLAZE SPEED TTS — PRODUCTION GRADE (100% RELIABILITY)
 # =============================================================================
 
-INITIAL_BUFFER_BYTES = 4800     # ~100ms @ 24kHz/16bit/mono
+INITIAL_BUFFER_BYTES = 9600     # ~200ms @ 24kHz/16bit/mono
 CONTINUOUS_JITTER_BYTES = 4800  # ~100ms continuous buffer
 WAV_HEADER_SIZE = 44
-POOL_SIZE = 4
+POOL_SIZE = 8  # Higher capacity for simultaneous segments
 FETCH_TIMEOUT = 10.0
 POOL_HEALTH_INTERVAL = 5.0
 PLAYBACK_JOIN_TIMEOUT = 30.0
@@ -259,7 +259,7 @@ class TTSProvider(TTSProviderBase):
                                 if valid_len > 0:
                                     self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer[:valid_len]), False, self.handle_opus)
                                     del jitter_buffer[:valid_len]
-                            jitter_buffer.clear()
+                            # REMOVED: jitter_buffer.clear() - Keep remaining bytes for seamless transition
                             seg_queue.task_done()
                             first_packet_sent = True
                             break
