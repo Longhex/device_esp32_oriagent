@@ -92,12 +92,19 @@ class OpusEncoderUtils:
         if end_of_stream and len(self.buffer) > 0:
             # 创建最后一帧并用0填充
             last_frame = np.zeros(self.total_frame_size, dtype=np.int16)
-            last_frame[: len(self.buffer)] = self.buffer
+            n = len(self.buffer)
+            last_frame[:n] = self.buffer
+            
+            # Apply a short fade out to the last few samples to avoid clicking if the signal ends abruptly
+            fade_len = min(n, 160)  # ~10ms fade out at 16kHz, ~6.6ms at 24kHz
+            if fade_len > 0:
+                fade_curve = np.linspace(1.0, 0.0, fade_len)
+                last_frame[n-fade_len:n] = (last_frame[n-fade_len:n] * fade_curve).astype(np.int16)
 
             output = self._encode(last_frame)
             if output:
                 callback(output)
-            self.buffer = np.array([], dtype=np.int16)
+            self.reset_state()
 
     def _encode(self, frame: np.ndarray) -> Optional[bytes]:
         """编码一帧音频数据"""

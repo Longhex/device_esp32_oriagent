@@ -55,6 +55,7 @@ class BlazeConnectionPool:
 
     async def _connect_and_auth(self, idx):
         """Create and authenticate a single WebSocket connection."""
+        ws = None
         try:
             ws = await asyncio.wait_for(
                 websockets.connect(
@@ -81,6 +82,11 @@ class BlazeConnectionPool:
 
         except Exception as e:
             logger.bind(tag=TAG).error(f"Pool[{idx}]: Warm-up failed: {e}")
+            if ws:
+                try:
+                    await ws.close()
+                except:
+                    pass
             self.pool[idx] = None
             return False
 
@@ -107,9 +113,22 @@ class BlazeConnectionPool:
                 if tasks:
                     await asyncio.gather(*tasks, return_exceptions=True)
 
+                # Send a small heartbeat to all active connections to prevent idle timeout
+                for i in range(self.pool_size):
+                    ws = self.pool[i]
+                    if ws and not getattr(ws, "closed", True):
+                        try:
+                            # We can send a ping or just a dummy check
+                            await asyncio.wait_for(ws.ping(), timeout=2.0)
+                        except:
+                            logger.bind(tag=TAG).warning(f"Pool[{i}]: Heartbeat failed, marking for revival.")
+                            await ws.close()
+                            self.pool[i] = None
+
                 # Wait for next interval or an immediate trigger
                 try:
-                    await asyncio.wait_for(self._maintain_event.wait(), timeout=POOL_HEALTH_INTERVAL)
+                    # Longer interval for health checks to reduce spam (30s)
+                    await asyncio.wait_for(self._maintain_event.wait(), timeout=POOL_HEALTH_INTERVAL * 6) 
                     self._maintain_event.clear()
                 except asyncio.TimeoutError:
                     pass
@@ -260,9 +279,12 @@ class TTSProvider(TTSProviderBase):
                             jitter_buffer = jitter_buffer[:-1]
                         if len(jitter_buffer) > 0:
                             self.opus_encoder.encode_pcm_to_opus_stream(
-                                bytes(jitter_buffer), False, self.handle_opus
+                                bytes(jitter_buffer), True, self.handle_opus
                             )
-                        jitter_buffer.clear()
+                    else:
+                        # Even if buffer empty, signal end to reset encoder state
+                        self.opus_encoder.reset_state()
+                    jitter_buffer.clear()
                     first_packet_sent = False
                     self.playback_queue.task_done()
                     continue
@@ -270,7 +292,7 @@ class TTSProvider(TTSProviderBase):
                 # --- V2 FLUSH: clear jitter buffer immediately ---
                 if item == "FLUSH":
                     jitter_buffer.clear()
-                    first_packet_sent = False
+                    self.opus_encoder.reset_state()
                     self.playback_queue.task_done()
                     continue
 
@@ -306,11 +328,16 @@ class TTSProvider(TTSProviderBase):
                                 valid_len = len(jitter_buffer) - (len(jitter_buffer) % 2)
                                 if valid_len > 0:
                                     self.opus_encoder.encode_pcm_to_opus_stream(
-                                        bytes(jitter_buffer[:valid_len]), False, self.handle_opus
+                                        bytes(jitter_buffer[:valid_len]), True, self.handle_opus
                                     )
                                     del jitter_buffer[:valid_len]
-                            first_packet_sent = True # Mark true so next segment starts fresh
+                            else:
+                                # Ensure encoder state is reset even if buffer empty
+                                self.opus_encoder.reset_state()
+                            
+                            jitter_buffer.clear()
                             seg_queue.task_done()
+                            first_packet_sent = True # Mark true so next segment starts fresh
                             break
 
                         jitter_buffer.extend(pcm_chunk)

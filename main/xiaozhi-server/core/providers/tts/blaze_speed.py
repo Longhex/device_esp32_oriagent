@@ -70,6 +70,7 @@ class TTSProvider(TTSProviderBase):
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
 
+        ws = None
         try:
             ws = await websockets.connect(
                 self.ws_url, ssl=ssl_context, ping_interval=5.0, ping_timeout=5.0
@@ -88,6 +89,11 @@ class TTSProvider(TTSProviderBase):
             return ws
         except Exception as e:
             logger.bind(tag=TAG).error(f"Blaze WS[{pool_idx}]: Error: {e}")
+            if ws:
+                try:
+                    await ws.close()
+                except:
+                    pass
             return None
 
     # =========================================================================
@@ -116,8 +122,10 @@ class TTSProvider(TTSProviderBase):
                         if len(jitter_buffer) % 2 != 0:
                             jitter_buffer = jitter_buffer[:-1]
                         if jitter_buffer:
-                            self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer), False, self.handle_opus)
+                            self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer), True, self.handle_opus)
                         jitter_buffer.clear()
+                    else:
+                        self.opus_encoder.reset_state()
                     first_packet_sent = False
                     self.playback_queue.task_done()
                     continue
@@ -148,10 +156,13 @@ class TTSProvider(TTSProviderBase):
                             # Ensure even length for 16-bit PCM
                             valid_len = len(jitter_buffer) - (len(jitter_buffer) % 2)
                             if valid_len > 0:
-                                self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer[:valid_len]), False, self.handle_opus)
+                                self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer[:valid_len]), True, self.handle_opus)
                                 del jitter_buffer[:valid_len]
                             jitter_buffer.clear()
                             first_packet_sent = True
+                        else:
+                            self.opus_encoder.reset_state()
+                            jitter_buffer.clear()
                         seg_queue.task_done()
                         break
 

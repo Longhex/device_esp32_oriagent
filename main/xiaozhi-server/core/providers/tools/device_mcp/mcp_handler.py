@@ -183,6 +183,10 @@ async def handle_mcp_message(
                 logger.bind(tag=TAG).info(
                     f"Number of tools supported by client device: {len(tools_data)}"
                 )
+                
+                # Diagnostic: Log names of all fetched tools to identify missing ones
+                tool_names = [t.get("name", "unknown") for t in tools_data]
+                logger.bind(tag=TAG).debug(f"Fetched tools from device: {tool_names}")
 
                 for i, tool in enumerate(tools_data):
                     if not isinstance(tool, dict):
