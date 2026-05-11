@@ -50,6 +50,7 @@ class BlazeConnectionPool:
         self.pool = [None] * pool_size
         self.locks = [asyncio.Lock() for _ in range(pool_size)]
         self._maintain_task = None
+        self._maintain_event = asyncio.Event()
         self._active = False
 
     async def _connect_and_auth(self, idx):
@@ -58,9 +59,9 @@ class BlazeConnectionPool:
             ws = await asyncio.wait_for(
                 websockets.connect(
                     self.ws_url, ssl=self.ssl_context,
-                    ping_interval=20.0, ping_timeout=10.0,
+                    ping_interval=10.0, ping_timeout=10.0,
                 ),
-                timeout=10.0,
+                timeout=5.0,
             )
             # Wait for successful-connection message
             await asyncio.wait_for(ws.recv(), timeout=5.0)
@@ -95,12 +96,24 @@ class BlazeConnectionPool:
         """Background task: revive dead connections automatically."""
         while self._active:
             try:
+                # Check all slots in parallel
+                tasks = []
                 for i in range(self.pool_size):
                     ws = self.pool[i]
                     if ws is None or getattr(ws, "closed", True):
                         if self._active:
-                            await self._connect_and_auth(i)
-                await asyncio.sleep(POOL_HEALTH_INTERVAL)
+                            tasks.append(self._connect_and_auth(i))
+                
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+
+                # Wait for next interval or an immediate trigger
+                try:
+                    await asyncio.wait_for(self._maintain_event.wait(), timeout=POOL_HEALTH_INTERVAL)
+                    self._maintain_event.clear()
+                except asyncio.TimeoutError:
+                    pass
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -138,6 +151,7 @@ class BlazeConnectionPool:
     def mark_dead(self, idx):
         """Mark a connection as dead — maintainer will revive it."""
         self.pool[idx] = None
+        self._maintain_event.set()
 
     async def close_all(self):
         """Shutdown pool: cancel maintainer, close all connections."""
@@ -466,6 +480,7 @@ class TTSProvider(TTSProviderBase):
             self.pool.mark_dead(pool_idx)
             return False
         except asyncio.CancelledError:
+            self.pool.mark_dead(pool_idx)
             raise  # Propagate to _fetch_with_retry
         except Exception as e:
             logger.bind(tag=TAG).error(f"V2 Fetch[{pool_idx}] Seg#{idx} error: {e}")

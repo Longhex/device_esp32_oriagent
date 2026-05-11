@@ -112,7 +112,11 @@ class TTSProvider(TTSProviderBase):
 
                 if item == 'END_OF_SESSION':
                     if jitter_buffer:
-                        self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer), False, self.handle_opus)
+                        # Ensure even length for 16-bit PCM
+                        if len(jitter_buffer) % 2 != 0:
+                            jitter_buffer = jitter_buffer[:-1]
+                        if jitter_buffer:
+                            self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer), False, self.handle_opus)
                         jitter_buffer.clear()
                     first_packet_sent = False
                     self.playback_queue.task_done()
@@ -141,7 +145,11 @@ class TTSProvider(TTSProviderBase):
                     pcm_chunk = await seg_queue.get()
                     if pcm_chunk == b'END_OF_SEGMENT':
                         if not first_packet_sent and jitter_buffer:
-                            self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer), False, self.handle_opus)
+                            # Ensure even length for 16-bit PCM
+                            valid_len = len(jitter_buffer) - (len(jitter_buffer) % 2)
+                            if valid_len > 0:
+                                self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer[:valid_len]), False, self.handle_opus)
+                                del jitter_buffer[:valid_len]
                             jitter_buffer.clear()
                             first_packet_sent = True
                         seg_queue.task_done()
@@ -151,13 +159,19 @@ class TTSProvider(TTSProviderBase):
 
                     if not first_packet_sent:
                         if len(jitter_buffer) >= INITIAL_BUFFER_BYTES:
-                            self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer), False, self.handle_opus)
-                            jitter_buffer.clear()
+                            # Ensure even length
+                            valid_len = len(jitter_buffer) - (len(jitter_buffer) % 2)
+                            if valid_len > 0:
+                                self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer[:valid_len]), False, self.handle_opus)
+                                del jitter_buffer[:valid_len]
                             first_packet_sent = True
                     else:
                         if len(jitter_buffer) >= CONTINUOUS_JITTER_THRESHOLD:
-                            self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer), False, self.handle_opus)
-                            jitter_buffer.clear()
+                            # Ensure even length
+                            valid_len = len(jitter_buffer) - (len(jitter_buffer) % 2)
+                            if valid_len > 0:
+                                self.opus_encoder.encode_pcm_to_opus_stream(bytes(jitter_buffer[:valid_len]), False, self.handle_opus)
+                                del jitter_buffer[:valid_len]
 
                     seg_queue.task_done()
 

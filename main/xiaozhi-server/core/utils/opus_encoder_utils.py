@@ -117,7 +117,10 @@ class OpusEncoderUtils:
 
     def _convert_bytes_to_shorts(self, bytes_data: bytes) -> np.ndarray:
         """将字节数组转换为short数组 (16位PCM)"""
-        # 假设输入是小端字节序的16位PCM
+        # Ensure buffer size is a multiple of element size (2 bytes for int16)
+        if len(bytes_data) % 2 != 0:
+            logging.warning(f"OpusEncoder: Buffer size {len(bytes_data)} is odd, padding with zero byte.")
+            bytes_data += b'\x00'
         return np.frombuffer(bytes_data, dtype=np.int16)
 
     def _validate_pcm_data(self, pcm_shorts: np.ndarray) -> None:
