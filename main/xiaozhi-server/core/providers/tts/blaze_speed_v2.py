@@ -25,7 +25,7 @@ POOL_SIZE = 4
 FETCH_TIMEOUT = 10.0
 POOL_HEALTH_INTERVAL = 5.0
 PLAYBACK_JOIN_TIMEOUT = 30.0
-SEGMENT_FETCH_TIMEOUT = 10.0
+SEGMENT_FETCH_TIMEOUT = 25.0  # Increased to allow Producer retries (10s+10s+5s)
 
 # =============================================================================
 # CONNECTION POOL: PRE-WARMED & SELF-HEALING
@@ -44,12 +44,20 @@ class BlazeConnectionPool:
         self.last_idx = 0
 
     async def _connect_and_auth(self, idx):
+        # Ensure old connection is closed if it exists
+        if self.pool[idx]:
+            try:
+                await self.pool[idx].close()
+            except:
+                pass
+            self.pool[idx] = None
+
         ws = None
         try:
             ws = await asyncio.wait_for(
                 websockets.connect(
                     self.ws_url, ssl=self.ssl_context,
-                    ping_interval=10.0, ping_timeout=10.0,
+                    ping_interval=30.0, ping_timeout=30.0, # Relaxed ping
                 ),
                 timeout=5.0,
             )
@@ -80,9 +88,10 @@ class BlazeConnectionPool:
         while self._active:
             try:
                 for i in range(self.pool_size):
-                    ws = self.pool[i]
-                    if ws is None or getattr(ws, "closed", True):
-                        await self._connect_and_auth(i)
+                    async with self.locks[i]: # PREVENT RACE CONDITION with get_connection
+                        ws = self.pool[i]
+                        if ws is None or getattr(ws, "closed", True):
+                            await self._connect_and_auth(i)
                 
                 await asyncio.wait_for(self._maintain_event.wait(), timeout=POOL_HEALTH_INTERVAL * 6)
                 self._maintain_event.clear()
@@ -126,6 +135,7 @@ class BlazeConnectionPool:
                 self.locks[target_idx].release()
 
     def mark_dead(self, idx):
+        logger.bind(tag=TAG).warning(f"Pool[{idx}]: Connection marked DEAD, triggering revival.")
         self.pool[idx] = None
         self._maintain_event.set()
 
@@ -324,8 +334,10 @@ class TTSProvider(TTSProviderBase):
             await seg_queue.put(b"END_OF_SEGMENT")
 
     async def _do_fetch(self, idx, text, session_id, attempt=0):
+        pool_idx = -1
         try:
-            async with self.pool.get_connection() as (pool_idx, ws):
+            async with self.pool.get_connection() as (p_idx, ws):
+                pool_idx = p_idx
                 if not ws or self.current_session_id != session_id: return False
                 
                 req = {
@@ -356,7 +368,10 @@ class TTSProvider(TTSProviderBase):
                         if status == "finished-byte-stream": return True
                         if status in ("failed-request", "internal-error", "bad-request"):
                             return False
-        except Exception: return False
+        except Exception:
+            if pool_idx != -1:
+                self.pool.mark_dead(pool_idx)
+            return False
 
     def _schedule_fetch(self, idx, text, session_id, is_last=False):
         async def _tracked():

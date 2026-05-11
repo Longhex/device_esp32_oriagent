@@ -1136,6 +1136,16 @@ class ConnectionHandler:
                                                                 }))
                                                 
                                                 asyncio.run_coroutine_threadsafe(_forward_unwrapped(content), self.loop)
+                                                
+                                                # Send LAST signal to release playback queue and end session
+                                                self.tts.tts_text_queue.put(
+                                                    TTSMessageDTO(
+                                                        sentence_id=self.sentence_id,
+                                                        sentence_type=SentenceType.LAST,
+                                                        content_type=ContentType.ACTION,
+                                                    )
+                                                )
+                                                
                                                 is_json_payload = True # Mark for skipping TTS recorder
                                                 continue # Skip further processing for this token
                                                 
@@ -1195,6 +1205,16 @@ class ConnectionHandler:
                                                 }))
                                 
                                 asyncio.run_coroutine_threadsafe(_forward_system_msg(content), self.loop)
+                                
+                                # Send LAST signal to release playback queue and end session
+                                self.tts.tts_text_queue.put(
+                                    TTSMessageDTO(
+                                        sentence_id=self.sentence_id,
+                                        sentence_type=SentenceType.LAST,
+                                        content_type=ContentType.ACTION,
+                                    )
+                                )
+                                
                                 continue # Skip TTS push
                             except Exception as e:
                                 self.logger.bind(tag=TAG).error(f"System Interceptor failure: {e}")
