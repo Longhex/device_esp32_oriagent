@@ -57,12 +57,12 @@ class BlazeConnectionPool:
             ws = await asyncio.wait_for(
                 websockets.connect(
                     self.ws_url, ssl=self.ssl_context,
-                    ping_interval=30.0, ping_timeout=30.0, # Relaxed ping
+                    ping_interval=30.0, ping_timeout=30.0,
                 ),
                 timeout=5.0,
             )
             await asyncio.wait_for(ws.recv(), timeout=5.0)
-            await ws.send(json.dumps({"token": self.token, "strategy": "streaming"}))
+            await ws.send(json.dumps({"token": self.token, "strategy": "request"}))
             auth_msg = await asyncio.wait_for(ws.recv(), timeout=5.0)
 
             if "successful-authentication" not in str(auth_msg):
@@ -156,8 +156,8 @@ class TTSProvider(TTSProviderBase):
         self.api_key = config.get("api_key")
         self.model = config.get("model", "2.0-realtime")
         self.speaker_id = config.get("private_voice", "HN-Nu-ThuHuyenDeThuong")
-        self.audio_speed = config.get("audio_speed", "1.1")
-        self.audio_format = "wav"
+        self.audio_speed = config.get("audio_speed", "1.2")
+        self.audio_format = "pcm"
         self.sample_rate = 24000
         self.audio_quality = 128
 
@@ -347,6 +347,18 @@ class TTSProvider(TTSProviderBase):
                     "model": self.model, "sample_rate": self.sample_rate,
                 }
                 await ws.send(json.dumps(req))
+                
+                # Protocol from demo: processing-request -> started-byte-stream -> chunks
+                try:
+                    msg = await asyncio.wait_for(ws.recv(), timeout=FETCH_TIMEOUT)
+                    # Skip 'processing-request' if it arrives
+                    if not isinstance(msg, bytes) and "processing-request" in str(msg):
+                        msg = await asyncio.wait_for(ws.recv(), timeout=FETCH_TIMEOUT)
+                    # Skip 'started-byte-stream' if it arrives
+                    if not isinstance(msg, bytes) and "started-byte-stream" in str(msg):
+                        pass
+                except: pass
+
                 header_skipped = False
                 task_id = f"{session_id}_{idx}"
                 seg_queue = self.segment_queues.get(task_id)
@@ -357,11 +369,8 @@ class TTSProvider(TTSProviderBase):
                     message = await asyncio.wait_for(ws.recv(), timeout=FETCH_TIMEOUT)
 
                     if isinstance(message, bytes):
-                        pcm_data = message
-                        if not header_skipped:
-                            if pcm_data[:4] == b"RIFF": pcm_data = pcm_data[WAV_HEADER_SIZE:]
-                            header_skipped = True
-                        if pcm_data: await seg_queue.put(pcm_data)
+                        # Using raw PCM from server - no header to skip
+                        await seg_queue.put(message)
                     else:
                         data = json.loads(message)
                         status = data.get("type") or data.get("status")
@@ -442,7 +451,7 @@ class TTSProvider(TTSProviderBase):
         words = temp_text.split()
         word_count = len(words)
 
-        # Priority 1: Hard stops
+        # Priority 1: Full Sentence (Sentence-based logic like V1)
         hard_stops = [".", "!", "?", "\n", "。", "！", "？"]
         for i, char in enumerate(text_to_process):
             if char in hard_stops:
@@ -451,19 +460,9 @@ class TTSProvider(TTSProviderBase):
                     self.processed_chars += i + 1
                     return seg
 
-        # Priority 2: Soft stops (8 words / 60 chars)
-        soft_stops = [",", ":", ";", "，", "：", "；"]
-        for i, char in enumerate(text_to_process):
-            if char in soft_stops:
-                if word_count >= 8 or i >= 60:
-                    seg = text_to_process[:i+1].strip()
-                    if seg:
-                        self.processed_chars += i + 1
-                        return seg
-
-        # Priority 3: Hard limit (12 words / 100 chars)
-        if word_count >= 12 or len(text_to_process) >= 100:
-            limit = min(len(text_to_process), 100)
+        # Priority 2: Force segment only if text is very long (preventing buffer overflow)
+        if len(text_to_process) >= 150:
+            limit = 120
             last_space = text_to_process.rfind(" ", 0, limit)
             if last_space == -1: last_space = limit
             seg = text_to_process[:last_space].strip()
