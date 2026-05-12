@@ -17,7 +17,7 @@ server:
   # This may not be accurate when using Docker or public deployments (using SSL/domain).
   # If using Docker, set websocket to the local area network address.
   # If using public deployment, set websocket to the public address.
-  websocket: ws://your_ip_or_domain:port/xiaozhi/v1/
+  websocket: ws://10.17.0.111:8000/xiaozhi/v1/
   # Vision analysis interface address sent to the device
   # By default, the system automatically generates it.
   vision_explain: http://your_ip_or_domain:port/mcp/vision/explain
