@@ -189,7 +189,7 @@ class TTSProvider(TTSProviderBase):
             self._segment_done.set()
 
     def tts_text_priority_thread(self):
-        logger.bind(tag=TAG).info("Blaze V3 TTS: worker thread active.")
+        logger.bind(tag=TAG).info("Blaze V3 TTS: worker thread active (1-connection mode).")
         while not self.conn.stop_event.is_set():
             try:
                 message = self.tts_text_queue.get(timeout=1)
@@ -197,30 +197,22 @@ class TTSProvider(TTSProviderBase):
                 if message.sentence_type == SentenceType.FIRST:
                     self.conn.client_abort = False
                     self.tts_text_buff = []
-                    self.processed_chars = 0
 
                 if self.conn.client_abort:
                     continue
 
                 if ContentType.TEXT == message.content_type and message.content_detail:
                     self.tts_text_buff.append(message.content_detail)
-                    segment = self._get_smart_segment()
-                    if segment:
-                        if self.conn.client_abort:
-                            continue
-                        asyncio.run_coroutine_threadsafe(
-                            self.text_to_speak(segment, None), self.conn.loop
-                        ).result(timeout=20)
+                    # GOM TOÀN BỘ CHỮ, KHÔNG CẮT ĐOẠN ĐỂ DÙNG 1 CONNECTION DUY NHẤT
 
                 if message.sentence_type == SentenceType.LAST:
                     full_text = "".join(self.tts_text_buff)
-                    remaining = full_text[self.processed_chars:]
-                    if remaining.strip():
+                    if full_text.strip():
                         if self.conn.client_abort:
                             continue
                         asyncio.run_coroutine_threadsafe(
-                            self.text_to_speak(remaining, None), self.conn.loop
-                        ).result(timeout=20)
+                            self.text_to_speak(full_text, None), self.conn.loop
+                        ).result(timeout=60)
                     self.tts_audio_queue.put(
                         (SentenceType.LAST, [], message.content_detail)
                     )
