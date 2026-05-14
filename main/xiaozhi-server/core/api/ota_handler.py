@@ -332,12 +332,9 @@ class OTAHandler(BaseHandler):
                     if _is_higher_version(ver, device_version):
                         # build download url (only allow download via our download endpoint)
                         chosen_version = ver
-                        # Use get_vision_url to get the base URL and replace the path
-                        vision_url = get_vision_url(self.config)
-                        # Replace the path from "/mcp/vision/explain" to "/xiaozhi/ota/download/{fname}"
-                        chosen_url = vision_url.replace(
-                            "/mcp/vision/explain", f"/xiaozhi/ota/download/{fname}"
-                        )
+                        scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
+                        host = request.headers.get("Host", request.host)
+                        chosen_url = f"{scheme}://{host}/xiaozhi/ota/download/{fname}"
                         break
 
                 if chosen_url:
