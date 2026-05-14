@@ -303,13 +303,16 @@ class ConnectionHandler:
             self.logger.bind(tag=TAG).info(f"配置输出音频采样率为: {self.sample_rate}")
 
             # 在后台初始化配置和组件（完全不阻塞主循环）
+            self.logger.bind(tag=TAG).info(f"Configured output audio sample rate: {self.sample_rate}")
+
+            # Background initialization
             asyncio.create_task(self._background_initialize())
 
             try:
                 async for message in self.websocket:
                     await self._route_message(message)
             except websockets.exceptions.ConnectionClosed:
-                self.logger.bind(tag=TAG).info("客户端断开连接")
+                self.logger.bind(tag=TAG).info("Client disconnected")
 
         except AuthenticationError as e:
             self.logger.bind(tag=TAG).error(f"Authentication failed: {str(e)}")
@@ -322,23 +325,23 @@ class ConnectionHandler:
             try:
                 await self._save_and_close(ws)
             except Exception as final_error:
-                self.logger.bind(tag=TAG).error(f"最终清理时出错: {final_error}")
-                # 确保即使保存记忆失败，也要关闭连接
+                self.logger.bind(tag=TAG).error(f"Error during final cleanup: {final_error}")
+                # Ensure connection closes even if memory save fails
                 try:
                     await self.close(ws)
                 except Exception as close_error:
                     self.logger.bind(tag=TAG).error(
-                        f"强制关闭连接时出错: {close_error}"
+                        f"Error during forced close: {close_error}"
                     )
 
     async def _save_and_close(self, ws):
-        """保存记忆并关闭连接"""
+        """Save memory and close connection"""
         try:
             if self.memory:
-                # 使用线程池异步保存记忆
+                # Use thread pool to save memory asynchronously
                 def save_memory_task():
                     try:
-                        # 创建新事件循环（避免与主循环冲突）
+                        # New event loop to avoid main loop conflict
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
                         loop.run_until_complete(
@@ -347,56 +350,49 @@ class ConnectionHandler:
                             )
                         )
                     except Exception as e:
-                        self.logger.bind(tag=TAG).error(f"保存记忆失败: {e}")
+                        self.logger.bind(tag=TAG).error(f"Failed to save memory: {e}")
                     finally:
                         try:
                             loop.close()
                         except Exception:
                             pass
 
-                # 启动线程保存记忆，不等待完成
+                # Start thread, don't wait for completion
                 threading.Thread(target=save_memory_task, daemon=True).start()
         except Exception as e:
-            self.logger.bind(tag=TAG).error(f"保存记忆失败: {e}")
+            self.logger.bind(tag=TAG).error(f"Failed to save memory: {e}")
         finally:
-            # 立即关闭连接，不等待记忆保存完成
+            # Immediate close
             try:
                 await self.close(ws)
             except Exception as close_error:
                 self.logger.bind(tag=TAG).error(
-                    f"保存记忆后关闭连接失败: {close_error}"
+                    f"Error closing connection after memory save: {close_error}"
                 )
 
     async def _discard_message_with_bind_prompt(self):
-        """丢弃消息并检查是否需要播放绑定提示"""
+        """Discard message and check if bind prompt should be played"""
         current_time = time.time()
-        # 检查是否需要播放绑定提示
+        # Check interval
         if current_time - self.last_bind_prompt_time >= self.bind_prompt_interval:
             self.last_bind_prompt_time = current_time
-            # 复用现有的绑定提示逻辑
+            # Reuse logic
             from core.handle.receiveAudioHandle import check_bind_device
 
             asyncio.create_task(check_bind_device(self))
 
     async def _route_message(self, message):
-        """消息路由"""
-        # 检查是否已经获取到真实的绑定状态
+        """Message routing"""
         if not self.bind_completed_event.is_set():
-            # 还没有获取到真实状态，等待直到获取到真实状态或超时
             try:
                 await asyncio.wait_for(self.bind_completed_event.wait(), timeout=1)
             except asyncio.TimeoutError:
-                # 超时仍未获取到真实状态，丢弃消息
                 await self._discard_message_with_bind_prompt()
                 return
 
-        # 已经获取到真实状态，检查是否需要绑定
         if self.need_bind:
-            # 需要绑定，丢弃消息
             await self._discard_message_with_bind_prompt()
             return
-
-        # 不需要绑定，继续处理消息
 
         if isinstance(message, str):
             await handleTextMessage(self, message)
@@ -404,62 +400,51 @@ class ConnectionHandler:
             if self.vad is None or self.asr is None:
                 return
 
-            # 处理来自MQTT网关的音频包
             if self.conn_from_mqtt_gateway and len(message) >= 16:
                 handled = await self._process_mqtt_audio_message(message)
                 if handled:
                     return
 
-            # 不需要头部处理或没有头部时，直接处理原始消息
             self.asr_audio_queue.put(message)
 
     async def _process_mqtt_audio_message(self, message):
         """
-        处理来自MQTT网关的音频消息，解析16字节头部并提取音频数据
+        Handle audio message from MQTT gateway, parse 16-byte header
 
         Args:
-            message: 包含头部的音频消息
+            message: Raw bytes
 
         Returns:
-            bool: 是否成功处理了消息
+            bool: Success status
         """
         try:
-            # 提取头部信息
             timestamp = int.from_bytes(message[8:12], "big")
             audio_length = int.from_bytes(message[12:16], "big")
 
-            # 提取音频数据
             if audio_length > 0 and len(message) >= 16 + audio_length:
-                # 有指定长度，提取精确的音频数据
                 audio_data = message[16 : 16 + audio_length]
-                # 基于时间戳进行排序处理
                 self._process_websocket_audio(audio_data, timestamp)
                 return True
             elif len(message) > 16:
-                # 没有指定长度或长度无效，去掉头部后处理剩余数据
                 audio_data = message[16:]
                 self.asr_audio_queue.put(audio_data)
                 return True
         except Exception as e:
-            self.logger.bind(tag=TAG).error(f"解析WebSocket音频包失败: {e}")
+            self.logger.bind(tag=TAG).error(f"Failed to parse WebSocket audio packet: {e}")
 
-        # 处理失败，返回False表示需要继续处理
         return False
 
     def _process_websocket_audio(self, audio_data, timestamp):
-        """处理WebSocket格式的音频包"""
-        # 初始化时间戳序列管理
+        """Process WebSocket format audio packet"""
         if not hasattr(self, "audio_timestamp_buffer"):
             self.audio_timestamp_buffer = {}
             self.last_processed_timestamp = 0
             self.max_timestamp_buffer_size = 20
 
-        # 如果时间戳是递增的，直接处理
         if timestamp >= self.last_processed_timestamp:
             self.asr_audio_queue.put(audio_data)
             self.last_processed_timestamp = timestamp
 
-            # 处理缓冲区中的后续包
             processed_any = True
             while processed_any:
                 processed_any = False
@@ -471,35 +456,32 @@ class ConnectionHandler:
                         processed_any = True
                         break
         else:
-            # 乱序包，暂存
             if len(self.audio_timestamp_buffer) < self.max_timestamp_buffer_size:
                 self.audio_timestamp_buffer[timestamp] = audio_data
             else:
                 self.asr_audio_queue.put(audio_data)
 
     async def handle_restart(self, message):
-        """处理服务器重启请求"""
+        """Handle server restart request"""
         try:
 
-            self.logger.bind(tag=TAG).info("收到服务器重启指令，准备执行...")
+            self.logger.bind(tag=TAG).info("Received server restart command, preparing...")
 
-            # 发送确认响应
             await self.websocket.send(
                 json.dumps(
                     {
                         "type": "server",
                         "status": "success",
-                        "message": "服务器重启中...",
+                        "message": "Restarting server...",
                         "content": {"action": "restart"},
                     }
                 )
             )
 
-            # 异步执行重启操作
             def restart_server():
-                """实际执行重启的方法"""
+                """Execute restart"""
                 time.sleep(1)
-                self.logger.bind(tag=TAG).info("执行服务器重启...")
+                self.logger.bind(tag=TAG).info("Executing server restart...")
                 subprocess.Popen(
                     [sys.executable, "app.py"],
                     stdin=sys.stdin,
@@ -509,11 +491,10 @@ class ConnectionHandler:
                 )
                 os._exit(0)
 
-            # 使用线程执行重启避免阻塞事件循环
             threading.Thread(target=restart_server, daemon=True).start()
 
         except Exception as e:
-            self.logger.bind(tag=TAG).error(f"重启失败: {str(e)}")
+            self.logger.bind(tag=TAG).error(f"Restart failed: {str(e)}")
             await self.websocket.send(
                 json.dumps(
                     {
@@ -529,7 +510,6 @@ class ConnectionHandler:
         try:
             if self.tts is None:
                 self.tts = self._initialize_tts()
-            # 打开语音合成通道
             asyncio.run_coroutine_threadsafe(
                 self.tts.open_audio_channels(self), self.loop
             )
@@ -541,54 +521,51 @@ class ConnectionHandler:
             )
             self.logger = create_connection_logger(self.selected_module_str)
 
-            """初始化组件"""
+            """Initialize components"""
             if self.config.get("prompt") is not None:
                 user_prompt = self.config["prompt"]
-                # 使用快速提示词进行初始化
                 prompt = self.prompt_manager.get_quick_prompt(user_prompt)
                 self.change_system_prompt(prompt)
                 self.logger.bind(tag=TAG).info(
-                    f"快速初始化组件: prompt成功 {prompt[:50]}..."
+                    f"Quick init: prompt success {prompt[:50]}..."
                 )
 
-            """初始化本地组件"""
+            """Initialize local components"""
             if self.vad is None:
                 self.vad = self._vad
             if self.asr is None:
                 self.asr = self._initialize_asr()
 
-            # 初始化声纹识别
+            # Voiceprint
             self._initialize_voiceprint()
-            # 打开语音识别通道
             asyncio.run_coroutine_threadsafe(
                 self.asr.open_audio_channels(self), self.loop
             )
 
-            """加载记忆"""
+            """Load memory"""
             self._initialize_memory()
-            """加载意图识别"""
+            """Load intent"""
             self._initialize_intent()
-            """初始化上报线程"""
+            """Initialize report threads"""
             self._init_report_threads()
-            """更新系统提示词"""
+            """System prompt update"""
             self._init_prompt_enhancement()
 
         except Exception as e:
-            self.logger.bind(tag=TAG).error(f"实例化组件失败: {e}")
+            self.logger.bind(tag=TAG).error(f"Failed to instantiate components: {e}")
 
     def _init_prompt_enhancement(self):
 
-        # 更新上下文信息
         self.prompt_manager.update_context_info(self, self.client_ip)
         enhanced_prompt = self.prompt_manager.build_enhanced_prompt(
             self.config["prompt"], self.device_id, self.client_ip
         )
         if enhanced_prompt:
             self.change_system_prompt(enhanced_prompt)
-            self.logger.bind(tag=TAG).debug("系统提示词已增强更新")
+            self.logger.bind(tag=TAG).debug("System prompt enhanced and updated")
 
     def _init_report_threads(self):
-        """初始化ASR和TTS上报线程"""
+        """Initialize ASR and TTS report threads"""
         if not self.read_config_from_api or self.need_bind:
             return
         if self.chat_history_conf == 0:
@@ -598,10 +575,10 @@ class ConnectionHandler:
                 target=self._report_worker, daemon=True
             )
             self.report_thread.start()
-            self.logger.bind(tag=TAG).info("TTS上报线程已启动")
+            self.logger.bind(tag=TAG).info("TTS reporting thread started")
 
     def _initialize_tts(self):
-        """初始化TTS"""
+        """Initialize TTS"""
         tts = None
         if not self.need_bind:
             tts = initialize_tts(self.config)
@@ -612,50 +589,44 @@ class ConnectionHandler:
         return tts
 
     def _initialize_asr(self):
-        """初始化ASR"""
+        """Initialize ASR"""
         if (
                 self._asr is not None
                 and hasattr(self._asr, "interface_type")
                 and self._asr.interface_type == InterfaceType.LOCAL
         ):
-            # 如果公共ASR是本地服务，则直接返回
-            # 因为本地一个实例ASR，可以被多个连接共享
             asr = self._asr
         else:
-            # 如果公共ASR是远程服务，则初始化一个新实例
-            # 因为远程ASR，涉及到websocket连接和接收线程，需要每个连接一个实例
             asr = initialize_asr(self.config)
 
         return asr
 
     def _initialize_voiceprint(self):
-        """为当前连接初始化声纹识别"""
+        """Initialize voiceprint for current connection"""
         try:
             voiceprint_config = self.config.get("voiceprint", {})
             if voiceprint_config:
                 voiceprint_provider = VoiceprintProvider(voiceprint_config)
                 if voiceprint_provider is not None and voiceprint_provider.enabled:
                     self.voiceprint_provider = voiceprint_provider
-                    self.logger.bind(tag=TAG).info("声纹识别功能已在连接时动态启用")
+                    self.logger.bind(tag=TAG).info("Voiceprint recognition enabled dynamically")
                 else:
-                    self.logger.bind(tag=TAG).warning("声纹识别功能启用但配置不完整")
+                    self.logger.bind(tag=TAG).warning("Voiceprint enabled but config incomplete")
             else:
-                self.logger.bind(tag=TAG).info("声纹识别功能未启用")
+                self.logger.bind(tag=TAG).info("Voiceprint disabled")
         except Exception as e:
-            self.logger.bind(tag=TAG).warning(f"声纹识别初始化失败: {str(e)}")
+            self.logger.bind(tag=TAG).warning(f"Voiceprint initialization failed: {str(e)}")
 
     async def _background_initialize(self):
-        """在后台初始化配置和组件（完全不阻塞主循环）"""
+        """Background initialization"""
         try:
-            # 异步获取差异化配置
             await self._initialize_private_config_async()
-            # 在线程池中初始化组件
             self.executor.submit(self._initialize_components)
         except Exception as e:
-            self.logger.bind(tag=TAG).error(f"后台初始化失败: {e}")
+            self.logger.bind(tag=TAG).error(f"Background initialization failed: {e}")
 
     async def _initialize_private_config_async(self):
-        """从接口异步获取差异化配置（异步版本，不阻塞主循环）"""
+        """Async differential config retrieval"""
         if not self.read_config_from_api:
             self.need_bind = False
             self.bind_completed_event.set()
@@ -669,7 +640,7 @@ class ConnectionHandler:
             )
             private_config["delete_audio"] = bool(self.config.get("delete_audio", True))
             self.logger.bind(tag=TAG).info(
-                f"{time.time() - begin_time} 秒，异步获取差异化配置成功: {json.dumps(filter_sensitive_info(private_config), ensure_ascii=False)}"
+                f"{time.time() - begin_time} seconds, differential config success: {json.dumps(filter_sensitive_info(private_config), ensure_ascii=False)}"
             )
             self.need_bind = False
             self.bind_completed_event.set()
@@ -682,7 +653,7 @@ class ConnectionHandler:
             private_config = {}
         except Exception as e:
             self.need_bind = True
-            self.logger.bind(tag=TAG).error(f"异步获取差异化配置失败: {e}")
+            self.logger.bind(tag=TAG).error(f"Failed to fetch differential config: {e}")
             private_config = {}
 
         init_llm, init_tts, init_memory, init_intent = (
@@ -733,7 +704,6 @@ class ConnectionHandler:
             self.config["Intent"] = private_config["Intent"]
             model_intent = private_config.get("selected_module", {}).get("Intent", {})
             self.config["selected_module"]["Intent"] = model_intent
-            # 加载插件配置
             if model_intent != "Intent_nointent":
                 plugin_from_server = private_config.get("plugins", {})
                 for plugin, config_str in plugin_from_server.items():
@@ -744,7 +714,6 @@ class ConnectionHandler:
                 ] = plugin_from_server.keys()
         if private_config.get("prompt", None) is not None:
             self.config["prompt"] = private_config["prompt"]
-        # 获取声纹信息
         if private_config.get("voiceprint", None) is not None:
             self.config["voiceprint"] = private_config["voiceprint"]
         if private_config.get("summaryMemory", None) is not None:
@@ -758,10 +727,9 @@ class ConnectionHandler:
         if private_config.get("context_providers", None) is not None:
             self.config["context_providers"] = private_config["context_providers"]
 
-        # 使用 run_in_executor 在线程池中执行 initialize_modules，避免阻塞主循环
         try:
             modules = await self.loop.run_in_executor(
-                None,  # 使用默认线程池
+                None,
                 initialize_modules,
                 self.logger,
                 private_config,
@@ -773,7 +741,7 @@ class ConnectionHandler:
                 init_intent,
             )
         except Exception as e:
-            self.logger.bind(tag=TAG).error(f"初始化组件失败: {e}")
+            self.logger.bind(tag=TAG).error(f"Failed to initialize components: {e}")
             modules = {}
         if modules.get("tts", None) is not None:
             self.tts = modules["tts"]
@@ -791,7 +759,7 @@ class ConnectionHandler:
     def _initialize_memory(self):
         if self.memory is None:
             return
-        """初始化记忆模块"""
+        """Initialize memory"""
         self.memory.init_memory(
             role_id=self.device_id,
             llm=self.llm,
@@ -799,21 +767,17 @@ class ConnectionHandler:
             save_to_file=not self.read_config_from_api,
         )
 
-        # 获取记忆总结配置
         memory_config = self.config["Memory"]
         memory_type = self.config["Memory"][self.config["selected_module"]["Memory"]][
             "type"
         ]
-        # 如果使用 nomen 或 mem_report_only，直接返回
         if memory_type == "nomem" or memory_type == "mem_report_only":
             return
-        # 使用 mem_local_short 模式
         elif memory_type == "mem_local_short":
             memory_llm_name = memory_config[self.config["selected_module"]["Memory"]][
                 "llm"
             ]
             if memory_llm_name and memory_llm_name in self.config["LLM"]:
-                # 如果配置了专用LLM，则创建独立的LLM实例
                 from core.utils import llm as llm_utils
 
                 memory_llm_config = self.config["LLM"][memory_llm_name]
@@ -822,13 +786,12 @@ class ConnectionHandler:
                     memory_llm_type, memory_llm_config
                 )
                 self.logger.bind(tag=TAG).info(
-                    f"为记忆总结创建了专用LLM: {memory_llm_name}, 类型: {memory_llm_type}"
+                    f"Created dedicated LLM for memory summary: {memory_llm_name}, type: {memory_llm_type}"
                 )
                 self.memory.set_llm(memory_llm)
             else:
-                # 否则使用主LLM
                 self.memory.set_llm(self.llm)
-                self.logger.bind(tag=TAG).info("使用主LLM作为意图识别模型")
+                self.logger.bind(tag=TAG).info("Using main LLM for intent recognition")
 
     def _initialize_intent(self):
         if self.intent is None:
@@ -838,24 +801,20 @@ class ConnectionHandler:
         ]["type"]
         if self.intent_type == "function_call" or self.intent_type == "intent_llm":
             self.load_function_plugin = True
-        """初始化意图识别模块"""
-        # 获取意图识别配置
+        """Initialize intent recognition"""
         intent_config = self.config["Intent"]
         intent_type = self.config["Intent"][self.config["selected_module"]["Intent"]][
             "type"
         ]
 
-        # 如果使用 nointent，直接返回
         if intent_type == "nointent":
             return
-        # 使用 intent_llm 模式
         elif intent_type == "intent_llm":
             intent_llm_name = intent_config[self.config["selected_module"]["Intent"]][
                 "llm"
             ]
 
             if intent_llm_name and intent_llm_name in self.config["LLM"]:
-                # 如果配置了专用LLM，则创建独立的LLM实例
                 from core.utils import llm as llm_utils
 
                 intent_llm_config = self.config["LLM"][intent_llm_name]
@@ -864,17 +823,15 @@ class ConnectionHandler:
                     intent_llm_type, intent_llm_config
                 )
                 self.logger.bind(tag=TAG).info(
-                    f"为意图识别创建了专用LLM: {intent_llm_name}, 类型: {intent_llm_type}"
+                    f"Created dedicated LLM for intent recognition: {intent_llm_name}, type: {intent_llm_type}"
                 )
                 self.intent.set_llm(intent_llm)
             else:
-                # 否则使用主LLM
                 self.intent.set_llm(self.llm)
-                self.logger.bind(tag=TAG).info("使用主LLM作为意图识别模型")
+                self.logger.bind(tag=TAG).info("Using main LLM for intent recognition")
 
-        """加载统一工具处理器"""
+        """Load unified tool handler"""
         self.func_handler = UnifiedToolHandler(self)
-        # 异步初始化工具处理器
         if self._is_dify_llm():
             self.logger.bind(tag=TAG).info(
                 "UnifiedToolHandler initialized for local routing and gateway tools only (Oriagent mode)"

@@ -59,9 +59,9 @@ def initialize_modules(
             intent_type,
             config["Intent"][select_intent_module],
         )
-        logger.bind(tag=TAG).info(f"初始化组件: intent成功 {select_intent_module}")
+        logger.bind(tag=TAG).info(f"Component initialized: Intent successful {select_intent_module}")
 
-    # 初始化Memory模块
+    # Initialize Memory module
     if init_memory:
         select_memory_module = config["selected_module"]["Memory"]
         memory_type = (
@@ -74,9 +74,9 @@ def initialize_modules(
             config["Memory"][select_memory_module],
             config.get("summaryMemory", None),
         )
-        logger.bind(tag=TAG).info(f"初始化组件: memory成功 {select_memory_module}")
+        logger.bind(tag=TAG).info(f"Component initialized: Memory successful {select_memory_module}")
 
-    # 初始化VAD模块
+    # Initialize VAD module
     if init_vad:
         select_vad_module = config["selected_module"]["VAD"]
         vad_type = (
@@ -88,13 +88,13 @@ def initialize_modules(
             vad_type,
             config["VAD"][select_vad_module],
         )
-        logger.bind(tag=TAG).info(f"初始化组件: vad成功 {select_vad_module}")
+        logger.bind(tag=TAG).info(f"Component initialized: VAD successful {select_vad_module}")
 
-    # 初始化ASR模块
+    # Initialize ASR module
     if init_asr:
         select_asr_module = config["selected_module"]["ASR"]
         modules["asr"] = initialize_asr(config)
-        logger.bind(tag=TAG).info(f"初始化组件: asr成功 {select_asr_module}")
+        logger.bind(tag=TAG).info(f"Component initialized: ASR successful {select_asr_module}")
     return modules
 
 
@@ -125,12 +125,12 @@ def initialize_asr(config):
         config["ASR"][select_asr_module],
         str(config.get("delete_audio", True)).lower() in ("true", "1", "yes"),
     )
-    logger.bind(tag=TAG).info("ASR模块初始化完成")
+    logger.bind(tag=TAG).info("ASR module initialization complete")
     return new_asr
 
 
 def initialize_voiceprint(asr_instance, config):
-    """初始化声纹识别功能"""
+    """Initialize voiceprint recognition function"""
     voiceprint_config = config.get("voiceprint")
     if not voiceprint_config:
         return False  

@@ -22,12 +22,12 @@ def check_config_file():
     # 检查是否从API读取配置
     config = load_config()
     if config.get("read_config_from_api", False):
-        print("从API读取配置")
+        print("Read config from API")
         old_config_origin = read_config(custom_config_file)
         if old_config_origin.get("selected_module") is not None:
-            error_msg = "您的配置文件好像既包含智控台的配置又包含本地配置：\n"
-            error_msg += "\n建议您：\n"
-            error_msg += "1、将根目录的config_from_api.yaml文件复制到data下，重命名为.config.yaml\n"
-            error_msg += "2、按教程配置好接口地址和密钥\n"
+            error_msg = "Your configuration file seems to contain both smart console configuration and local configuration:\n"
+            error_msg += "\nIt is recommended that you:\n"
+            error_msg += "1. Copy the config_from_api.yaml file from the root directory to the data folder and rename it to .config.yaml\n"
+            error_msg += "2. Configure the interface address and API key according to the tutorial\n"
             raise ValueError(error_msg)
     config_file_valid = True

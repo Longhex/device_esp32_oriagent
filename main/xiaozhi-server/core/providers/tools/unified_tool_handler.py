@@ -235,13 +235,13 @@ class UnifiedToolHandler:
         try:
             await self.server_mcp_executor.cleanup()
 
-            # 清理MCP接入点连接
+            # Clean up MCP endpoint connection
             if (
                 hasattr(self.conn, "mcp_endpoint_client")
                 and self.conn.mcp_endpoint_client
             ):
                 await self.conn.mcp_endpoint_client.close()
 
-            self.logger.info("工具处理器清理完成")
+            self.logger.info("Tool processor cleanup complete")
         except Exception as e:
-            self.logger.error(f"工具处理器清理失败: {e}")
+            self.logger.error(f"Tool processor cleanup failed: {e}")
