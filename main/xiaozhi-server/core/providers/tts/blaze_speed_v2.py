@@ -25,10 +25,10 @@ CONTINUOUS_JITTER_BYTES = 14400 # ~300ms continuous buffer (Fix 1: was 100ms, ch
 WAV_HEADER_SIZE = 44
 POOL_SIZE = 8  # Higher capacity for simultaneous segments
 FETCH_TIMEOUT = 10.0
-POOL_HEALTH_INTERVAL = 5.0      # Fix 3: maintenance loop check mỗi 5s (was: 30s vì timeout=interval*6)
+POOL_HEALTH_INTERVAL = 30.0     # inline get_connection() reconnects dead slots on demand; 30s cuts log noise 6x
 PLAYBACK_JOIN_TIMEOUT = 30.0
 SEGMENT_FETCH_TIMEOUT = 25.0  # Increased to allow Producer retries (10s+10s+5s)
-FETCH_CONCURRENCY = 3           # Fix 2: max 3 segment fetches song song (chống rate-limit Blaze)
+FETCH_CONCURRENCY = 5           # raised from 3: reduces blaze_fetch_queue_ms on long responses; watch blaze_error_ms for rate limits
 UNDERRUN_THRESHOLD_MS = 100     # Fix 4: gap audio playback > 100ms coi là underrun
 KEEPALIVE_IDLE_SEC = 25.0       # Fix 5: gửi ping nếu connection idle quá ngưỡng này
 
@@ -671,11 +671,12 @@ class TTSProvider(TTSProviderBase):
         FORCE_SEG_LEN = 80
         FORCE_LIMIT = 60
 
+        MIN_SEG_CHARS = 5  # skip cuts that produce tiny segments (e.g. "1." from numbered lists)
         soft_idx = -1
         for i, char in enumerate(text_to_process):
             if char in hard_stops:
                 seg = text_to_process[:i+1].strip()
-                if seg:
+                if seg and len(seg) >= MIN_SEG_CHARS:
                     self.processed_chars += i + 1
                     return seg
             elif soft_idx < 0 and char in soft_stops and (i + 1) >= MIN_SOFT_LEN:
