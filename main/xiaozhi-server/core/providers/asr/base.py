@@ -83,6 +83,14 @@ class ASRProviderBase(ABC):
     # 处理语音停止
     async def handle_voice_stop(self, conn: "ConnectionHandler", asr_audio_task: List[bytes]):
         """并行处理ASR和声纹识别"""
+        # Method 4: trigger LLM pool warmup in background while ASR runs (~2-3s).
+        # If pool is already warm this costs ~20ms (HEAD reuse); if cold it saves ~350ms.
+        llm = getattr(conn, "llm", None)
+        if llm is not None and hasattr(llm, "_warmup_pool"):
+            threading.Thread(
+                target=llm._warmup_pool, name="llm-parallel-warmup", daemon=True,
+            ).start()
+
         try:
             total_start_time = time.monotonic()
 

@@ -1,5 +1,6 @@
 import json
 import time
+import socket
 import threading
 import httpx
 from config.logger import setup_logging
@@ -17,6 +18,10 @@ _HTTPX_LIMITS = httpx.Limits(
     max_connections=50,
     keepalive_expiry=300.0,
 )
+
+# Method 5: TCP_NODELAY disables Nagle's algorithm — eliminates ~40ms buffering
+# delay on small SSE chunks. Shared transport reuses the same pool settings.
+_TCP_NODELAY_OPTIONS = [(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)]
 
 
 class LLMProvider(LLMProviderBase):
@@ -37,22 +42,28 @@ class LLMProvider(LLMProviderBase):
         self.model_name = config.get("model_name", "oriagent-default")
         self.session_conversation_map = {}  # Map session IDs to Oriagent conversation IDs
 
-        # Persistent pooled client. Try HTTP/2 (giảm thêm RTT cho multi-stream);
-        # fallback HTTP/1.1 nếu package 'h2' chưa cài.
+        # Persistent pooled client with TCP_NODELAY (Method 5).
+        # Transport carries pool limits + socket options so Client inherits both.
+        # Try HTTP/2 (giảm thêm RTT cho multi-stream); fallback HTTP/1.1 nếu h2 chưa cài.
         try:
-            self.http_client = httpx.Client(
-                timeout=_HTTPX_TIMEOUT, limits=_HTTPX_LIMITS, http2=True,
+            _transport = httpx.HTTPTransport(
+                http2=True,
+                limits=_HTTPX_LIMITS,
+                socket_options=_TCP_NODELAY_OPTIONS,
             )
+            self.http_client = httpx.Client(timeout=_HTTPX_TIMEOUT, transport=_transport)
             self._http_proto = "h2"
-        except ImportError:
-            self.http_client = httpx.Client(
-                timeout=_HTTPX_TIMEOUT, limits=_HTTPX_LIMITS,
+        except Exception:
+            _transport = httpx.HTTPTransport(
+                limits=_HTTPX_LIMITS,
+                socket_options=_TCP_NODELAY_OPTIONS,
             )
+            self.http_client = httpx.Client(timeout=_HTTPX_TIMEOUT, transport=_transport)
             self._http_proto = "h1"
         logger.bind(tag=TAG).info(
             f"Oriagent HTTP pool ready (proto={self._http_proto}, "
             f"max_keepalive={_HTTPX_LIMITS.max_keepalive_connections}, "
-            f"keepalive_expiry={_HTTPX_LIMITS.keepalive_expiry}s)"
+            f"keepalive_expiry={_HTTPX_LIMITS.keepalive_expiry}s, TCP_NODELAY=on)"
         )
 
         # Task 3.3: pre-warm pool. Mở TCP+TLS sẵn trong background thread để
