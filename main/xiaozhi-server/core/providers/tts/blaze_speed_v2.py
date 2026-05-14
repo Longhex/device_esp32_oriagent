@@ -568,6 +568,9 @@ class TTSProvider(TTSProviderBase):
                                     "blaze_total_ms", total_ms,
                                     attempt=attempt, text_len=len(text),
                                 )
+                            logger.bind(tag=TAG).info(
+                                f"Blaze segment #{idx} finished, response data: {data}"
+                            )
                             return True
                         if status in ("failed-request", "internal-error", "bad-request"):
                             perf_metrics.record(
