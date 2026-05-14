@@ -262,7 +262,7 @@ class TTSProvider(TTSProviderBase):
         self.speaker_id = config.get("private_voice", "HN-Nu-ThuHuyenDeThuong")
         self.audio_speed = config.get("audio_speed", "1.2")
         self.audio_format = "pcm"
-        self.sample_rate = 16000
+        self.sample_rate = config.get("sample_rate", 24000)
         self.audio_quality = 128
 
         domain = config.get("domain") or "api.blaze.vn"
