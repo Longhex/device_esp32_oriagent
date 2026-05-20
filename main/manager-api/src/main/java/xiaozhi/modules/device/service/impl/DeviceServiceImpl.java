@@ -21,8 +21,8 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.aop.framework.AopContext;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -81,8 +81,24 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
     private final RedisUtils redisUtils;
     private final OtaService otaService;
 
-    @Async
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateDeviceConnectionInfo(String agentId, String deviceId, String appVersion) {
+        // ✅ 不用@Async，避免设备被删除后仍然更新的问题
+        // 改为同步执行，这样caller可以知道是否成功
+
+        if (StringUtils.isBlank(deviceId)) {
+            log.warn("updateDeviceConnectionInfo: deviceId is blank");
+            return;
+        }
+
+        // 先验证设备存在（防止删除后仍然更新）
+        DeviceEntity existing = baseDao.selectById(deviceId);
+        if (existing == null) {
+            log.warn("Device {} not found when updating connection info", deviceId);
+            return;
+        }
+
         try {
             DeviceEntity device = new DeviceEntity();
             device.setId(deviceId);
@@ -90,16 +106,28 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
             if (StringUtils.isNotBlank(appVersion)) {
                 device.setAppVersion(appVersion);
             }
-            deviceDao.updateById(device);
+
+            // ✅ 检查更新是否成功（避免silent failure）
+            int updated = deviceDao.updateById(device);
+            if (updated == 0) {
+                log.warn("Device {} update failed (0 rows affected) - may have been deleted", deviceId);
+                return;
+            }
+
+            // 缓存最后连接时间
             if (StringUtils.isNotBlank(agentId)) {
                 redisUtils.set(RedisKeys.getAgentDeviceLastConnectedAtById(agentId), new Date());
             }
+
+            log.debug("Device {} connection info updated successfully", deviceId);
         } catch (Exception e) {
-            log.error("异步更新设备连接信息失败", e);
+            log.error("Failed to update device {} connection info: {}", deviceId, e.getMessage(), e);
+            throw e;  // ✅ 抛出异常而不是silently fail
         }
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Boolean deviceActivation(String agentId, String activationCode) {
         if (StringUtils.isBlank(activationCode)) {
             throw new RenException(ErrorCode.ACTIVATION_CODE_EMPTY);
@@ -120,6 +148,7 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
         if (!activationCode.equals(cachedCode)) {
             throw new RenException(ErrorCode.ACTIVATION_CODE_ERROR);
         }
+
         // 检查设备有没有被激活
         if (selectById(deviceId) != null) {
             throw new RenException(ErrorCode.DEVICE_ALREADY_ACTIVATED);
@@ -132,6 +161,10 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
         if (user.getId() == null) {
             throw new RenException(ErrorCode.USER_NOT_LOGIN);
         }
+
+        // ✅ 策略：先清缓存，再插入DB
+        // 这样缓存和DB状态会保持一致，即使并发请求也不会看到脏数据
+        redisUtils.delete(List.of(cacheDeviceKey, deviceKey, RedisKeys.getAgentDeviceCountById(agentId)));
 
         Date currentTime = new Date();
         DeviceEntity deviceEntity = new DeviceEntity();
@@ -147,10 +180,18 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
         deviceEntity.setUpdater(user.getId());
         deviceEntity.setUpdateDate(currentTime);
         deviceEntity.setLastConnectedAt(currentTime);
-        deviceDao.insert(deviceEntity);
 
-        // 清理redis缓存、清除智能体设备数量缓存
-        redisUtils.delete(List.of(cacheDeviceKey, deviceKey, RedisKeys.getAgentDeviceCountById(agentId)));
+        try {
+            deviceDao.insert(deviceEntity);
+        } catch (Exception e) {
+            // ✅ 处理并发激活：如果插入失败（可能是另一个请求同时激活了同一个设备）
+            if (e.getMessage() != null && e.getMessage().contains("Duplicate entry")) {
+                log.warn("Device {} was activated concurrently by another request", deviceId);
+                throw new RenException(ErrorCode.DEVICE_ALREADY_ACTIVATED);
+            }
+            throw e;
+        }
+
         return true;
     }
 
@@ -275,14 +316,37 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
         }
 
         if (deviceById != null) {
-            // 如果设备存在，则异步更新上次连接时间和版本信息
-            String appVersion = deviceReport.getApplication() != null ? deviceReport.getApplication().getVersion()
-                    : null;
-            // 通过Spring代理调用异步方法
-            ((DeviceServiceImpl) AopContext.currentProxy()).updateDeviceConnectionInfo(deviceById.getAgentId(),
-                    deviceById.getId(), appVersion);
+            // ✅ Re-validate: chống race condition với unbind đồng thời
+            // Nếu user ấn "hủy liên kết" trong lúc OTA đang được xử lý, device đã bị xóa khỏi DB
+            // → cần chuyển sang flow activation thay vì để client tưởng đang còn active
+            DeviceEntity revalidated = baseDao.selectById(deviceById.getId());
+            if (revalidated == null) {
+                log.warn("Device {} was unbound during OTA check, switching to activation flow",
+                        deviceById.getId());
+
+                // Reset firmware về INVALID (device không còn tồn tại nên không thể OTA)
+                DeviceReportRespDTO.Firmware firmware = new DeviceReportRespDTO.Firmware();
+                String currentVer = (deviceReport.getApplication() != null
+                        && deviceReport.getApplication().getVersion() != null)
+                                ? deviceReport.getApplication().getVersion()
+                                : "0.0.0";
+                firmware.setVersion(currentVer);
+                firmware.setUrl(Constant.INVALID_FIRMWARE_URL);
+                response.setFirmware(firmware);
+
+                // Sinh activation code mới để client hiển thị màn hình kích hoạt
+                DeviceReportRespDTO.Activation code = buildActivation(macAddress, deviceReport);
+                response.setActivation(code);
+            } else {
+                // Device vẫn tồn tại → update connection info như bình thường
+                String appVersion = deviceReport.getApplication() != null
+                        ? deviceReport.getApplication().getVersion()
+                        : null;
+                ((DeviceServiceImpl) AopContext.currentProxy()).updateDeviceConnectionInfo(
+                        deviceById.getAgentId(), deviceById.getId(), appVersion);
+            }
         } else {
-            // 如果设备不存在，则生成激活码
+            // Device không tồn tại từ đầu → sinh activation code
             DeviceReportRespDTO.Activation code = buildActivation(macAddress, deviceReport);
             response.setActivation(code);
         }
@@ -299,21 +363,51 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void unbindDevice(Long userId, String deviceId) {
-        // 先查询设备信息，获取agentId
         DeviceEntity device = baseDao.selectById(deviceId);
         if (device == null) {
             return;
         }
-        if (StringUtils.isNotBlank(device.getAgentId())) {
-            // 清除智能体设备数量缓存
-            redisUtils.delete(RedisKeys.getAgentDeviceCountById(device.getAgentId()));
+        String agentId = device.getAgentId();
+
+        // 先读 activation_code (nếu cache còn) để có thể xóa reverse-lookup key sau khi delete DB
+        String safeDeviceId = deviceId.replace(":", "_").toLowerCase();
+        String activationInfoKey = RedisKeys.getOtaDeviceActivationInfo(safeDeviceId);
+        String activationCode = null;
+        Object cached = redisUtils.get(activationInfoKey);
+        if (cached instanceof Map) {
+            Object code = ((Map<?, ?>) cached).get("activation_code");
+            if (code != null) {
+                activationCode = code.toString();
+            }
         }
 
+        // Xóa DB TRƯỚC, cache SAU: tránh trường hợp DB rollback mà cache đã bay
         UpdateWrapper<DeviceEntity> wrapper = new UpdateWrapper<>();
         wrapper.eq("user_id", userId);
         wrapper.eq("id", deviceId);
-        baseDao.delete(wrapper);
+        int deleted = baseDao.delete(wrapper);
+
+        if (deleted == 0) {
+            log.warn("Device {} not found or already deleted for user {}", deviceId, userId);
+            return;
+        }
+
+        // Clear toàn bộ cache liên quan
+        List<String> keysToDelete = new ArrayList<>();
+        keysToDelete.add(activationInfoKey);
+        if (activationCode != null) {
+            keysToDelete.add(RedisKeys.getOtaActivationCode(activationCode));
+        }
+        if (StringUtils.isNotBlank(agentId)) {
+            keysToDelete.add(RedisKeys.getAgentDeviceCountById(agentId));
+            keysToDelete.add(RedisKeys.getAgentDeviceLastConnectedAtById(agentId));
+        }
+        redisUtils.delete(keysToDelete);
+
+        log.info("Device {} unbound successfully for user {}, cleared {} cache keys",
+                deviceId, userId, keysToDelete.size());
     }
 
     @Override
@@ -771,6 +865,14 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
             cursor = nextCursor;
         }
 
+        // ✅ 重新验证设备在长操作后仍然存在
+        // HTTP调用可能耗时10秒，期间设备可能被解绑
+        DeviceEntity revalidated = baseDao.selectById(deviceId);
+        if (revalidated == null) {
+            log.warn("Device {} was unbound during tool list retrieval", deviceId);
+            throw new RenException(ErrorCode.DEVICE_NOT_EXIST);
+        }
+
         // 构建返回结果
         if (allTools.isEmpty()) {
             return null;
@@ -837,6 +939,14 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
                 .body(JSONUtil.toJsonStr(requestBody))
                 .timeout(10000) // 超时，毫秒
                 .execute().body();
+
+        // ✅ 重新验证设备在长操作后仍然存在
+        // HTTP调用可能耗时10秒，期间设备可能被解绑
+        DeviceEntity revalidated = baseDao.selectById(deviceId);
+        if (revalidated == null) {
+            log.warn("Device {} was unbound during tool call", deviceId);
+            throw new RenException(ErrorCode.DEVICE_NOT_EXIST);
+        }
 
         // 解析响应
         if (StringUtils.isNotBlank(resultMessage)) {

@@ -42,6 +42,7 @@ from core.utils.prompt_manager import PromptManager
 from core.utils.voiceprint_provider import VoiceprintProvider
 from core.utils.util import get_system_error_response
 from core.utils import textUtils
+from core.utils.device_conversation_store import load_conversation_id, save_conversation_id
 
 
 TAG = __name__
@@ -258,6 +259,7 @@ class ConnectionHandler:
             self.logger.bind(tag=TAG).info(
                 f"Oriagent conversation_id updated: {conversation_id[:16]}..."
             )
+            save_conversation_id(self.device_id, conversation_id)
 
     async def handle_connection(self, ws: websockets.ServerConnection):
         try:
@@ -278,6 +280,12 @@ class ConnectionHandler:
             )
 
             self.device_id = self.headers.get("device-id", None)
+            self.oriagent_conversation_id = load_conversation_id(self.device_id)
+            if self.oriagent_conversation_id:
+                self.logger.bind(tag=TAG).info(
+                    f"Resuming Oriagent conversation for device {self.device_id}: "
+                    f"{self.oriagent_conversation_id[:16]}..."
+                )
 
             # 认证通过,继续处理
             self.websocket = ws
