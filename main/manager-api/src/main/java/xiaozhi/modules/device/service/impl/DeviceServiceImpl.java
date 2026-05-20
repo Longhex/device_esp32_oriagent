@@ -506,6 +506,31 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
         return RedisKeys.getOtaDeviceActivationInfo(safeDeviceId);
     }
 
+    @Override
+    public String generateActivationCodeForUnboundDevice(String macAddress) {
+        // Trả về code đã cache nếu có (idempotent)
+        String cachedCode = geCodeByDeviceId(macAddress);
+        if (StringUtils.isNotBlank(cachedCode)) {
+            return cachedCode;
+        }
+
+        // Sinh code mới và lưu cache (2 chiều: data + reverse lookup)
+        String newCode = RandomUtil.randomNumbers(6);
+        Map<String, Object> dataMap = new HashMap<>();
+        dataMap.put("id", macAddress);
+        dataMap.put("mac_address", macAddress);
+        dataMap.put("board", "unknown");
+        dataMap.put("app_version", null);
+        dataMap.put("deviceId", macAddress);
+        dataMap.put("activation_code", newCode);
+
+        redisUtils.set(getDeviceCacheKey(macAddress), dataMap);
+        redisUtils.set(RedisKeys.getOtaActivationCode(newCode), macAddress);
+
+        log.info("Generated activation code {} for unbound device {}", newCode, macAddress);
+        return newCode;
+    }
+
     public DeviceReportRespDTO.Activation buildActivation(String deviceId, DeviceReportReqDTO deviceReport) {
         DeviceReportRespDTO.Activation code = new DeviceReportRespDTO.Activation();
 

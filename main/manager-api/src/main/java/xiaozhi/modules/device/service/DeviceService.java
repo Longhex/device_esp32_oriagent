@@ -80,11 +80,20 @@ public interface DeviceService extends BaseService<DeviceEntity> {
 
     /**
      * 根据设备ID获取激活码
-     * 
+     *
      * @param deviceId 设备ID
      * @return 激活码
      */
     String geCodeByDeviceId(String deviceId);
+
+    /**
+     * Sinh activation code cho thiết bị chưa bind (không tồn tại trong DB)
+     * Dùng khi device đã unbind hoặc chưa từng activate
+     *
+     * @param macAddress MAC address dùng làm deviceId
+     * @return Activation code 6 số
+     */
+    String generateActivationCodeForUnboundDevice(String macAddress);
 
     /**
      * 获取这个智能体设备理的最近的最后连接时间

@@ -126,12 +126,14 @@ public class ConfigServiceImpl implements ConfigService {
         // 根据MAC地址查找设备
         DeviceEntity device = deviceService.getDeviceByMacAddress(macAddress);
         if (device == null) {
-            // 如果设备，去redis里看看有没有需要连接的设备
+            // Device chưa bind hoặc đã bị unbind:
+            // - Nếu cache đã có activation code → dùng lại
+            // - Nếu chưa có → auto-gen code mới để client luôn có cách bind lại
             String cachedCode = deviceService.geCodeByDeviceId(macAddress);
-            if (StringUtils.isNotBlank(cachedCode)) {
-                throw new RenException(ErrorCode.OTA_DEVICE_NEED_BIND, cachedCode);
+            if (StringUtils.isBlank(cachedCode)) {
+                cachedCode = deviceService.generateActivationCodeForUnboundDevice(macAddress);
             }
-            throw new RenException(ErrorCode.OTA_DEVICE_NOT_FOUND);
+            throw new RenException(ErrorCode.OTA_DEVICE_NEED_BIND, cachedCode);
         }
 
         // 获取智能体信息

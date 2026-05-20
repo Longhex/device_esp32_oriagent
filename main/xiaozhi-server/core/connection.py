@@ -996,7 +996,24 @@ class ConnectionHandler:
                     on_conversation_id=self._on_oriagent_conversation_id,
                 )
                 self.logger.bind(tag=TAG).debug(f"Using Oriagent Conversation ID: {self.oriagent_conversation_id}")
-                
+            elif functions is not None:
+                # Standard LLM (ChatGLM, OpenAI, ...) WITH function calling
+                llm_responses = self.llm.response_with_functions(
+                    self.session_id,
+                    self.dialogue.get_llm_dialogue_with_memory(
+                        memory_str, self.config.get("voiceprint", {})
+                    ),
+                    functions=functions,
+                )
+            else:
+                # Standard LLM (ChatGLM, OpenAI, ...) text-only
+                llm_responses = self.llm.response(
+                    self.session_id,
+                    self.dialogue.get_llm_dialogue_with_memory(
+                        memory_str, self.config.get("voiceprint", {})
+                    ),
+                )
+
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"LLM 处理出错 {query}: {e}")
             return None
