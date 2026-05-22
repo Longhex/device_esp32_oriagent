@@ -203,6 +203,15 @@ class LLMProvider(LLMProviderBase):
                         yield from self.response(session_id, dialogue, **retry_kwargs)
                         return
 
+                    # If this is a retry attempt and still failed, don't expose technical error to user.
+                    # Just log and return silently — user has already waited for retry.
+                    if _retry:
+                        logger.bind(tag=TAG).error(
+                            f"Retry failed after stale conversation recovery. Status={r.status_code}: {error_text[:100]}"
+                        )
+                        return
+
+                    # First attempt error (not stale_conv recovery) → yield error for debugging
                     yield f" [HTTP Error {r.status_code}: {error_text[:100]}] "
                     return
 
