@@ -134,6 +134,9 @@ class LLMProvider(LLMProviderBase):
         # Priority: explicit kwarg > internal map
         conversation_id = kwargs.get("conversation_id", "") or self.session_conversation_map.get(session_id, "")
         on_conversation_id = kwargs.get("on_conversation_id")
+        on_conversation_cleared = kwargs.get("on_conversation_cleared")
+        # Guard against infinite retry loop when 404 persists
+        _retry = kwargs.get("_retry", False)
 
         # Target payload structure matching Oriagent REST requirements
         request_payload = {
@@ -175,8 +178,32 @@ class LLMProvider(LLMProviderBase):
                 )
                 if r.status_code != 200:
                     error_body = r.read()
-                    logger.bind(tag=TAG).error(f"Oriagent API Error (Status {r.status_code}): {error_body.decode()}")
-                    yield f" [HTTP Error {r.status_code}: {error_body.decode()[:100]}] "
+                    error_text = error_body.decode()
+                    logger.bind(tag=TAG).error(f"Oriagent API Error (Status {r.status_code}): {error_text}")
+
+                    # Self-healing: stale conversation_id on server side.
+                    # Clear local + persistent state, then retry once with a fresh conversation.
+                    is_stale_conv = (
+                        r.status_code == 404
+                        and conversation_id
+                        and ("not_found" in error_text.lower() or "conversation not exists" in error_text.lower())
+                    )
+                    if is_stale_conv and not _retry:
+                        logger.bind(tag=TAG).warning(
+                            f"Stale Oriagent conversation_id detected ({conversation_id[:16]}...). "
+                            f"Clearing and retrying with a new conversation."
+                        )
+                        self.session_conversation_map.pop(session_id, None)
+                        if callable(on_conversation_cleared):
+                            try:
+                                on_conversation_cleared()
+                            except Exception as cb_err:
+                                logger.bind(tag=TAG).error(f"on_conversation_cleared callback failed: {cb_err}")
+                        retry_kwargs = {**kwargs, "conversation_id": "", "_retry": True}
+                        yield from self.response(session_id, dialogue, **retry_kwargs)
+                        return
+
+                    yield f" [HTTP Error {r.status_code}: {error_text[:100]}] "
                     return
 
                 for line in r.iter_lines():

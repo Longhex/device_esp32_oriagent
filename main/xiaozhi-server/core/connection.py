@@ -42,7 +42,11 @@ from core.utils.prompt_manager import PromptManager
 from core.utils.voiceprint_provider import VoiceprintProvider
 from core.utils.util import get_system_error_response
 from core.utils import textUtils
-from core.utils.device_conversation_store import load_conversation_id, save_conversation_id
+from core.utils.device_conversation_store import (
+    load_conversation_id,
+    save_conversation_id,
+    clear_conversation_id,
+)
 
 
 TAG = __name__
@@ -260,6 +264,16 @@ class ConnectionHandler:
                 f"Oriagent conversation_id updated: {conversation_id[:16]}..."
             )
             save_conversation_id(self.device_id, conversation_id)
+
+    def _on_oriagent_conversation_cleared(self):
+        """Callback from Oriagent provider when stale conversation_id must be discarded.
+        Triggered on 404 'Conversation Not Exists' so next turn opens a fresh session."""
+        stale_id = self.oriagent_conversation_id
+        self.oriagent_conversation_id = ""
+        self.logger.bind(tag=TAG).warning(
+            f"Oriagent conversation_id cleared (stale: {stale_id[:16] if stale_id else 'none'}...)"
+        )
+        clear_conversation_id(self.device_id)
 
     async def handle_connection(self, ws: websockets.ServerConnection):
         try:
@@ -984,6 +998,7 @@ class ConnectionHandler:
                     functions=functions,
                     conversation_id=self.oriagent_conversation_id,
                     on_conversation_id=self._on_oriagent_conversation_id,
+                    on_conversation_cleared=self._on_oriagent_conversation_cleared,
                 )
             elif self._is_dify_llm():
                 # Oriagent text-only mode
@@ -994,6 +1009,7 @@ class ConnectionHandler:
                     ),
                     conversation_id=self.oriagent_conversation_id,
                     on_conversation_id=self._on_oriagent_conversation_id,
+                    on_conversation_cleared=self._on_oriagent_conversation_cleared,
                 )
                 self.logger.bind(tag=TAG).debug(f"Using Oriagent Conversation ID: {self.oriagent_conversation_id}")
             elif functions is not None:

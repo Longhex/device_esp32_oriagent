@@ -40,3 +40,13 @@ def save_conversation_id(device_id: str, conversation_id: str) -> None:
         if data.get(device_id) != conversation_id:
             data[device_id] = conversation_id
             _write(data)
+
+
+def clear_conversation_id(device_id: str) -> None:
+    if not device_id:
+        return
+    with _lock:
+        data = _read()
+        if device_id in data:
+            data.pop(device_id, None)
+            _write(data)
