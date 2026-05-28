@@ -91,9 +91,18 @@ public class LoginController {
     public Result<TokenDTO> login(@RequestBody LoginDTO login) {
         String password = login.getPassword();
 
-        // 使用工具类解密并验证验证码
-        String actualPassword = Sm2DecryptUtil.decryptAndValidateCaptcha(
-                password, login.getCaptchaId(), captchaService, sysParamsService);
+        // 直接解密密码（已移除Captcha在登录界面的验证）
+        String privateKeyStr = sysParamsService.getValue(Constant.SM2_PRIVATE_KEY, true);
+        if (StringUtils.isBlank(privateKeyStr)) {
+            throw new RenException(ErrorCode.SM2_KEY_NOT_CONFIGURED);
+        }
+        
+        String actualPassword;
+        try {
+            actualPassword = xiaozhi.common.utils.SM2Utils.decrypt(privateKeyStr, password);
+        } catch (Exception e) {
+            throw new RenException(ErrorCode.SM2_DECRYPT_ERROR);
+        }
 
         login.setPassword(actualPassword);
 

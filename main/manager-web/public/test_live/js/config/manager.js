@@ -25,9 +25,11 @@ export function loadConfig() {
     const agentId = urlParams.get('agentId');
     const queryOtaUrl = urlParams.get('otaUrl');
 
-    // 优先从URL获取MAC地址（agentId），否则从localStorage加载，最后生成随机的
-    let savedMac = agentId || localStorage.getItem('xz_tester_deviceMac');
-    if (!savedMac) {
+    // 优先从URL获取MAC地址，但是要注意如果agentId被传进来，它是一个UUID而不是MAC，不能直接用作MAC地址
+    // 修复OTA连接失败：不把agentId作为MAC地址
+    let savedMac = localStorage.getItem('xz_tester_deviceMac');
+    // 如果保存的MAC地址格式不对（比如之前错误地保存了UUID），则重新生成
+    if (!savedMac || !savedMac.includes(':')) {
         savedMac = generateRandomMac();
         localStorage.setItem('xz_tester_deviceMac', savedMac);
     }
