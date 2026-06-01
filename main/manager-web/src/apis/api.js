@@ -5,6 +5,7 @@ import device from './module/device.js'
 import dict from './module/dict.js'
 import model from './module/model.js'
 import ota from './module/ota.js'
+import deviceMonitor from './module/deviceMonitor.js'
 import timbre from "./module/timbre.js"
 import user from './module/user.js'
 import voiceClone from './module/voiceClone.js'
@@ -38,6 +39,7 @@ export default {
     model,
     timbre,
     ota,
+    deviceMonitor,
     dict,
     voiceResource,
     voiceClone,

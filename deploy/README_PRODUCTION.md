@@ -59,6 +59,31 @@ Production endpoints:
 - OTA: `https://device.oriagent.com/xiaozhi/ota/`
 - Vision API: `https://device.oriagent.com/mcp/vision/explain`
 
+## EMQX — broker quản lý/giám sát thiết bị
+
+`docker-compose.prod.yml` thêm service `emqx` làm **mặt phẳng quản lý/giám sát độc lập** với luồng audio xiaozhi. Đây KHÔNG phải `xiaozhi-mqtt-gateway` (kênh truyền audio MQTT+UDP) — hai thứ tách biệt.
+
+Cổng:
+
+- `1883` MQTT TCP, `8883` MQTT over TLS — thiết bị kết nối (mở public qua firewall/VPS).
+- `8083`/`8084` MQTT over WebSocket/WSS — cho app/web nếu cần kết nối trực tiếp.
+- `18083` Dashboard quản trị — mặc định bind `127.0.0.1`, truy cập qua SSH tunnel:
+  `ssh -L 18083:127.0.0.1:18083 user@server` rồi mở `http://localhost:18083`.
+
+Chuẩn bị trong `.env`:
+
+1. Đặt `EMQX_DASHBOARD_PASSWORD` mạnh và `EMQX_NODE_COOKIE` ngẫu nhiên.
+2. ⚠️ EMQX 5.x **mặc định cho phép kết nối ẩn danh** khi chưa cấu hình authenticator. Trước khi mở cổng `1883`/`8883` ra public, **bắt buộc** bật authentication: Dashboard → Access Control → Authentication → tạo built-in DB (per-device username/password) hoặc HTTP authn trỏ về `manager-api`. Smoke-test xong nhớ khoá lại.
+
+Kiểm tra nhanh sau khi `up`:
+
+```bash
+docker compose -f docker-compose.prod.yml exec emqx emqx ctl status   # "is started"
+docker compose -f docker-compose.prod.yml exec emqx emqx ctl listeners # thấy tcp:default 1883...
+```
+
+Bước tiếp theo (chưa làm ở stack này): cấu hình authentication theo từng thiết bị (per-device credential, có thể wire HTTP authn trỏ về `manager-api`), rule-engine/bridge đẩy presence + telemetry về Redis/DB, và API cho web/app.
+
 ## Resource tuning
 
 Compose cannot auto-scale CPU and memory limits by itself. For a Linux VPS, you can generate suggested values and paste them into `.env`:

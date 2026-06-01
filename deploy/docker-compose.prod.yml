@@ -118,6 +118,84 @@ services:
         aliases:
           - xiaozhi-esp32-server-redis
 
+  # EMQX broker — mặt phẳng QUẢN LÝ/GIÁM SÁT thiết bị (độc lập với luồng audio xiaozhi).
+  # Dùng cho: presence online/offline (LWT), telemetry, lệnh cấu hình/nâng cấp.
+  # KHÔNG liên quan tới xiaozhi-mqtt-gateway (kênh truyền audio MQTT+UDP).
+  emqx:
+    image: emqx/emqx:${EMQX_IMAGE_TAG:-5.8}
+    restart: always
+    environment:
+      TZ: ${TZ:-Asia/Saigon}
+      EMQX_NODE__NAME: emqx@127.0.0.1
+      EMQX_NODE__COOKIE: ${EMQX_NODE_COOKIE:?Set EMQX_NODE_COOKIE in .env}
+      EMQX_DASHBOARD__DEFAULT_USERNAME: ${EMQX_DASHBOARD_USER:-admin}
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_DASHBOARD_PASSWORD:?Set EMQX_DASHBOARD_PASSWORD in .env}
+      # LƯU Ý BẢO MẬT: EMQX 5.x mặc định CHO PHÉP ẩn danh khi chưa cấu hình authenticator.
+      # Trước khi mở cổng 1883/8883 ra public PHẢI thêm authn (Dashboard > Access Control >
+      # Authentication) — built-in DB hoặc HTTP authn trỏ về manager-api. Xem README_PRODUCTION.md.
+    ports:
+      # Cổng thiết bị kết nối từ Internet — phải mở public
+      - "${MQTT_TCP_PORT:-1883}:1883"      # MQTT TCP
+      - "${MQTT_SSL_PORT:-8883}:8883"      # MQTT over TLS
+      - "${MQTT_WS_PORT:-8083}:8083"       # MQTT over WebSocket (cho app/web nếu cần)
+      - "${MQTT_WSS_PORT:-8084}:8084"      # MQTT over WSS
+      # Dashboard quản trị — chỉ bind localhost, truy cập qua SSH tunnel cho an toàn
+      - "${EMQX_DASHBOARD_BIND:-127.0.0.1}:${EMQX_DASHBOARD_PORT:-18083}:18083"
+    volumes:
+      - emqx-data:/opt/emqx/data
+      - emqx-log:/opt/emqx/log
+    healthcheck:
+      test: [ "CMD", "/opt/emqx/bin/emqx", "ctl", "status" ]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    mem_limit: ${EMQX_MEMORY_LIMIT:-512m}
+    cpus: ${EMQX_CPU_LIMIT:-0.5}
+    networks:
+      backend:
+        aliases:
+          - emqx
+
+  # Consumer mặt phẳng quản lý: nhận presence/telemetry/ack từ EMQX, mirror sang
+  # Redis (state chung cho web/app), expose HTTP API. Độc lập luồng audio xiaozhi.
+  device-monitor:
+    image: ${MONITOR_IMAGE_NAME:-oriagent-device-monitor:local}
+    build:
+      context: ../main/device-monitor
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      TZ: ${TZ:-Asia/Saigon}
+      EMQX_HOST: emqx
+      EMQX_MQTT_PORT: "1883"
+      REDIS_HOST: xiaozhi-esp32-server-redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      MQTT_BACKEND_USER: ${MQTT_BACKEND_USER:-oriagent-monitor}
+      MQTT_BACKEND_PASS: ${MQTT_BACKEND_PASS:?Set MQTT_BACKEND_PASS in .env}
+      MONITOR_HTTP_PORT: "8090"
+      # Admin EMQX (để /activate cấp credential cho thiết bị)
+      EMQX_API_BASE: http://emqx:18083/api/v5
+      EMQX_DASHBOARD_USER: ${EMQX_DASHBOARD_USER:-admin}
+      EMQX_DASHBOARD_PASSWORD: ${EMQX_DASHBOARD_PASSWORD:?Set EMQX_DASHBOARD_PASSWORD in .env}
+      # Endpoint MQTT public trả cho thiết bị khi activate
+      MQTT_PUBLIC_ENDPOINT: ${MQTT_PUBLIC_ENDPOINT:-127.0.0.1:1883}
+    # Lưu ý: EMQX phải được provision auth trước (provision_auth.py) để backend user tồn tại.
+    ports:
+      - "${MONITOR_HTTP_BIND:-127.0.0.1}:${MONITOR_HTTP_PORT:-8090}:8090"
+    depends_on:
+      emqx:
+        condition: service_healthy
+      xiaozhi-redis:
+        condition: service_healthy
+    mem_limit: ${MONITOR_MEMORY_LIMIT:-200m}
+    cpus: ${MONITOR_CPU_LIMIT:-0.3}
+    networks:
+      backend:
+        aliases:
+          - device-monitor
+
   xiaozhi-edge-router:
     image: nginx:${EDGE_NGINX_TAG:-1.27-alpine}
     restart: always
@@ -203,6 +281,8 @@ networks:
 
 volumes:
   redis-data:
+  emqx-data:
+  emqx-log:
   proxy-certs:
   proxy-vhost:
   proxy-html:

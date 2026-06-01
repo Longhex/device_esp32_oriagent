@@ -203,6 +203,28 @@ const routes = [
       title: '智能体配置'
     }
   },
+  {
+    path: '/device-monitor',
+    name: 'DeviceMonitor',
+    component: function () {
+      return import('../views/DeviceMonitor.vue')
+    },
+    meta: {
+      requiresAuth: true,
+      title: '设备监控'
+    }
+  },
+  {
+    path: '/serial-management',
+    name: 'SerialManagement',
+    component: function () {
+      return import('../views/SerialManagement.vue')
+    },
+    meta: {
+      requiresAuth: true,
+      title: '序列号管理'
+    }
+  },
 ]
 const router = new VueRouter({
   base: process.env.VUE_APP_PUBLIC_PATH || '/',
@@ -224,7 +246,7 @@ VueRouter.prototype.push = function push(location) {
 }
 
 // 需要登录才能访问的路由
-const protectedRoutes = ['home', 'UserManagement', 'ModelConfig', 'KnowledgeBaseManagement', 'KnowledgeFileUpload', 'AgentConfig']
+const protectedRoutes = ['home', 'UserManagement', 'ModelConfig', 'KnowledgeBaseManagement', 'KnowledgeFileUpload', 'AgentConfig', 'DeviceMonitor', 'SerialManagement']
 
 // 路由守卫
 router.beforeEach((to, from, next) => {

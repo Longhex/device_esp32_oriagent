@@ -84,6 +84,16 @@
             <span>{{ $t("header.otaManagement") }}</span>
           </el-menu-item>
 
+          <el-menu-item index="/device-monitor">
+            <i class="el-icon-cpu"></i>
+            <span>{{ $t("header.deviceMonitor") }}</span>
+          </el-menu-item>
+
+          <el-menu-item index="/serial-management">
+            <i class="el-icon-postcard"></i>
+            <span>{{ $t("header.serialManagement") }}</span>
+          </el-menu-item>
+
           <el-menu-item index="/emoji-management">
             <i class="el-icon-picture-outline"></i>
             <span>{{ $t("header.emojiManagement") }}</span>
