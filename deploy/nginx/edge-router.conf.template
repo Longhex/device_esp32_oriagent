@@ -33,6 +33,11 @@ server {
         proxy_buffering off;
     }
 
+    # OTA URL thiếu dấu '/' cuối: ESP32 không follow 301 -> rewrite nội bộ (không trả 301 cho thiết bị)
+    location = /xiaozhi/ota {
+        rewrite ^ /xiaozhi/ota/ last;
+    }
+
     location /xiaozhi/ota/ {
         set $http_upstream http://xiaozhi-esp32-server-web:8003;
         proxy_pass $http_upstream;
