@@ -51,6 +51,8 @@
                                 <template slot-scope="scope">
                                     <el-button size="mini" type="text"
                                         @click="downloadFirmware(scope.row)">{{ $t('otaManagement.download') }}</el-button>
+                                    <el-button size="mini" type="text"
+                                        @click="copyStableLink(scope.row)">{{ $t('emojiManagement.copyLink') }}</el-button>
                                     <el-button size="mini" type="text" @click="editParam(scope.row)">{{ $t('otaManagement.edit') }}</el-button>
                                     <el-button size="mini" type="text" @click="deleteParam(scope.row)">{{ $t('otaManagement.delete') }}</el-button>
                                 </template>
@@ -174,6 +176,7 @@ export default {
                 page: this.currentPage,
                 limit: this.pageSize,
                 firmwareName: this.searchName || "",
+                excludeTypePrefix: "asset-",
                 orderField: "create_date",
                 order: "desc"
             };
@@ -368,6 +371,32 @@ export default {
         goToPage(page) {
             this.currentPage = page;
             this.fetchFirmwareList();
+        },
+        async copyStableLink(firmware) {
+            if (!firmware || !firmware.id) {
+                this.$message.error(this.$t('otaManagement.incompleteFirmwareInfo'));
+                return;
+            }
+            const baseUrl = process.env.VUE_APP_API_BASE_URL || '';
+            const url = `${window.location.origin}${baseUrl}/otaMag/file/${firmware.id}`;
+            try {
+                await navigator.clipboard.writeText(url);
+                this.$message.success(this.$t('emojiManagement.copied'));
+            } catch (e) {
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = url;
+                    ta.style.position = 'fixed';
+                    ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    this.$message.success(this.$t('emojiManagement.copied'));
+                } catch (e2) {
+                    this.$message.warning(this.$t('emojiManagement.copyFailed') + ': ' + url);
+                }
+            }
         },
         downloadFirmware(firmware) {
             if (!firmware || !firmware.id) {

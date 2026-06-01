@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import javax.crypto.Mac;
@@ -597,10 +596,9 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
                             .getRequest();
                     otaUrl = request.getRequestURL().toString();
                 }
-                // 将URL中的/ota/替换为/otaMag/download/
-                String uuid = UUID.randomUUID().toString();
-                redisUtils.set(RedisKeys.getOtaIdKey(uuid), ota.getId());
-                downloadUrl = otaUrl.replace("/ota/", "/otaMag/download/") + uuid;
+                // 使用稳定下载链接（按固件ID）：永久有效、可重复下载，替换固件文件后链接不变
+                // 每个 type 只保留一条固件记录(id不变)，因此该链接对设备而言是固定的
+                downloadUrl = otaUrl.replace("/ota/", "/otaMag/file/") + ota.getId();
             }
         }
 
@@ -626,8 +624,8 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
 
         int length = Math.max(v1Parts.length, v2Parts.length);
         for (int i = 0; i < length; i++) {
-            int v1 = i < v1Parts.length ? Integer.parseInt(v1Parts[i]) : 0;
-            int v2 = i < v2Parts.length ? Integer.parseInt(v2Parts[i]) : 0;
+            int v1 = i < v1Parts.length ? parseVersionPart(v1Parts[i]) : 0;
+            int v2 = i < v2Parts.length ? parseVersionPart(v2Parts[i]) : 0;
 
             if (v1 > v2) {
                 return 1;
@@ -636,6 +634,28 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
             }
         }
         return 0;
+    }
+
+    /**
+     * 安全解析版本号的某一段：仅取开头连续数字，遇到非数字（如 "0-beta"）即截断，无数字则返回0。
+     * 避免设备上报非纯数字版本（如 1.0.0-beta、v1.0.0）导致 NumberFormatException 使整个 OTA 检查失败。
+     */
+    private static int parseVersionPart(String part) {
+        if (part == null || part.isEmpty()) {
+            return 0;
+        }
+        int end = 0;
+        while (end < part.length() && Character.isDigit(part.charAt(end))) {
+            end++;
+        }
+        if (end == 0) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(part.substring(0, end));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     @Override

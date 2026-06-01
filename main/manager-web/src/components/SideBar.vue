@@ -83,7 +83,12 @@
             <i class="el-icon-upload"></i>
             <span>{{ $t("header.otaManagement") }}</span>
           </el-menu-item>
-          
+
+          <el-menu-item index="/emoji-management">
+            <i class="el-icon-picture-outline"></i>
+            <span>{{ $t("header.emojiManagement") }}</span>
+          </el-menu-item>
+
           <el-menu-item index="/provider-management">
             <i class="el-icon-connection"></i>
             <span>{{ $t("header.providerManagement") }}</span>

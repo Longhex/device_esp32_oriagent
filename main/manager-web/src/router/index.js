@@ -118,6 +118,17 @@ const routes = [
     }
   },
   {
+    path: '/emoji-management',
+    name: 'EmojiManagement',
+    component: function () {
+      return import('../views/EmojiManagement.vue')
+    },
+    meta: {
+      requiresAuth: true,
+      title: '表情/资源管理'
+    }
+  },
+  {
     path: '/voice-resource-management',
     name: 'VoiceResourceManagement',
     component: function () {

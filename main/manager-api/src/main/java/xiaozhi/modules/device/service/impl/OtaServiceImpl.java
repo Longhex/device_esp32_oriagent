@@ -31,9 +31,21 @@ public class OtaServiceImpl extends BaseServiceImpl<OtaDao, OtaEntity> implement
 
     private QueryWrapper<OtaEntity> getWrapper(Map<String, Object> params) {
         String firmwareName = (String) params.get("firmwareName");
+        String type = (String) params.get("type");
+        String excludeType = (String) params.get("excludeType");
+        String typePrefix = (String) params.get("typePrefix");
+        String excludeTypePrefix = (String) params.get("excludeTypePrefix");
 
         QueryWrapper<OtaEntity> wrapper = new QueryWrapper<>();
         wrapper.like(StringUtils.isNotBlank(firmwareName), "firmware_name", firmwareName);
+        // 精确按类型筛选
+        wrapper.eq(StringUtils.isNotBlank(type), "type", type);
+        wrapper.ne(StringUtils.isNotBlank(excludeType), "type", excludeType);
+        // 按类型前缀筛选（资源页传 typePrefix=asset- 列出全部资源；每种资源 type=asset-<key>）
+        wrapper.likeRight(StringUtils.isNotBlank(typePrefix), "type", typePrefix);
+        // 排除类型前缀（固件页传 excludeTypePrefix=asset- 隐藏所有资源文件）
+        wrapper.apply(StringUtils.isNotBlank(excludeTypePrefix), "type NOT LIKE {0}",
+                StringUtils.isNotBlank(excludeTypePrefix) ? excludeTypePrefix + "%" : "");
 
         return wrapper;
     }
@@ -81,5 +93,13 @@ public class OtaServiceImpl extends BaseServiceImpl<OtaDao, OtaEntity> implement
                 .orderByDesc("update_date")
                 .last("LIMIT 1");
         return baseDao.selectOne(wrapper);
+    }
+
+    @Override
+    public List<OtaEntity> listByTypePrefix(String typePrefix) {
+        QueryWrapper<OtaEntity> wrapper = new QueryWrapper<>();
+        wrapper.likeRight("type", typePrefix)
+                .orderByAsc("type");
+        return baseDao.selectList(wrapper);
     }
 }

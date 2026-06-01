@@ -7,6 +7,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,7 +32,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import jakarta.servlet.http.HttpServletRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -140,6 +144,47 @@ public class OTAMagController {
         String uuid = UUID.randomUUID().toString();
         redisUtils.set(RedisKeys.getOtaIdKey(uuid), id);
         return new Result<String>().ok(uuid);
+    }
+
+    @GetMapping("/assets")
+    @Operation(summary = "获取全部资源(emoji/logo/music...)及版本与稳定下载链接，供设备一次性检查更新")
+    public Result<List<Map<String, Object>>> listAssets(HttpServletRequest request) {
+        String assetPrefix = "asset-";
+        String contextPath = request.getContextPath();
+        String baseUrl = ServletUriComponentsBuilder.fromContextPath(request).build().toUriString();
+
+        List<OtaEntity> assets = otaService.listByTypePrefix(assetPrefix);
+        List<Map<String, Object>> data = new ArrayList<>();
+        for (OtaEntity e : assets) {
+            String type = e.getType();
+            String key = (type != null && type.startsWith(assetPrefix)) ? type.substring(assetPrefix.length()) : type;
+            String relativePath = contextPath + "/otaMag/file/" + e.getId();
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("type", key);
+            item.put("name", e.getFirmwareName());
+            item.put("version", e.getVersion());
+            item.put("size", e.getSize());
+            item.put("path", relativePath);
+            item.put("url", baseUrl + "/otaMag/file/" + e.getId());
+            item.put("updateDate", e.getUpdateDate());
+            data.add(item);
+        }
+        return new Result<List<Map<String, Object>>>().ok(data);
+    }
+
+    @GetMapping("/file/{id}")
+    @Operation(summary = "稳定下载链接（按ID，永久有效、可重复下载，编辑文件后链接不变）")
+    public ResponseEntity<byte[]> downloadById(@PathVariable("id") String id) {
+        if (StringUtils.isBlank(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        OtaEntity otaEntity = otaService.selectById(id);
+        if (otaEntity == null || StringUtils.isBlank(otaEntity.getFirmwarePath())) {
+            logger.warn("Stable download: file not found or path empty for ID: {}", id);
+            return ResponseEntity.notFound().build();
+        }
+        return serveOtaFile(otaEntity, id);
     }
 
     @GetMapping("/download/{uuid}")
@@ -257,8 +302,9 @@ public class OTAMagController {
         }
 
         String extension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
-        if (!extension.equals(".bin") && !extension.equals(".apk")) {
-            return new Result<String>().error("只允许上传.bin和.apk格式的文件");
+        if (!extension.equals(".bin") && !extension.equals(".apk")
+                && !extension.equals(".tar") && !extension.equals(".gz") && !extension.equals(".zip")) {
+            return new Result<String>().error("只允许上传 .bin/.apk/.tar/.gz/.zip 格式的文件");
         }
 
         try {
@@ -327,6 +373,56 @@ public class OTAMagController {
             result.setData(downloadUrl);
         }
         return result;
+    }
+
+    /**
+     * 按固件记录读取文件并返回下载响应（供 UUID 临时链接与稳定链接共用）
+     */
+    private ResponseEntity<byte[]> serveOtaFile(OtaEntity otaEntity, String idForLog) {
+        try {
+            String firmwarePath = otaEntity.getFirmwarePath();
+            String originalFilename = otaEntity.getType() + "_" + otaEntity.getVersion();
+            Path path;
+            if (Paths.get(firmwarePath).isAbsolute()) {
+                path = Paths.get(firmwarePath);
+            } else {
+                path = Paths.get(System.getProperty("user.dir"), firmwarePath);
+            }
+
+            if (!Files.exists(path) || !Files.isRegularFile(path)) {
+                // 兼容旧路径：尝试 firmware 目录
+                String fileName = new File(firmwarePath).getName();
+                Path altPath = Paths.get(System.getProperty("user.dir"), "firmware", fileName);
+                if (Files.exists(altPath) && Files.isRegularFile(altPath)) {
+                    path = altPath;
+                } else {
+                    logger.error("File not found at either path: {} or {}",
+                            path.toAbsolutePath(), altPath.toAbsolutePath());
+                    return ResponseEntity.notFound().build();
+                }
+            }
+
+            byte[] fileContent = Files.readAllBytes(path);
+
+            if (firmwarePath.contains(".")) {
+                originalFilename += firmwarePath.substring(firmwarePath.lastIndexOf("."));
+            }
+            String safeFilename = originalFilename.replaceAll("[^a-zA-Z0-9._-]", "_");
+
+            logger.info("Providing download for ID: {}, filename: {}, size: {} bytes",
+                    idForLog, safeFilename, fileContent.length);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safeFilename + "\"")
+                    .body(fileContent);
+        } catch (IOException e) {
+            logger.error("Error reading file for ID: {}", idForLog, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } catch (Exception e) {
+            logger.error("Unexpected error during file download for ID: {}", idForLog, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     private String calculateMD5(MultipartFile file) throws IOException, NoSuchAlgorithmException {
