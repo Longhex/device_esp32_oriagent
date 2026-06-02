@@ -18,19 +18,29 @@
         </div>
 
         <div class="config-flow">
-          <!-- Oriagent API KEY Field -->
+          <!-- Toggle: Tùy chỉnh System Prompt (ẩn với Oriagent vì prompt đã cấu hình sẵn trong Studio) -->
+          <div class="custom-field-group" v-if="!isOriagentLLM">
+            <div class="prompt-toggle-row">
+              <label class="field-label-premium">
+                <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> Tùy chỉnh System Prompt
+              </label>
+              <el-switch v-model="showSystemPrompt" active-color="#08c45b" />
+            </div>
+          </div>
+
+          <!-- LLM Model Selector -->
           <div class="custom-field-group">
             <label class="field-label-premium">
-              <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> Oriagent API KEY
+              <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> {{ $t("roleConfig.llm") }}
             </label>
             <div class="premium-field-pill">
-              <el-input 
-                :value="oriagentApiKey" 
-                @input="$emit('update:oriagentApiKey', $event)"
-                class="premium-input-field" 
-                :placeholder="$t('roleConfig.placeholderApiKey')"
-                show-password
-              />
+              <el-select
+                v-model="form.model.llmModelId"
+                class="premium-select-field"
+                @change="handleModelChange('LLM', $event)"
+              >
+                <el-option v-for="item in modelOptions['LLM']" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
             </div>
           </div>
 
@@ -111,15 +121,35 @@
         </div>
       </div>
 
+      <!-- Middle Column: System Prompt (chỉ hiện khi bật toggle & model không phải Oriagent) -->
+      <div class="system-prompt-panel card-style" v-if="showSystemPrompt && !isOriagentLLM">
+        <div class="sp-header">
+          <label class="field-label-premium">
+            <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> System Prompt
+          </label>
+          <p class="sp-hint">Hướng dẫn tác nhân cách giao tiếp và xử lý yêu cầu.</p>
+        </div>
+        <el-input
+          type="textarea"
+          v-model="form.systemPrompt"
+          class="sp-textarea"
+          :rows="16"
+          maxlength="4000"
+          show-word-limit
+          resize="none"
+          placeholder="Ví dụ: Bạn là trợ lý thân thiện, trả lời ngắn gọn, dễ hiểu..."
+        />
+      </div>
+
       <!-- Right Column: Live Preview / Test -->
       <div class="preview-panel card-style">
          <div class="mockup-screen">
             <!-- Live iframe -->
             <template v-if="isLiveTesting">
                <div class="live-test-wrapper">
-                  <iframe 
-                    :src="testLiveUrl" 
-                    frameborder="0" 
+                  <iframe
+                    :src="testLiveUrl"
+                    frameborder="0"
                     class="live-iframe"
                     :title="$t('roleConfig.liveTestTitle')"
                   ></iframe>
@@ -154,18 +184,23 @@ export default {
     agentId: String,
     form: Object,
     modelOptions: Object,
+    llmModeTypeMap: Object,
     voiceOptions: Array,
     languageOptions: Array,
-    selectedLanguage: String,
-    oriagentApiKey: String
+    selectedLanguage: String
   },
   data() {
     return {
       isLiveTesting: false,
-      internalLanguage: this.selectedLanguage
+      internalLanguage: this.selectedLanguage,
+      showSystemPrompt: false
     };
   },
   computed: {
+    isOriagentLLM() {
+      const map = this.llmModeTypeMap || {};
+      return map[this.form.model.llmModelId] === 'oriagent_ws';
+    },
     testLiveUrl() {
       const baseUrl = "/test_live/test_page.html";
       const otaUrl = Api.getServiceUrl() + '/ota/';
@@ -186,6 +221,13 @@ export default {
   watch: {
     selectedLanguage(newVal) {
       this.internalLanguage = newVal;
+    },
+    // Tự bật toggle nếu agent đã có sẵn system prompt
+    'form.systemPrompt': {
+      immediate: true,
+      handler(val) {
+        if (val && val.trim()) this.showSystemPrompt = true;
+      }
     }
   },
   methods: {
@@ -249,6 +291,44 @@ $ori-border: #f1f5f9;
     width: 100%;
     min-width: 0;
     max-height: none; // Allow it to grow on mobile
+  }
+}
+
+/* Toggle row: Tùy chỉnh System Prompt */
+.prompt-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Middle Column: System Prompt */
+.system-prompt-panel {
+  flex: 1;
+  min-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 40px;
+
+  @media (max-width: 1200px) {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sp-header { display: flex; flex-direction: column; gap: 6px; }
+  .sp-hint { margin: 0; font-size: 13px; color: $ori-slate; }
+  .sp-textarea { flex: 1; display: flex; }
+  ::v-deep .sp-textarea .el-textarea__inner {
+    height: 100%;
+    min-height: 360px;
+    border-radius: 16px;
+    border: 1px solid $ori-border;
+    background: #f8fafc;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 16px;
   }
 }
 

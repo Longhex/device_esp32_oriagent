@@ -18,10 +18,10 @@
           :agent-id="agentId"
           :form="agentForm"
           :model-options="modelOptions"
+          :llm-mode-type-map="llmModeTypeMap"
           :voice-options="voiceOptions"
           :language-options="languageOptions"
           :selected-language.sync="selectedLanguage"
-          :oriagent-api-key.sync="oriagentApiKey"
           @filter-voices="filterVoicesByLanguage"
           @model-change="handleModelChange"
           @open-plugins="showFunctionDialog = true"
@@ -126,10 +126,6 @@ export default {
       voiceOptions: [],
       languageOptions: [],
       selectedLanguage: '',
-      oriagentFields: [
-        { key: "api_key", type: "string", label: "Oriagent API KEY" },
-        { key: "model_name", type: "string", label: "Model Name" }
-      ],
       llmModeTypeMap: {},
       firmwareTypes: [],
       mqttServiceAvailable: false,
@@ -143,10 +139,6 @@ export default {
       currentFunctions: [],
       allFunctions: [],
       currentContextProviders: [],
-      
-      // Oriagent API Key management
-      oriagentApiKey: '',
-      oriagentModelDetail: null,
     };
   },
   computed: {
@@ -183,10 +175,6 @@ export default {
           this.initialAgentForm = JSON.parse(JSON.stringify(this.agentForm));
           if (this.agentForm.model.ttsModelId) this.fetchVoiceOptions(this.agentForm.model.ttsModelId);
           this.currentContextProviders = data.data.contextProviders || [];
-          this.oriagentApiKey = data.data.oriagentApiKey || '';
-          this.oriagentModelName = data.data.oriagentModelName || '';
-          this.initialOriagentApiKey = this.oriagentApiKey;
-          this.initialOriagentModelName = this.oriagentModelName;
 
           this.fetchAllFunctions().then(() => {
              const savedMappings = data.data.functions || [];
@@ -223,9 +211,14 @@ export default {
         Api.model.getModelNames(type, "", ({ data }) => {
            if (data.code === 0) {
               this.$set(this.modelOptions, type, data.data.map(item => ({ value: item.id, label: item.modelName })));
-              if (type === 'LLM') data.data.forEach(item => this.llmModeTypeMap[item.id] = item.type);
            }
         });
+      });
+      // getModelNames không trả 'type' → dùng getLlmModelCodeList để biết type (openai/oriagent_ws/...) từng model LLM
+      Api.model.getLlmModelCodeList("", ({ data }) => {
+        if (data.code === 0 && Array.isArray(data.data)) {
+          data.data.forEach(item => this.$set(this.llmModeTypeMap, item.id, item.type));
+        }
       });
     },
     fetchAllFunctions() {
@@ -272,8 +265,6 @@ export default {
       if (this.selectedLanguage !== this.initialAgentForm.ttsLanguage) diff.ttsLanguage = this.selectedLanguage;
       diff.functions = this.currentFunctions.map(f => ({ pluginId: f.id, paramInfo: f.params }));
       diff.contextProviders = this.currentContextProviders;
-      if (this.oriagentApiKey !== this.initialOriagentApiKey) diff.oriagentApiKey = this.oriagentApiKey;
-      if (this.oriagentModelName !== this.initialOriagentModelName) diff.oriagentModelName = this.oriagentModelName;
 
       promises.push(new Promise((resolve) => {
          Api.agent.updateAgentConfig(this.agentId, diff, () => resolve());
@@ -291,8 +282,6 @@ export default {
          this.$message.success(this.$t('roleConfig.saveSuccess'));
          this.initialAgentForm = JSON.parse(JSON.stringify(this.agentForm));
          this.initialDeviceList = JSON.parse(JSON.stringify(this.deviceList));
-         this.initialOriagentApiKey = this.oriagentApiKey;
-         this.initialOriagentModelName = this.oriagentModelName;
       }).finally(() => { this.saving = false; });
     }
   },

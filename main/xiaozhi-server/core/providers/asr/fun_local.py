@@ -5,6 +5,7 @@ import time
 import shutil
 import psutil
 import asyncio
+import threading
 
 from funasr import AutoModel
 from config.logger import setup_logging
@@ -18,6 +19,10 @@ logger = setup_logging()
 
 MAX_RETRIES = 2
 RETRY_DELAY = 1  # 重试延迟（秒）
+
+# 进程级模型缓存：同一个 model_dir 只加载一次 AutoModel，tránh mỗi kết nối nạp lại (~18s) và giảm RAM
+_MODEL_CACHE = {}
+_MODEL_CACHE_LOCK = threading.Lock()
 
 
 # 捕获标准输出
@@ -55,13 +60,22 @@ class ASRProvider(ASRProviderBase):
         # 确保输出目录存在
         os.makedirs(self.output_dir, exist_ok=True)
         with CaptureOutput():
-            self.model = AutoModel(
-                model=self.model_dir,
-                vad_kwargs={"max_single_segment_time": 30000},
-                disable_update=True,
-                hub="hf",
-                # device="cuda:0",  # 启用GPU加速
-            )
+            with _MODEL_CACHE_LOCK:
+                if self.model_dir in _MODEL_CACHE:
+                    # 复用已加载的模型，避免重复加载导致的连接冷启动延迟与额外内存
+                    self.model = _MODEL_CACHE[self.model_dir]
+                    logger.bind(tag=TAG).info(
+                        f"复用已缓存的FunASR模型: {self.model_dir}"
+                    )
+                else:
+                    self.model = AutoModel(
+                        model=self.model_dir,
+                        vad_kwargs={"max_single_segment_time": 30000},
+                        disable_update=True,
+                        hub="hf",
+                        # device="cuda:0",  # 启用GPU加速
+                    )
+                    _MODEL_CACHE[self.model_dir] = self.model
 
     async def speech_to_text(
         self, opus_data: List[bytes], session_id: str, audio_format="opus", artifacts=None
