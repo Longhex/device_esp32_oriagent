@@ -138,13 +138,20 @@ class LLMProvider(LLMProviderBase):
         # Guard against infinite retry loop when 404 persists
         _retry = kwargs.get("_retry", False)
 
+        # End-user binding: Dify ràng buộc conversation theo EndUser (lookup by `user`).
+        # session_id là uuid4() đổi MỖI reconnect → tạo EndUser mới → conv cũ mất quyền
+        # → 404 "Conversation Not Exists". Dùng user_id ổn định (device_id) để cùng một
+        # EndUser được tái dùng qua mọi reconnect → hết 404 + nhớ ngữ cảnh thật.
+        # Fallback về session_id nếu caller không truyền (giữ tương thích ngược).
+        user_id = kwargs.get("user_id") or session_id
+
         # Target payload structure matching Oriagent REST requirements
         request_payload = {
             "inputs": {},
             "query": query,
             "response_mode": "streaming",
             "conversation_id": conversation_id,
-            "user": session_id,
+            "user": user_id,
         }
 
         headers = {
@@ -179,7 +186,6 @@ class LLMProvider(LLMProviderBase):
                 if r.status_code != 200:
                     error_body = r.read()
                     error_text = error_body.decode()
-                    logger.bind(tag=TAG).error(f"Oriagent API Error (Status {r.status_code}): {error_text}")
 
                     # Self-healing: stale conversation_id on server side.
                     # Clear local + persistent state, then retry once with a fresh conversation.
@@ -188,10 +194,15 @@ class LLMProvider(LLMProviderBase):
                         and conversation_id
                         and ("not_found" in error_text.lower() or "conversation not exists" in error_text.lower())
                     )
+                    # Chỉ log ERROR đỏ cho lỗi thật. Stale-conv là tự-hồi-phục bình thường
+                    # (hết hạn phía server) → log INFO, tránh báo động giả trên dashboard.
+                    if not (is_stale_conv and not _retry):
+                        logger.bind(tag=TAG).error(f"Oriagent API Error (Status {r.status_code}): {error_text}")
+
                     if is_stale_conv and not _retry:
-                        logger.bind(tag=TAG).warning(
-                            f"Stale Oriagent conversation_id detected ({conversation_id[:16]}...). "
-                            f"Clearing and retrying with a new conversation."
+                        logger.bind(tag=TAG).info(
+                            f"Oriagent conversation expired ({conversation_id[:16]}...). "
+                            f"Starting a fresh conversation."
                         )
                         self.session_conversation_map.pop(session_id, None)
                         if callable(on_conversation_cleared):

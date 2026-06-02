@@ -999,6 +999,7 @@ class ConnectionHandler:
                     conversation_id=self.oriagent_conversation_id,
                     on_conversation_id=self._on_oriagent_conversation_id,
                     on_conversation_cleared=self._on_oriagent_conversation_cleared,
+                    user_id=self.device_id,
                 )
             elif self._is_dify_llm():
                 # Oriagent text-only mode
@@ -1010,6 +1011,7 @@ class ConnectionHandler:
                     conversation_id=self.oriagent_conversation_id,
                     on_conversation_id=self._on_oriagent_conversation_id,
                     on_conversation_cleared=self._on_oriagent_conversation_cleared,
+                    user_id=self.device_id,
                 )
                 self.logger.bind(tag=TAG).debug(f"Using Oriagent Conversation ID: {self.oriagent_conversation_id}")
             elif functions is not None:

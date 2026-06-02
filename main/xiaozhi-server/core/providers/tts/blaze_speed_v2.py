@@ -22,6 +22,11 @@ logger = setup_logging()
 
 INITIAL_BUFFER_BYTES = 14400    # ~300ms @ 24kHz/16bit/mono (Fix 1: was 200ms)
 CONTINUOUS_JITTER_BYTES = 14400 # ~300ms continuous buffer (Fix 1: was 100ms, chịu được TTFB jitter ~300ms)
+# Lead-in: chèn ~250ms im lặng TRƯỚC byte audio đầu tiên của segment đầu để che
+# giai đoạn DAC/amp ESP32 ramp-up (nếu không, âm tiết đầu "Chào" bị clip → "TRUNG").
+# Khác với INITIAL_BUFFER_BYTES (tích lũy audio thật); đây là silence prepend.
+# 24000 Hz * 2 byte * 0.25s = 12000 byte.
+LEAD_IN_SILENCE_BYTES = 12000
 WAV_HEADER_SIZE = 44
 POOL_SIZE = 8  # Higher capacity for simultaneous segments
 FETCH_TIMEOUT = 10.0
@@ -107,6 +112,16 @@ class _HealthMonitor:
 # =============================================================================
 # CONNECTION POOL: PRE-WARMED & SELF-HEALING
 # =============================================================================
+def _ws_alive(ws):
+    """
+    websockets 14.x dùng asyncio API mới (ClientConnection) — KHÔNG còn thuộc tính
+    `.closed`. Bản cũ dùng getattr(ws,"closed",True) => luôn trả True => pool coi
+    mọi kết nối là chết => reconnect mỗi lần dùng (churn + spam Pool Ready).
+    Trạng thái OPEN ⇔ close_code is None. Nếu thiếu attr → coi như chết (an toàn).
+    """
+    return ws is not None and getattr(ws, "close_code", 0) is None
+
+
 class BlazeConnectionPool:
     def __init__(self, ws_url, token, pool_size=POOL_SIZE, ssl_context=None):
         self.ws_url = ws_url
@@ -171,7 +186,7 @@ class BlazeConnectionPool:
                 for i in range(self.pool_size):
                     async with self.locks[i]: # PREVENT RACE CONDITION with get_connection
                         ws = self.pool[i]
-                        if ws is None or getattr(ws, "closed", True):
+                        if not _ws_alive(ws):
                             await self._connect_and_auth(i)
                         else:
                             # Fix 5: gửi ping nếu idle quá lâu, giữ WS alive xuyên qua server-side timeout
@@ -193,8 +208,9 @@ class BlazeConnectionPool:
                                     self.pool[i] = None
                                     await self._connect_and_auth(i)
 
-                # Fix 3: timeout = POOL_HEALTH_INTERVAL (5s) thay vì *6 (30s)
-                # → phát hiện connection chết nhanh hơn 6×, giảm cold handshake cho turn tiếp
+                # Health-check mỗi POOL_HEALTH_INTERVAL (30s). Với _ws_alive() đã đúng,
+                # vòng này chỉ reconnect slot thật sự chết + ping slot idle, không còn
+                # reconnect mù mỗi tick như trước.
                 await asyncio.wait_for(self._maintain_event.wait(), timeout=POOL_HEALTH_INTERVAL)
                 self._maintain_event.clear()
             except asyncio.TimeoutError: pass
@@ -214,10 +230,10 @@ class BlazeConnectionPool:
             self.last_idx += 1
             if not self.locks[idx].locked():
                 await self.locks[idx].acquire()
-                if self.pool[idx] is None or getattr(self.pool[idx], "closed", True):
+                if not _ws_alive(self.pool[idx]):
                     await self._connect_and_auth(idx)
-                
-                if self.pool[idx] and not getattr(self.pool[idx], "closed", True):
+
+                if _ws_alive(self.pool[idx]):
                     target_idx = idx
                     break
                 else:
@@ -227,7 +243,7 @@ class BlazeConnectionPool:
             target_idx = self.last_idx % self.pool_size
             self.last_idx += 1
             await self.locks[target_idx].acquire()
-            if self.pool[target_idx] is None or getattr(self.pool[target_idx], "closed", True):
+            if not _ws_alive(self.pool[target_idx]):
                 await self._connect_and_auth(target_idx)
 
         try:
@@ -333,6 +349,10 @@ class TTSProvider(TTSProviderBase):
                 if item == "FLUSH":
                     jitter_buffer.clear()
                     self.opus_encoder.reset_state()
+                    # FLUSH = bắt đầu câu trả lời mới → coi như chưa gửi packet nào, để
+                    # lead-in silence luôn được chèn cho segment đầu (kể cả khi câu trước
+                    # bị ngắt giữa chừng, END_OF_SESSION không kịp reset).
+                    first_packet_sent = False
                     self.playback_queue.task_done()
                     continue
 
@@ -356,6 +376,11 @@ class TTSProvider(TTSProviderBase):
                 if is_first:
                     self.tts_audio_queue.put((SentenceType.FIRST, None, segment_text))
                     last_segment_complete_ts = None  # reset cho session mới
+                    # Lead-in silence: prepend ~250ms im lặng trước audio thật của segment
+                    # đầu tiên để che hardware ramp-up (chống clip âm tiết đầu). Chỉ khi
+                    # chưa gửi packet nào trong session này.
+                    if not first_packet_sent:
+                        jitter_buffer.extend(b"\x00" * LEAD_IN_SILENCE_BYTES)
                 else:
                     self.tts_audio_queue.put((SentenceType.MIDDLE, None, segment_text))
                     # Fix 4: đo gap giữa segment trước hoàn thành và segment này bắt đầu
