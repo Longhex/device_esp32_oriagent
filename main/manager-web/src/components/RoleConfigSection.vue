@@ -44,6 +44,21 @@
             </div>
           </div>
 
+          <!-- Oriagent API Key riêng từng agent — chỉ hiện khi chọn Oriagent; để trống = dùng key chung của model -->
+          <div class="custom-field-group" v-if="isOriagentLLM">
+            <label class="field-label-premium">
+              <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> Oriagent API Key (riêng agent này)
+            </label>
+            <div class="premium-field-pill">
+              <el-input
+                v-model="form.oriagentApiKey"
+                class="premium-input-field"
+                placeholder="Nhập key riêng (app-...); để trống = dùng key chung của model"
+                show-password
+              />
+            </div>
+          </div>
+
           <!-- Component Selectors -->
           <div class="selection-grid-vertical">
             <div class="custom-field-group">
