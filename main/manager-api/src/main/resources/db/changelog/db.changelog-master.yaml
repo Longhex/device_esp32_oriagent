@@ -648,3 +648,10 @@ databaseChangeLog:
         - sqlFile:
             encoding: utf8
             path: classpath:db/changelog/202605131000.sql
+  - changeSet:
+      id: 202606041700
+      author: oriagent
+      changes:
+        - sqlFile:
+            encoding: utf8
+            path: classpath:db/changelog/202606041700.sql
