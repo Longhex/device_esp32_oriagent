@@ -84,9 +84,9 @@
       </div>
       <div style="height: 2px; background: #e9e9e9; margin-bottom: 22px"></div>
 
-      <el-form :model="form.configJson" ref="callInfoForm" label-width="auto" class="custom-form">
+      <el-form :model="form.configJson" ref="callInfoForm" label-position="top" class="custom-form call-info-form">
         <template v-for="(row, rowIndex) in chunkedCallInfoFields">
-          <div :key="rowIndex" style="display: flex; gap: 20px; margin-bottom: 0">
+          <div :key="rowIndex" style="display: flex; gap: 20px; margin-bottom: 0; align-items: flex-end">
             <el-form-item v-for="field in row" :key="field.prop" :label="field.label" :prop="field.prop"
               style="flex: 1">
               <template v-if="field.type === 'json-textarea'">
@@ -643,5 +643,28 @@ export default {
   font-weight: normal;
   text-align: right;
   padding-right: 20px;
+}
+
+/* Form "Thông tin gọi": nhãn nằm trên, sát đầu dòng bên trái, cho xuống dòng đủ chữ,
+   ô nhập full-width luôn hiện. Dùng ::v-deep để CSS xuyên vào component Element UI (scoped). */
+.call-info-form ::v-deep .el-form-item__label {
+  float: none;
+  display: block;
+  width: 100% !important;
+  text-align: left !important;
+  padding: 0 0 4px 0 !important;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
+  height: auto;
+}
+
+.call-info-form ::v-deep .el-form-item__content {
+  margin-left: 0 !important;
+}
+
+.call-info-form ::v-deep .el-form-item {
+  display: flex;
+  flex-direction: column;
 }
 </style>
