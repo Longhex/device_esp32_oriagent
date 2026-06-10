@@ -175,7 +175,7 @@
          
          <div class="test-live-bar">
             <div class="pill-bar">
-               <div class="call-btn start" @click="isLiveTesting = !isLiveTesting" :class="{ active: isLiveTesting }">
+               <div class="call-btn start" @click="toggleLiveTest" :class="{ active: isLiveTesting }">
                   <img src="@/assets/dashboard/phone_calling.svg" class="btn-icon-svg" v-if="!isLiveTesting" />
                   <i class="el-icon-close" v-else></i>
                </div>
@@ -216,11 +216,18 @@ export default {
       const map = this.llmModeTypeMap || {};
       return map[this.form.model.llmModelId] === 'oriagent_ws';
     },
+    // MAC test cố định RIÊNG theo từng agent (per-agent), KHÔNG bao giờ trùng MAC thiết bị thật:
+    // tiền tố 02 (locally-administered) + 5 octet suy ra từ agentId. Ổn định -> không bao giờ phải move binding.
+    testDeviceMac() {
+      const hex = (this.agentId || '').replace(/[^0-9a-fA-F]/g, '').toUpperCase().padEnd(10, '0').slice(0, 10);
+      const octets = hex.match(/.{2}/g) || ['00', '00', '00', '00', '00'];
+      return ['02', ...octets].join(':');
+    },
     testLiveUrl() {
       const baseUrl = "/test_live/test_page.html";
       const otaUrl = Api.getServiceUrl() + '/ota/';
       const lang = this.$i18n.locale;
-      return `${baseUrl}?agentId=${this.agentId}&otaUrl=${encodeURIComponent(otaUrl)}&lang=${lang}`;
+      return `${baseUrl}?agentId=${this.agentId}&otaUrl=${encodeURIComponent(otaUrl)}&lang=${lang}&deviceMac=${this.testDeviceMac}`;
     },
     currentModelLabel() {
       if (!this.form.model.ttsModelId || !this.modelOptions['TTS']) return '';
@@ -246,6 +253,33 @@ export default {
     }
   },
   methods: {
+    // Bật/tắt test trực tiếp. Khi bật: đảm bảo MAC test riêng của agent đã được bind, RỒI mới mở iframe.
+    toggleLiveTest() {
+      if (this.isLiveTesting) {
+        this.isLiveTesting = false;
+        return;
+      }
+      let opened = false;
+      const open = () => { if (!opened) { opened = true; this.isLiveTesting = true; } };
+      this.ensureTestDevice(open);
+      // Fallback: vẫn mở test dù API chậm/lỗi (không để treo nút)
+      setTimeout(open, 2500);
+    },
+    // Đăng ký MAC test riêng cho agent hiện tại.
+    // AN TOÀN: chỉ THÊM khi MAC chưa tồn tại; không bao giờ move/sửa binding sẵn có (của agent khác / thiết bị thật).
+    ensureTestDevice(done) {
+      const finish = () => { if (done) done(); };
+      if (!this.agentId) { finish(); return; }
+      const mac = this.testDeviceMac;
+      Api.device.getAgentBindDevices(this.agentId, ({ data }) => {
+        const exists = (data || []).some(d => (d.macAddress || '').toUpperCase() === mac.toUpperCase());
+        if (exists) { finish(); return; } // đã bind đúng agent này -> không làm gì
+        Api.device.manualAddDevice(
+          { agentId: this.agentId, board: 'web-test', appVersion: '1.0.0', macAddress: mac },
+          () => finish()
+        );
+      });
+    },
     handleModelChange(type, value) {
       this.$emit('model-change', { type, value });
     },

@@ -27,11 +27,19 @@ export function loadConfig() {
 
     // 优先从URL获取MAC地址，但是要注意如果agentId被传进来，它是一个UUID而不是MAC，不能直接用作MAC地址
     // 修复OTA连接失败：不把agentId作为MAC地址
-    let savedMac = localStorage.getItem('xz_tester_deviceMac');
-    // 如果保存的MAC地址格式不对（比如之前错误地保存了UUID），则重新生成
-    if (!savedMac || !savedMac.includes(':')) {
-        savedMac = generateRandomMac();
-        localStorage.setItem('xz_tester_deviceMac', savedMac);
+    // Ưu tiên MAC test RIÊNG theo agent (truyền từ trang quản lý qua tham số deviceMac) -> mỗi agent 1 MAC,
+    // tránh việc mọi agent dùng chung 1 MAC trong localStorage. KHÔNG ghi đè key chung để không ảnh hưởng dùng độc lập.
+    const queryMac = urlParams.get('deviceMac');
+    let savedMac;
+    if (queryMac && queryMac.includes(':')) {
+        savedMac = queryMac;
+    } else {
+        savedMac = localStorage.getItem('xz_tester_deviceMac');
+        // 如果保存的MAC地址格式不对（比如之前错误地保存了UUID），则重新生成
+        if (!savedMac || !savedMac.includes(':')) {
+            savedMac = generateRandomMac();
+            localStorage.setItem('xz_tester_deviceMac', savedMac);
+        }
     }
     deviceMacInput.value = savedMac;
 
