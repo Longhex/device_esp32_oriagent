@@ -99,6 +99,9 @@ class LLMProvider(LLMProviderBase):
             return
 
         user_id = kwargs.get("user_id") or session_id
+        # Strip user_id from kwargs — _stream receives it as a positional arg,
+        # so passing it again via **kwargs causes "multiple values for argument".
+        stream_kwargs = {k: v for k, v in kwargs.items() if k != "user_id"}
         lock = self._get_device_lock(user_id)
 
         if not lock.acquire(timeout=_LOCK_TIMEOUT):
@@ -106,7 +109,7 @@ class LLMProvider(LLMProviderBase):
             return
 
         try:
-            yield from self._stream(user_id, session_id, dialogue, **kwargs)
+            yield from self._stream(user_id, session_id, dialogue, **stream_kwargs)
         finally:
             lock.release()
 
