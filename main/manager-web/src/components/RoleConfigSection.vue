@@ -214,7 +214,8 @@ export default {
   computed: {
     isOriagentLLM() {
       const map = this.llmModeTypeMap || {};
-      return map[this.form.model.llmModelId] === 'oriagent_ws';
+      const t = map[this.form.model.llmModelId];
+      return t === 'oriagent_http' || t === 'oriagent_websocket';
     },
     testLiveUrl() {
       const baseUrl = "/test_live/test_page.html";
