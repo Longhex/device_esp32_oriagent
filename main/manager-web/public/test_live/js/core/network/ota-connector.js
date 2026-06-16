@@ -15,10 +15,15 @@ export async function webSocketConnect(otaUrl, config) {
     }
 
     // 从OTA响应中提取websocket信息
-    const { websocket } = otaResult;
+    const { websocket, activation } = otaResult;
     if (!websocket || !websocket.url) {
         log('OTA响应中缺少websocket信息', 'error');
         return;
+    }
+
+    if (activation && activation.code) {
+        log(`MÃ KÍCH HOẠT MỚI: ${activation.code}`, 'success');
+        alert(`MÃ KÍCH HOẠT THIẾT BỊ CỦA BẠN LÀ: ${activation.code}\n\nHãy nhập mã này vào trang Thêm thiết bị!`);
     }
 
     // 使用OTA返回的websocket URL

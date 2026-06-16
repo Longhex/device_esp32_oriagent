@@ -450,6 +450,20 @@ LLM:
     model_name: qwen2.5:3b-AWQ
     base_url: http://localhost:9997
 
+  # ── Oriagent HTTP SSE (baseline) ──────────────────────────────────────────
+  OriagentHTTP:
+    type: oriagent_http
+    api_url: "http://localhost:5001/v1/chat-messages"
+    api_key: "app-7yFCHtUo7GTputO2rlXhkqbe"
+    model_name: "oriagent-http"
+
+  # ── Oriagent WebSocket (so sánh A/B với OriagentHTTP) ─────────────────────
+  OriagentWebSocket:
+    type: oriagent_websocket
+    ws_url: "ws://localhost:5001/ws/chat"
+    api_key: "app-7yFCHtUo7GTputO2rlXhkqbe"
+    model_name: "oriagent-websocket"
+
 VLLM:
   ChatGLMVLLM:
     type: openai

@@ -505,8 +505,8 @@ public class ConfigServiceImpl implements ConfigService {
                 }
                 // 如果是LLM类型，且intentLLMModelId不为空，则添加附加模型
                 if ("LLM".equals(modelTypes[i])) {
-                    // Inject agent-specific Oriagent configuration
-                    if ("oriagent_ws".equals(configCopy.get("type"))) {
+                    // Inject agent-specific Oriagent configuration (applies to oriagent_http and oriagent_websocket)
+                    if (isOriagentType(configCopy.get("type"))) {
                         if (StringUtils.isNotBlank(oriagentApiKey)) {
                             configCopy.put("api_key", oriagentApiKey);
                         }
@@ -520,7 +520,7 @@ public class ConfigServiceImpl implements ConfigService {
                             ModelConfigEntity intentLLM = modelConfigService.getModelByIdFromCache(intentLLMModelId);
                             if (intentLLM != null && intentLLM.getConfigJson() != null) {
                                 Map<String, Object> intentLLMCopy = new HashMap<>(intentLLM.getConfigJson());
-                                if ("oriagent_ws".equals(intentLLMCopy.get("type"))) {
+                                if (isOriagentType(intentLLMCopy.get("type"))) {
                                     if (StringUtils.isNotBlank(oriagentApiKey)) {
                                         intentLLMCopy.put("api_key", oriagentApiKey);
                                     }
@@ -538,7 +538,7 @@ public class ConfigServiceImpl implements ConfigService {
                                     .getModelByIdFromCache(memLocalShortLLMModelId);
                             if (memLocalShortLLM != null && memLocalShortLLM.getConfigJson() != null) {
                                 Map<String, Object> memLLMCopy = new HashMap<>(memLocalShortLLM.getConfigJson());
-                                if ("oriagent_ws".equals(memLLMCopy.get("type"))) {
+                                if (isOriagentType(memLLMCopy.get("type"))) {
                                     if (StringUtils.isNotBlank(oriagentApiKey)) {
                                         memLLMCopy.put("api_key", oriagentApiKey);
                                     }
@@ -563,5 +563,9 @@ public class ConfigServiceImpl implements ConfigService {
         }
         result.put("prompt", prompt);
         result.put("summaryMemory", summaryMemory);
+    }
+
+    private boolean isOriagentType(Object type) {
+        return "oriagent_http".equals(type) || "oriagent_websocket".equals(type);
     }
 }
