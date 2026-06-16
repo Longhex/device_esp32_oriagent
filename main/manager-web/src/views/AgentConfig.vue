@@ -238,6 +238,11 @@ export default {
           const allLanguages = new Set();
           data.data.forEach(voice => { if (voice.languages) voice.languages.split(/[、]/).forEach(l => allLanguages.add(l.trim())); });
           this.languageOptions = Array.from(allLanguages).map(l => ({ value: l, label: l }));
+          // Riêng model Edge song ngữ: thêm "Auto (Việt/Anh)" -> tự đổi giọng theo từng câu.
+          // Chỉ thêm cho model này để không ảnh hưởng model khác.
+          if (modelId === 'TTS_OriagentEdge') {
+            this.languageOptions.push({ value: 'auto', label: 'Auto (Việt/Anh)' });
+          }
           this.selectedLanguage = this.agentForm.ttsLanguage || (this.languageOptions[0]?.value || '');
           this.filterVoicesByLanguage();
         }
@@ -245,7 +250,10 @@ export default {
     },
     filterVoicesByLanguage() {
       const allVoices = Object.values(this.voiceDetails);
-      const filtered = allVoices.filter(v => v.languages?.includes(this.selectedLanguage) || Boolean(v.isClone));
+      // Chế độ Auto: không lọc theo ngôn ngữ (giọng do hệ thống tự chọn theo câu) -> hiện tất cả.
+      const filtered = this.selectedLanguage === 'auto'
+        ? allVoices
+        : allVoices.filter(v => v.languages?.includes(this.selectedLanguage) || Boolean(v.isClone));
       this.voiceOptions = filtered.map(v => ({ value: v.id, label: v.name }));
     },
     handleModelChange({ type, value }) { if (type === 'TTS') this.fetchVoiceOptions(value); },

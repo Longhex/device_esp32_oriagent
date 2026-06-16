@@ -35,8 +35,16 @@ class TTSProvider(TTSProviderBase):
         self.api_url = base if base.endswith("/tts/generate") else f"{base}/tts/generate"
         self.api_key = config.get("api_key", "")
         self.voice = config.get("voice", "en-US-AvaMultilingualNeural")
-        # ngôn ngữ mặc định khi không phát hiện được; vẫn ưu tiên detect theo text
+        # ngôn ngữ mặc định / nền (lấy từ field Language của agent)
         self.default_language = "vi" if str(config.get("language", "")).lower().startswith("vi") else "en"
+        # Giọng "Multilingual" của Edge tự chuyển ngôn ngữ TRONG câu -> KHÔNG ép vi/en theo từng câu,
+        # chỉ gửi 1 ngôn ngữ nền cố định để giọng tự xử lý câu trộn (vd "Cơm là Rice").
+        self.is_multilingual = "multilingual" in self.voice.lower()
+        # Chế độ Auto song ngữ (Language = "auto"): mỗi câu tự chọn GIỌNG đúng theo ngôn ngữ
+        # -> câu Việt đọc giọng Việt chuẩn, câu Anh đọc giọng Anh chuẩn. Cặp giọng cấu hình được.
+        self.auto_bilingual = str(config.get("language", "")).strip().lower() == "auto"
+        self.auto_voice_vi = config.get("auto_voice_vi") or "vi-VN-HoaiMyNeural"
+        self.auto_voice_en = config.get("auto_voice_en") or "en-US-AvaMultilingualNeural"
         self.tts_model = config.get("model", "edge-tts")
         # prosody (chỉ edge-tts mới áp dụng); để trống thì không gửi
         self.rate = config.get("rate") or None
@@ -54,7 +62,16 @@ class TTSProvider(TTSProviderBase):
         if not self.api_key:
             raise Exception("Oriagent Edge TTS: api_key chưa được cấu hình")
 
-        language = _detect_text_lang(text) or self.default_language
+        if self.auto_bilingual:
+            # Auto song ngữ: detect ngôn ngữ từng câu -> chọn GIỌNG đúng (Việt/Anh) cho câu đó.
+            language = _detect_text_lang(text)
+            voice = self.auto_voice_vi if language == "vi" else self.auto_voice_en
+        else:
+            # Thực nghiệm: giọng Multilingual đọc đúng cả Việt lẫn Anh khi gửi language="en"
+            # (gửi "vi" thì tiếng Việt bị méo). Giọng đơn ngữ: detect vi/en theo câu.
+            voice = self.voice
+            language = "en" if self.is_multilingual else _detect_text_lang(text)
+
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -63,7 +80,7 @@ class TTSProvider(TTSProviderBase):
             "text": text,
             "language": language,
             "model": self.tts_model,
-            "voice": self.voice,
+            "voice": voice,
             "format": self.audio_file_type,
         }
         for key, val in (("rate", self.rate), ("pitch", self.pitch), ("volume", self.volume)):
