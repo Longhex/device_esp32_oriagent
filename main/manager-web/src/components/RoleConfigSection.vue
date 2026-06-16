@@ -214,7 +214,8 @@ export default {
   computed: {
     isOriagentLLM() {
       const map = this.llmModeTypeMap || {};
-      return map[this.form.model.llmModelId] === 'oriagent_ws';
+      const t = map[this.form.model.llmModelId];
+      return t === 'oriagent_http' || t === 'oriagent_websocket';
     },
     // MAC test cố định RIÊNG theo từng agent (per-agent), KHÔNG bao giờ trùng MAC thiết bị thật:
     // tiền tố 02 (locally-administered) + 5 octet suy ra từ agentId. Ổn định -> không bao giờ phải move binding.

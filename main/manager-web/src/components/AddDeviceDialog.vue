@@ -15,7 +15,7 @@
         <span style="font-size: 11px"> {{ $t('device.verificationCode') }}</span>
       </div>
       <div class="input-46" style="margin-top: 12px;">
-        <el-input :placeholder="$t('device.verificationCodePlaceholder')" v-model="deviceCode" @keyup.enter.native="confirm" />
+        <el-input :placeholder="$t('device.verificationCodePlaceholder')" v-model="deviceCode" @blur="deviceCode = deviceCode.trim()" @keyup.enter.native="confirm" />
       </div>
     </div>
     <div style="display: flex;margin: 15px 15px;gap: 7px;">
@@ -46,14 +46,15 @@ export default {
   },
   methods: {
     confirm() {
-      if (!/^\d{6}$/.test(this.deviceCode)) {
+      const trimmedCode = this.deviceCode.trim();
+      if (!/^\d{6}$/.test(trimmedCode)) {
         this.$message.error(this.$t('device.input6DigitCode'));
         return;
       }
       this.loading = true;
       Api.device.bindDevice(
         this.agentId,
-        this.deviceCode, ({ data }) => {
+        trimmedCode, ({ data }) => {
           this.loading = false;
           if (data.code === 0) {
             this.$emit('refresh');

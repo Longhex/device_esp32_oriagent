@@ -194,15 +194,27 @@ class LLMProvider(LLMProviderBase):
                         and conversation_id
                         and ("not_found" in error_text.lower() or "conversation not exists" in error_text.lower())
                     )
-                    # Chỉ log ERROR đỏ cho lỗi thật. Stale-conv là tự-hồi-phục bình thường
-                    # (hết hạn phía server) → log INFO, tránh báo động giả trên dashboard.
-                    if not (is_stale_conv and not _retry):
+                    # Self-healing: conversation history contains `role:function` which newer
+                    # OpenAI models reject with 400. The only fix is to drop the broken history
+                    # and start a new conversation — same recovery path as stale-conv (404).
+                    is_bad_function_role = (
+                        r.status_code == 400
+                        and conversation_id
+                        and "function" in error_text.lower()
+                        and "messages[" in error_text.lower()
+                    )
+                    _auto_reset = is_stale_conv or is_bad_function_role
+
+                    # Chỉ log ERROR đỏ cho lỗi thật. Auto-reset là tự-hồi-phục bình thường
+                    # → log INFO, tránh báo động giả trên dashboard.
+                    if not (_auto_reset and not _retry):
                         logger.bind(tag=TAG).error(f"Oriagent API Error (Status {r.status_code}): {error_text}")
 
-                    if is_stale_conv and not _retry:
+                    if _auto_reset and not _retry:
+                        reason = "expired (404)" if is_stale_conv else "bad function-role history (400)"
                         logger.bind(tag=TAG).info(
-                            f"Oriagent conversation expired ({conversation_id[:16]}...). "
-                            f"Starting a fresh conversation."
+                            f"Oriagent conversation {reason} — resetting. "
+                            f"Old ID: {conversation_id[:16]}..."
                         )
                         self.session_conversation_map.pop(session_id, None)
                         if callable(on_conversation_cleared):

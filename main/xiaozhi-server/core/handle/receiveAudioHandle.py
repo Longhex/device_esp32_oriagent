@@ -35,8 +35,8 @@ async def handleAudioMessage(conn: "ConnectionHandler", audio):
 
 
 async def resume_vad_detection(conn: "ConnectionHandler"):
-    # 等待2秒后恢复VAD检测
-    await asyncio.sleep(2)
+    # ESP32 DAC ramp-up + wakeword tail ~200-300ms; 2s là quá dài
+    await asyncio.sleep(0.3)
     conn.just_woken_up = False
 
 

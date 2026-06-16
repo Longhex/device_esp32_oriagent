@@ -887,6 +887,14 @@ class ConnectionHandler:
                 )
             )
 
+        # Fire memory query ngay lập tức (async, không block) để chạy song song
+        # với toàn bộ phần setup functions/tools bên dưới (~50-150ms overlap)
+        _memory_future = None
+        if depth == 0 and self.memory is not None and query:
+            _memory_future = asyncio.run_coroutine_threadsafe(
+                self.memory.query_memory(query), self.loop
+            )
+
         # 设置最大递归深度，避免无限循环，可根据实际需求调整
         MAX_DEPTH = 5
         force_final_answer = False  # 标记是否强制最终回答
@@ -973,10 +981,15 @@ class ConnectionHandler:
             self.dialogue.put(Message(role="user", content=tool_call_reminder, is_temporary=True))
 
         try:
-            # 使用带记忆的对话
+            # Collect memory result (đã fire từ đầu hàm, chạy song song với setup)
             memory_str = None
-            # 仅当query非空（代表用户询问）时查询记忆
-            if self.memory is not None and query:
+            if _memory_future is not None:
+                try:
+                    memory_str = _memory_future.result(timeout=2.0)
+                except Exception as mem_err:
+                    self.logger.bind(tag=TAG).warning(f"Memory query failed/timeout: {mem_err}")
+            elif self.memory is not None and query and depth > 0:
+                # recursive depth: query memory normally
                 future = asyncio.run_coroutine_threadsafe(
                     self.memory.query_memory(query), self.loop
                 )
@@ -1299,10 +1312,17 @@ class ConnectionHandler:
                     )
                     futures_with_data.append((future, tool_call_data, tool_input))
 
-                # 等待协程结束（实际等待时长为最慢的那个）
+                # 等待协程结束 — timeout 30s tránh hang vô hạn nếu tool bị treo
+                TOOL_CALL_TIMEOUT = 30.0
                 tool_results = []
                 for future, tool_call_data, tool_input in futures_with_data:
-                    result = future.result()
+                    try:
+                        result = future.result(timeout=TOOL_CALL_TIMEOUT)
+                    except Exception as tool_err:
+                        self.logger.bind(tag=TAG).error(
+                            f"Tool call '{tool_call_data['name']}' failed/timeout: {tool_err}"
+                        )
+                        continue
                     tool_results.append((result, tool_call_data))
 
                     # 使用公共方法上报工具调用结果
@@ -1463,8 +1483,11 @@ class ConnectionHandler:
     def _process_report(self, type, text, audio_data, report_time):
         """处理上报任务"""
         try:
-            # 执行异步上报（在事件循环中运行）
-            asyncio.run(report(self, type, text, audio_data, report_time))
+            # Dùng event loop của server thay vì tạo loop mới mỗi lần (~200ms overhead)
+            future = asyncio.run_coroutine_threadsafe(
+                report(self, type, text, audio_data, report_time), self.loop
+            )
+            future.result(timeout=30.0)
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"上报处理异常: {e}")
         finally:

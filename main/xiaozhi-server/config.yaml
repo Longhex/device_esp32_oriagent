@@ -450,6 +450,20 @@ LLM:
     model_name: qwen2.5:3b-AWQ
     base_url: http://localhost:9997
 
+  # ── Oriagent HTTP SSE (baseline) ──────────────────────────────────────────
+  OriagentHTTP:
+    type: oriagent_http
+    api_url: "http://localhost:5001/v1/chat-messages"
+    api_key: "app-7yFCHtUo7GTputO2rlXhkqbe"
+    model_name: "oriagent-http"
+
+  # ── Oriagent WebSocket (so sánh A/B với OriagentHTTP) ─────────────────────
+  OriagentWebSocket:
+    type: oriagent_websocket
+    ws_url: "ws://localhost:5001/ws/chat"
+    api_key: "app-7yFCHtUo7GTputO2rlXhkqbe"
+    model_name: "oriagent-websocket"
+
 VLLM:
   ChatGLMVLLM:
     type: openai
@@ -602,3 +616,17 @@ TTS:
     api_key: "your_api_key"
     voice: x5_lingxiaoxuan_flow
     output_dir: tmp/
+  BlazeSpeedV4:
+    # Blaze Speed V4 — OPUS-Direct + Parallel Pool (pool=4, no local encode)
+    # Cải tiến so với V2: không encode PCM→Opus trên CPU → TTFA thấp hơn ~100-300ms
+    type: blaze_speed_v4
+    api_key: "YOUR_BLAZE_API_KEY"
+    private_voice: "HN-Nu-MaiThaoDeThuongV2"   # giọng Blaze
+    audio_speed: "1.2"                           # 1.0–2.0 (1.2 = tự nhiên, 1.5 = nhanh)
+    audio_quality: 64                            # 32/64/128 kbps Opus
+    model: "2.0-realtime"
+    language: "vi"
+    normalization: "basic"
+    domain: "api.blaze.vn"
+    initial_opus_chunks: 2                       # buffer 2 chunks (~60ms) trước khi phát
+    verify_ssl: true

@@ -47,9 +47,9 @@ async def sendAudioMessage(conn: "ConnectionHandler", sentenceType, audios, text
         await send_tts_message(conn, "stop", None)
         conn.client_is_speaking = False
         if conn.close_after_chat:
-            # 增加 5 秒延迟，确保设备有足够时间播放完最后的缓存音频
-            conn.logger.bind(tag=TAG).info("Đang đợi 5 giây để thiết bị phát hết âm thanh trước khi ngắt...")
-            await asyncio.sleep(5)
+            # _wait_for_audio_completion() đã chờ queue drain + pre-buffer playback
+            # chỉ cần thêm buffer nhỏ cho TCP flush, không cần 5s cứng
+            await asyncio.sleep(0.5)
             await conn.close()
 
 
