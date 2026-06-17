@@ -1214,13 +1214,15 @@ class ConnectionHandler:
                             except Exception as e:
                                 self.logger.bind(tag=TAG).error(f"System Interceptor failure: {e}")
 
-                        response_message.append(content)
+                        from core.utils.util import strip_language_tags
+                        tts_content = strip_language_tags(content)
+                        response_message.append(tts_content)
                         self.tts.tts_text_queue.put(
                             TTSMessageDTO(
                                 sentence_id=self.sentence_id,
                                 sentence_type=SentenceType.MIDDLE,
                                 content_type=ContentType.TEXT,
-                                content_detail=content,
+                                content_detail=tts_content,
                             )
                         )
         except Exception as e:

@@ -207,6 +207,7 @@ export default {
   data() {
     return {
       isLiveTesting: false,
+      testLoading: false,
       internalLanguage: this.selectedLanguage,
       showSystemPrompt: false
     };
@@ -260,10 +261,17 @@ export default {
         this.isLiveTesting = false;
         return;
       }
+      if (this.testLoading) return;
+      this.testLoading = true;
       let opened = false;
-      const open = () => { if (!opened) { opened = true; this.isLiveTesting = true; } };
+      const open = () => {
+        if (!opened) {
+          opened = true;
+          this.isLiveTesting = true;
+        }
+        this.testLoading = false;
+      };
       this.ensureTestDevice(open);
-      // Fallback: vẫn mở test dù API chậm/lỗi (không để treo nút)
       setTimeout(open, 2500);
     },
     // Đăng ký MAC test riêng cho agent hiện tại.

@@ -607,6 +607,13 @@ def get_system_error_response(config: dict) -> str:
     """
     return config.get("system_error_response", "主人，小智现在有点忙，我们稍后再试吧。")
 
+_LANG_TAG_RE = re.compile(r'\[[a-z]{2,3}\]', re.IGNORECASE)
+
+def strip_language_tags(text: str) -> str:
+    result = _LANG_TAG_RE.sub('', text)
+    return re.sub(r'  +', ' ', result)
+
+
 def recursive_json_prettify(data):
     """Recursively prettify JSON strings within data for log output."""
     if isinstance(data, dict):
