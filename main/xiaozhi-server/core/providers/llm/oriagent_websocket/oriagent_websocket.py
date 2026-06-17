@@ -74,6 +74,11 @@ class LLMProvider(LLMProviderBase):
         self._conn_locks: Dict[str, threading.Lock] = {}  # per-device serialize lock
         self._pool_lock   = threading.Lock()               # guards _conns + _conn_locks
 
+        # Tracks whether the previous stream on this connection ended cleanly
+        # (i.e., received a done/err frame). False means the stream was abandoned
+        # mid-flight (user abort), so there are stale frames in the socket buffer.
+        self._stream_clean: Dict[str, bool] = {}  # user_id → True if buffer is clean
+
         # Keepalive / activity-window management
         self._last_activity: Dict[str, float] = {}   # user_id → epoch of last response
         self._keepalive_running = False
@@ -176,6 +181,7 @@ class LLMProvider(LLMProviderBase):
 
         with self._pool_lock:
             self._conns[user_id]         = ws
+            self._stream_clean[user_id]  = True   # fresh connection — buffer is clean
             self._last_activity[user_id] = time.time()
             self._ensure_keepalive_running()
 
@@ -186,6 +192,7 @@ class LLMProvider(LLMProviderBase):
         with self._pool_lock:
             ws = self._conns.pop(user_id, None)
             self._last_activity.pop(user_id, None)
+            self._stream_clean.pop(user_id, None)
         if ws is not None:
             try:
                 ws.close()
@@ -329,6 +336,32 @@ class LLMProvider(LLMProviderBase):
         ttft_logged       = False
         last_hardware_obs = None
 
+        # ── Drain stale buffer from a previously aborted stream ───────────
+        # When user aborts mid-stream, the generator is abandoned without reading
+        # the server's done/err frame.  Those frames remain in the socket buffer
+        # and would be returned by the next ws.recv() — causing the new request
+        # to play the previous turn's audio response (1-turn shift bug).
+        if not self._stream_clean.get(user_id, True):
+            logger.bind(tag=TAG).warning(
+                f"[WS] Stale buffer detected for {user_id[:16]} — draining before new request"
+            )
+            drained_ok = self._drain_stale(ws, user_id)
+            if not drained_ok:
+                # _drain_stale already dropped the connection; reconnect now
+                try:
+                    ws, connect_ms = self._get_or_connect(user_id)
+                except Exception as exc:
+                    logger.bind(tag=TAG).error(f"[WS] Reconnect after drain failed ({user_id[:16]}): {exc}")
+                    yield " [System Error: WS reconnect failed] "
+                    return
+                if connect_ms is not None:
+                    perf_metrics.record(
+                        "oriagent_websocket_connect_ms", connect_ms, session=session_id
+                    )
+
+        # Mark buffer as dirty before sending — will be reset to True on done/err
+        self._stream_clean[user_id] = False
+
         # ── Send chat frame ───────────────────────────────────────────────
         chat_frame: dict = {"t": "chat", "text": query, "cid": conversation_id or ""}
         if inputs:
@@ -431,6 +464,8 @@ class LLMProvider(LLMProviderBase):
                     if callable(on_conversation_id):
                         on_conversation_id(conversation_id)
 
+                # Mark buffer clean — no stale frames remain
+                self._stream_clean[user_id] = True
                 # Mark activity so keepalive knows this device is still in use
                 with self._pool_lock:
                     self._last_activity[user_id] = time.time()
@@ -461,6 +496,7 @@ class LLMProvider(LLMProviderBase):
                 )
 
                 if is_recoverable:
+                    self._stream_clean[user_id] = True  # err frame is terminal; buffer clean before retry
                     reason = "conv_error" if error_code == "conv_error" else "bad function-role history"
                     logger.bind(tag=TAG).info(
                         f"[WS] Self-heal ({reason}) — resetting conversation"
@@ -482,10 +518,59 @@ class LLMProvider(LLMProviderBase):
                 logger.bind(tag=TAG).error(
                     f"[WS] Server error: {error_msg} (code={error_code})"
                 )
+                self._stream_clean[user_id] = True  # err frame = terminal, buffer clean
                 yield f" [LLM Error: {error_msg}] "
                 break
 
             # pong and other unknown frame types are dropped silently
+
+    # ------------------------------------------------------------------
+    # Stale-buffer drain
+    # ------------------------------------------------------------------
+
+    def _drain_stale(self, ws, user_id: str) -> bool:
+        """
+        Drain leftover frames from a previously aborted stream.
+
+        Reads frames until a terminal done/err frame is received or a
+        timeout/error occurs.  Returns True if drained cleanly, False if
+        the connection had to be dropped (caller should reconnect).
+        """
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            try:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                raw = ws.recv(timeout=min(2.0, remaining))
+                try:
+                    frame = json.loads(raw)
+                except (ValueError, TypeError):
+                    continue
+                t = frame.get("t")
+                if t in ("done", "err"):
+                    logger.bind(tag=TAG).info(
+                        f"[WS] Stale buffer drained cleanly for {user_id[:16]}"
+                    )
+                    self._stream_clean[user_id] = True
+                    return True
+            except ConnectionClosed:
+                self._drop_conn(user_id)
+                return False
+            except TimeoutError:
+                break
+            except Exception as exc:
+                logger.bind(tag=TAG).warning(
+                    f"[WS] Error draining stale buffer for {user_id[:16]}: {exc}"
+                )
+                break
+
+        # Drain timed out or errored — drop connection to guarantee clean state
+        logger.bind(tag=TAG).warning(
+            f"[WS] Drain timeout for {user_id[:16]} — dropping connection for clean restart"
+        )
+        self._drop_conn(user_id)
+        return False
 
     # ------------------------------------------------------------------
     # Static helpers
