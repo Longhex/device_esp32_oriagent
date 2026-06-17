@@ -99,10 +99,8 @@ export default {
                 callback(res);
             })
             .networkFail((err) => {
+                // Không retry — đây là optional status check, retry vô hạn gây spam toast
                 console.error('获取设备状态失败:', err);
-                RequestService.reAjaxFun(() => {
-                    this.getDeviceStatus(agentId, callback);
-                });
             }).send();
     },
 }
