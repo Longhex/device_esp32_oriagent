@@ -17,7 +17,7 @@ from core.utils.tts import MarkdownCleaner, convert_percentage_to_range
 from core.utils.output_counter import add_device_output
 from core.handle.reportHandle import enqueue_tts_report
 from core.handle.sendAudioHandle import sendAudioMessage
-from core.utils.util import audio_bytes_to_data_stream, audio_to_data_stream
+from core.utils.util import audio_bytes_to_data_stream, audio_to_data_stream, strip_language_tags
 from core.providers.tts.dto.dto import (
     TTSMessageDTO,
     SentenceType,
@@ -298,7 +298,7 @@ class TTSProviderBase(ABC):
                     self.tts_text_buff.append(message.content_detail)
                     segment_text = self._get_segment_text()
                     if segment_text:
-                        self.to_tts_stream(segment_text, opus_handler=self.handle_opus)
+                        self.to_tts_stream(strip_language_tags(segment_text), opus_handler=self.handle_opus)
                 elif ContentType.FILE == message.content_type:
                     self._process_remaining_text_stream(opus_handler=self.handle_opus)
                     tts_file = message.content_file
@@ -470,7 +470,7 @@ class TTSProviderBase(ABC):
         if remaining_text:
             segment_text = textUtils.get_string_no_punctuation_or_emoji(remaining_text)
             if segment_text:
-                self.to_tts_stream(segment_text, opus_handler=opus_handler)
+                self.to_tts_stream(strip_language_tags(segment_text), opus_handler=opus_handler)
                 self.processed_chars += len(full_text)
                 return True
         return False
