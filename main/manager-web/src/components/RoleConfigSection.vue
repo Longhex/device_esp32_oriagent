@@ -280,9 +280,10 @@ export default {
       const finish = () => { if (done) done(); };
       if (!this.agentId) { finish(); return; }
       const mac = this.testDeviceMac;
-      Api.device.getAgentBindDevices(this.agentId, ({ data }) => {
-        const exists = (data || []).some(d => (d.macAddress || '').toUpperCase() === mac.toUpperCase());
-        if (exists) { finish(); return; } // đã bind đúng agent này -> không làm gì
+      Api.device.getAgentBindDevices(this.agentId, (res) => {
+        const devices = (res.data && res.data.data) || [];
+        const exists = devices.some(d => (d.macAddress || '').toUpperCase() === mac.toUpperCase());
+        if (exists) { finish(); return; }
         Api.device.manualAddDevice(
           { agentId: this.agentId, board: 'web-test', appVersion: '1.0.0', macAddress: mac },
           () => finish()
