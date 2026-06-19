@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from core.connection import ConnectionHandler
 from core.utils import textUtils
 from core.utils.util import audio_to_data
+from core.utils.language_tags import strip_display
 from core.providers.tts.dto.dto import SentenceType
 from core.utils.audioRateController import AudioRateController
 
@@ -269,7 +270,8 @@ async def send_tts_message(conn: "ConnectionHandler", state, text=None):
         return
     message = {"type": "tts", "state": state, "session_id": conn.session_id}
     if text is not None:
-        message["text"] = textUtils.check_emoji(text)
+        # Bỏ nhãn [vi]/[en] + ngoặc/nháy khỏi chữ hiển thị (không đụng text vào TTS)
+        message["text"] = textUtils.check_emoji(strip_display(text))
 
     # TTS播放结束
     if state == "stop":

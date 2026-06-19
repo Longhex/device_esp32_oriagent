@@ -298,7 +298,11 @@ class TTSProviderBase(ABC):
                     self.tts_text_buff.append(message.content_detail)
                     segment_text = self._get_segment_text()
                     if segment_text:
-                        self.to_tts_stream(strip_language_tags(segment_text), opus_handler=self.handle_opus)
+                        # Provider tự xử lý nhãn (handles_language_tags) -> giữ nguyên nhãn;
+                        # còn lại -> strip để khỏi đọc "vi"/"en" thành tiếng.
+                        if not getattr(self, "handles_language_tags", False):
+                            segment_text = strip_language_tags(segment_text)
+                        self.to_tts_stream(segment_text, opus_handler=self.handle_opus)
                 elif ContentType.FILE == message.content_type:
                     self._process_remaining_text_stream(opus_handler=self.handle_opus)
                     tts_file = message.content_file
@@ -470,7 +474,9 @@ class TTSProviderBase(ABC):
         if remaining_text:
             segment_text = textUtils.get_string_no_punctuation_or_emoji(remaining_text)
             if segment_text:
-                self.to_tts_stream(strip_language_tags(segment_text), opus_handler=opus_handler)
+                if not getattr(self, "handles_language_tags", False):
+                    segment_text = strip_language_tags(segment_text)
+                self.to_tts_stream(segment_text, opus_handler=opus_handler)
                 self.processed_chars += len(full_text)
                 return True
         return False

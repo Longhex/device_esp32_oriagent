@@ -1215,14 +1215,16 @@ class ConnectionHandler:
                                 self.logger.bind(tag=TAG).error(f"System Interceptor failure: {e}")
 
                         from core.utils.util import strip_language_tags
-                        tts_content = strip_language_tags(content)
-                        response_message.append(tts_content)
+                        # Lịch sử hội thoại: bỏ nhãn cho sạch.
+                        response_message.append(strip_language_tags(content))
+                        # Hàng đợi TTS: GIỮ NGUYÊN nhãn [vi]/[en]. base.py sẽ strip cho
+                        # provider không tự xử lý, hoặc để provider tự xử lý (handles_language_tags).
                         self.tts.tts_text_queue.put(
                             TTSMessageDTO(
                                 sentence_id=self.sentence_id,
                                 sentence_type=SentenceType.MIDDLE,
                                 content_type=ContentType.TEXT,
-                                content_detail=tts_content,
+                                content_detail=content,
                             )
                         )
         except Exception as e:
