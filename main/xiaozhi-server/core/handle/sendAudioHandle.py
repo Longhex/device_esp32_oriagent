@@ -1,4 +1,5 @@
 import json
+import re
 import time
 import asyncio
 from typing import TYPE_CHECKING
@@ -9,6 +10,19 @@ from core.utils import textUtils
 from core.utils.util import audio_to_data
 from core.providers.tts.dto.dto import SentenceType
 from core.utils.audioRateController import AudioRateController
+
+# Bỏ nhãn ngôn ngữ [vi]/[en] (và biến thể cụt do streaming: vi]/en]) khỏi CHỮ HIỂN THỊ trên UI.
+# Nhãn chỉ dùng nội bộ để TTS chọn giọng, không nên hiện cho người dùng.
+_LANG_TAG_RE = re.compile(r"\[\s*(?:vi|en)\s*\]|(?<![\w\[])(?:vi|en)\]", re.IGNORECASE)
+# Nháy/ngoặc thường bị streaming cắt làm cụt (vd: 'a"', '"an') -> bỏ khỏi chữ hiển thị cho gọn.
+_DISPLAY_NOISE = {ord(c): "" for c in '"“”«»()[]【】「」『』'}
+
+
+def _strip_lang_tags(text):
+    if not text:
+        return text
+    text = _LANG_TAG_RE.sub("", text).translate(_DISPLAY_NOISE)
+    return re.sub(r"\s{2,}", " ", text).strip()
 
 TAG = __name__
 # 音频帧时长（毫秒）
@@ -269,7 +283,7 @@ async def send_tts_message(conn: "ConnectionHandler", state, text=None):
         return
     message = {"type": "tts", "state": state, "session_id": conn.session_id}
     if text is not None:
-        message["text"] = textUtils.check_emoji(text)
+        message["text"] = textUtils.check_emoji(_strip_lang_tags(text))
 
     # TTS播放结束
     if state == "stop":

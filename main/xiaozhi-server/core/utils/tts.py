@@ -105,12 +105,29 @@ class MarkdownCleaner:
     # 预编译所有正则表达式（按执行频率排序）
     # 这里要把 replace_xxx 的静态方法放在最前定义，以便在列表里能正确引用它们。
     REGEXES = [
-        (re.compile(r'```.*?```', re.DOTALL), ''),  # 代码块
-        (re.compile(r'^#+\s*', re.MULTILINE), ''),  # 标题
+        # Code block: xử lý trước
+        (re.compile(r"```.*?```", re.DOTALL), ""),
+
+        # Heading markdown
+        (re.compile(r"^#+\s*", re.MULTILINE), ""),
+
+        # Markdown image đầy đủ: giữ alt text
+        (re.compile(r"!\[([^\]]*)\]\((https?://[^)\s]+)[^)]*\)"), r"\1"),
+
+        # Markdown link đầy đủ: giữ title
+        (re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)[^)]*\)"), r"\1"),
+
+        # Mảnh markdown bị vỡ: ](https://...)
+        (re.compile(r"\]\s*\(\s*https?://[^)\s]+[^)]*\)"), ""),
+        
+        # Mảnh markdown còn sót dạng [text] ở cuối segment
+        (re.compile(r"\[\s*([^\]]+)\s*\]\s*$"), r"\1"),
+
+        # URL thô http/https
+        (re.compile(r"https?://[^\s<>\"\]]+"), ""),
+
         (re.compile(r'(\*\*|__)(.*?)\1'), r'\2'),  # 粗体
         (re.compile(r'(\*|_)(?=\S)(.*?)(?<=\S)\1'), r'\2'),  # 斜体
-        (re.compile(r'!\[.*?\]\(.*?\)'), ''),  # 图片
-        (re.compile(r'\[(.*?)\]\(.*?\)'), r'\1'),  # 链接
         (re.compile(r'^\s*>+\s*', re.MULTILINE), ''),  # 引用
         (
             re.compile(r'(?P<table_block>(?:^[^\n]*\|[^\n]*\n)+)', re.MULTILINE),
@@ -126,22 +143,49 @@ class MarkdownCleaner:
     ]
 
     @staticmethod
+    def _safe_preview(text: str, max_len: int = 300) -> str:
+        if not text:
+            return ""
+        preview = str(text)
+        preview = re.sub(r"https?://[^\s<>\"']+", "[URL_REDACTED]", preview)
+        preview = re.sub(r"\bwww\.[^\s<>\"']+", "[URL_REDACTED]", preview)
+        if len(preview) > max_len:
+            preview = preview[:max_len] + "..."
+        return preview
+
+    @staticmethod
     def clean_markdown(text: str) -> str:
         """
         主入口方法：依序执行所有正则，移除或替换 Markdown 元素
         """
-        # 检查文本是否全为英文和基本标点符号
-        if text and all((c.isascii() or c.isspace() or c in punctuation_set) for c in text):
-            # 保留原始空格，直接返回
-            return text
+        if not text:
+            return ""
+            
+        logger.debug(f"[TTS CLEAN BEFORE] {MarkdownCleaner._safe_preview(text)}")
+        
 
+        cleaned_text = text
         for regex, replacement in MarkdownCleaner.REGEXES:
-            text = regex.sub(replacement, text)
+            cleaned_text = regex.sub(replacement, cleaned_text)
+
+        # Cleanup leftover artifacts from markdown links/images
+        cleaned_text = cleaned_text.replace('![', '').replace('[]', '').replace('()', '').replace(']( )', '')
+        
+        # Cleanup orphan ']' or ')' if they look like broken markdown tails, but only carefully
+        cleaned_text = re.sub(r'\]\(.*?\)', '', cleaned_text)
+        
+        # Normalize whitespace (nhiều space thành 1, bỏ space trước dấu câu)
+        cleaned_text = cleaned_text.replace('\n', ' ')
+        cleaned_text = re.sub(r'\s{2,}', ' ', cleaned_text)
+        cleaned_text = re.sub(r'\s+([.,!?;:])', r'\1', cleaned_text)
 
         # 去除emoji表情
-        text = check_emoji(text)
+        cleaned_text = check_emoji(cleaned_text)
 
-        return text.strip()
+        cleaned_text = cleaned_text.strip()
+        
+        logger.debug(f"[TTS CLEAN AFTER] {MarkdownCleaner._safe_preview(cleaned_text)}")
+        return cleaned_text
 
 def convert_percentage_to_range(percentage, min_val, max_val, base_val=None):
     """
