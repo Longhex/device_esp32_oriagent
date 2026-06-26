@@ -648,6 +648,8 @@ class TTSProvider(TTSProviderBase):
                     while True:
                         segment = self._get_smart_segment()
                         if not segment: break
+                        segment = MarkdownCleaner.clean_markdown(segment)
+                        if not segment: continue
                         idx = self.segment_counter
                         self.segment_counter += 1
                         task_id = f"{self.current_session_id}_{idx}"
@@ -661,6 +663,7 @@ class TTSProvider(TTSProviderBase):
                 if message.sentence_type == SentenceType.LAST:
                     full_text = "".join(self.tts_text_buff)
                     remaining = full_text[self.processed_chars:]
+                    remaining = MarkdownCleaner.clean_markdown(remaining)
                     if remaining.strip() and not self.conn.client_abort:
                         idx = self.segment_counter
                         self.segment_counter += 1
@@ -698,13 +701,22 @@ class TTSProvider(TTSProviderBase):
 
         MIN_SEG_CHARS = 5  # skip cuts that produce tiny segments (e.g. "1." from numbered lists)
         soft_idx = -1
+        
+        import re
+        url_matches = list(re.finditer(r'https?://[^\s<>"]+|www\.[^\s<>"]+', text_to_process))
+        url_ranges = [(m.start(), m.end()) for m in url_matches]
+        def is_inside_url(index):
+            for start, end in url_ranges:
+                if start <= index < end: return True
+            return False
+
         for i, char in enumerate(text_to_process):
-            if char in hard_stops:
+            if char in hard_stops and not is_inside_url(i):
                 seg = text_to_process[:i+1].strip()
                 if seg and len(seg) >= MIN_SEG_CHARS:
                     self.processed_chars += i + 1
                     return seg
-            elif soft_idx < 0 and char in soft_stops and (i + 1) >= MIN_SOFT_LEN:
+            elif soft_idx < 0 and char in soft_stops and (i + 1) >= MIN_SOFT_LEN and not is_inside_url(i):
                 soft_idx = i  # ghi nhận soft-stop ĐẦU TIÊN sau ngưỡng
 
         # Priority 2: Soft stop (dấu phẩy/chấm phẩy) — chỉ kích hoạt khi đoạn đã đủ dài

@@ -400,9 +400,20 @@ class TTSProviderBase(ABC):
             if self.is_first_sentence
             else self.punctuations
         )
+        
+        import re
+        url_matches = list(re.finditer(r'https?://[^\s<>"]+|www\.[^\s<>"]+', current_text))
+        url_ranges = [(m.start(), m.end()) for m in url_matches]
+        def is_inside_url(index):
+            for start, end in url_ranges:
+                if start <= index < end: return True
+            return False
 
         for punct in punctuations_to_use:
             pos = current_text.rfind(punct)
+            while pos != -1 and is_inside_url(pos):
+                pos = current_text.rfind(punct, 0, pos)
+                
             if (pos != -1 and last_punct_pos == -1) or (
                 pos != -1 and pos < last_punct_pos
             ):
