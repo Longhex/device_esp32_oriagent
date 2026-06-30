@@ -133,6 +133,54 @@
               </div>
             </div>
           </div>
+
+          <!-- Câu đệm suy nghĩ (thinking-buffer) — TOÀN HỆ THỐNG, mọi TTS -->
+          <div class="filler-premium-card">
+            <div class="filler-header-row">
+              <label class="field-label-premium">
+                <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> Câu đệm suy nghĩ
+              </label>
+              <el-switch
+                v-model="form.fillerEnabled"
+                :active-value="1"
+                :inactive-value="0"
+                active-color="#08c45b"
+                @change="onFillerToggle"
+              />
+            </div>
+
+            <template v-if="form.fillerEnabled === 1">
+              <div class="filler-field">
+                <span class="filler-tag">Thời gian đợi trước khi đệm (ms)</span>
+                <div class="filler-input-pill">
+                  <el-input-number
+                    v-model="form.fillerDelayMs"
+                    class="filler-number"
+                    :min="100"
+                    :max="5000"
+                    :step="100"
+                    controls-position="right"
+                  />
+                </div>
+              </div>
+
+              <div class="filler-field">
+                <span class="filler-tag">Câu đệm (mỗi câu một dòng)</span>
+                <el-input
+                  type="textarea"
+                  v-model="form.fillerPhrases"
+                  class="filler-textarea"
+                  :autosize="{ minRows: 4, maxRows: 10 }"
+                  placeholder="Ừm, để mình nghĩ xíu nha&#10;Câu này hay nè, đợi mình một chút&#10;Để mình xem nào"
+                />
+              </div>
+
+              <p class="filler-hint">
+                Số dòng = số câu đệm (xoay vòng). Để trống = dùng câu mặc định toàn hệ thống.
+                Khi LLM nghĩ lâu hơn "thời gian đợi", hệ thống phát một câu đệm để che độ trễ — áp dụng cho mọi TTS.
+              </p>
+            </template>
+          </div>
         </div>
       </div>
 
@@ -255,6 +303,12 @@ export default {
     }
   },
   methods: {
+    // Bật câu đệm: nếu chưa có thời gian đợi thì đặt mặc định 700ms cho dễ dùng.
+    onFillerToggle(val) {
+      if (val === 1 && (this.form.fillerDelayMs == null || this.form.fillerDelayMs === '')) {
+        this.$set(this.form, 'fillerDelayMs', 700);
+      }
+    },
     // Bật/tắt test trực tiếp. Khi bật: đảm bảo MAC test riêng của agent đã được bind, RỒI mới mở iframe.
     toggleLiveTest() {
       if (this.isLiveTesting) {
@@ -432,6 +486,89 @@ $ori-border: #f1f5f9;
 
 .selection-grid-vertical {
   display: flex; flex-direction: column; gap: 20px;
+}
+
+/* Câu đệm suy nghĩ — card đồng bộ thiết kế với .tts-premium-card (xanh, bo tròn) */
+.filler-premium-card {
+  background: #DFF9C0;
+  border-radius: 20px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .filler-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .filler-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .filler-tag {
+    font-size: 12px;
+    font-weight: 700;
+    color: #3d4566;
+    padding-left: 4px;
+  }
+
+  .filler-input-pill {
+    background: white;
+    border-radius: 999px;
+    padding: 4px 6px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  }
+
+  .filler-hint {
+    margin: 0;
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.5;
+  }
+
+  ::v-deep .filler-number {
+    width: 100%;
+    line-height: normal;
+
+    .el-input__inner {
+      height: 44px;
+      border: none;
+      border-radius: 999px;
+      background: transparent;
+      text-align: left;
+      padding-left: 16px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #111827;
+    }
+    .el-input-number__decrease,
+    .el-input-number__increase {
+      border: none;
+      background: transparent;
+      color: $ori-green;
+    }
+    .el-input-number__decrease:hover,
+    .el-input-number__increase:hover {
+      color: #067a3a;
+    }
+  }
+
+  ::v-deep .filler-textarea .el-textarea__inner {
+    border: none;
+    border-radius: 16px;
+    background: white;
+    padding: 14px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #111827;
+    line-height: 1.6;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    resize: none;
+  }
 }
 
 /* Custom Fields */

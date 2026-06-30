@@ -135,10 +135,8 @@ public class SysParamsController {
         }
         for (String url : wsUrls) {
             if (StringUtils.isNotBlank(url)) {
-                // 检查是否包含localhost或127.0.0.1
-                if (url.contains("localhost") || url.contains("127.0.0.1")) {
-                    throw new RenException(ErrorCode.WEBSOCKET_URL_LOCALHOST);
-                }
+                // Cho phép localhost/127.0.0.1 để chạy dev local
+                // (vd ws://localhost:8000/xiaozhi/v1/). Prod nên dùng host/domain thật.
 
                 // 验证WebSocket地址格式
                 if (!WebSocketValidator.validateUrlFormat(url)) {
@@ -177,10 +175,8 @@ public class SysParamsController {
             return;
         }
 
-        // 检查是否包含localhost或127.0.0.1
-        if (url.contains("localhost") || url.contains("127.0.0.1")) {
-            throw new RenException(ErrorCode.OTA_URL_LOCALHOST);
-        }
+        // Cho phép localhost/127.0.0.1 để chạy dev local
+        // (vd http://localhost:8002/xiaozhi/ota/). Prod nên dùng host/domain thật.
 
         // 验证URL格式
         if (!url.toLowerCase().startsWith("http")) {

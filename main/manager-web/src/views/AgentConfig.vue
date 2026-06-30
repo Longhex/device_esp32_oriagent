@@ -265,7 +265,7 @@ export default {
       this.saving = true;
       const promises = [];
       const diff = {};
-      const fields = ['agentName', 'systemPrompt', 'oriagentApiKey'];
+      const fields = ['agentName', 'systemPrompt', 'oriagentApiKey', 'fillerEnabled', 'fillerDelayMs', 'fillerPhrases'];
       fields.forEach(f => { if (this.agentForm[f] !== this.initialAgentForm[f]) diff[f] = this.agentForm[f]; });
       const modelFields = ['asrModelId', 'vadModelId', 'llmModelId', 'ttsModelId', 'intentModelId'];
       modelFields.forEach(f => { if (this.agentForm.model[f] !== this.initialAgentForm.model[f]) diff[f] = this.agentForm.model[f]; });

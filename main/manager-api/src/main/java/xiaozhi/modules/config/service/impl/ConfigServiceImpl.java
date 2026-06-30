@@ -245,7 +245,30 @@ public class ConfigServiceImpl implements ConfigService {
                 result,
                 true);
 
+        // Câu đệm suy nghĩ (filler) per-agent. Nếu agent không cấu hình thì
+        // server tự dùng default toàn cục (filler_default.* trong sys_params).
+        buildFillerConfig(agent, result);
+
         return result;
+    }
+
+    /**
+     * Ghi cấu hình câu đệm (thinking-buffer) của agent vào config trả về server.
+     * Chỉ ghi khi agent bật/tắt rõ ràng; nếu null → server dùng filler_default.
+     */
+    private void buildFillerConfig(AgentEntity agent, Map<String, Object> result) {
+        if (agent.getFillerEnabled() == null) {
+            return;
+        }
+        Map<String, Object> filler = new HashMap<>();
+        filler.put("enabled", agent.getFillerEnabled() == 1);
+        if (agent.getFillerDelayMs() != null) {
+            filler.put("delay_ms", agent.getFillerDelayMs());
+        }
+        if (StringUtils.isNotBlank(agent.getFillerPhrases())) {
+            filler.put("phrases", agent.getFillerPhrases());
+        }
+        result.put("filler", filler);
     }
 
     /**
