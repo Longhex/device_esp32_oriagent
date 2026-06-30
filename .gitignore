@@ -177,6 +177,8 @@ main/xiaozhi-server/mysql
 uploadfile
 .vscode
 .cursor
+docs_ThanhVV/
+claude.md 
  
 # deploy data
 deploy/models/

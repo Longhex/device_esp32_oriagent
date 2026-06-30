@@ -74,7 +74,9 @@
         $t('modelConfigDialog.callInfo') }}</div>
       <div style="height: 2px; background: #e9e9e9; margin-bottom: 22px;"></div>
 
-      <el-form :model="formData.configJson" label-width="auto" label-position="left" class="custom-form">
+      <!-- Provider thường: render phẳng theo fields -->
+      <el-form v-if="!isOriagentVoice" :model="formData.configJson" label-width="auto" label-position="left"
+        class="custom-form">
         <div v-for="(row, rowIndex) in chunkedCallInfoFields" :key="rowIndex"
           style="display: flex; gap: 20px; margin-bottom: 0;">
           <el-form-item v-for="field in row" :key="field.prop" :label="field.label" :prop="field.prop" style="flex: 1;">
@@ -84,6 +86,42 @@
           </el-form-item>
         </div>
       </el-form>
+
+      <!-- Voice Oriagent: form đa giọng (mỗi API key một giọng) -->
+      <div v-else class="oriagent-voice-form">
+        <el-form :model="oriagentConfig" label-width="auto" label-position="left" class="custom-form">
+          <el-form-item label="URL" style="margin-bottom: 18px;">
+            <el-input v-model="oriagentConfig.api_url" :placeholder="oriagentDefaultUrl" class="custom-input-bg" />
+          </el-form-item>
+        </el-form>
+
+        <div v-for="(voice, vIndex) in oriagentVoices" :key="vIndex" class="voice-group">
+          <div class="voice-group-header">
+            <span class="voice-group-title">{{ $t('ttsModel.voice') || 'Giọng' }} {{ vIndex + 1 }}</span>
+            <el-button v-if="oriagentVoices.length > 1" type="text" class="voice-remove-btn"
+              @click="removeVoice(vIndex)">{{ $t('ttsModel.delete') || 'Xóa' }}</el-button>
+          </div>
+          <el-form label-width="auto" label-position="left" class="custom-form">
+            <div style="display: flex; gap: 20px; margin-bottom: 0;">
+              <el-form-item :label="$t('ttsModel.voiceName') || 'Tên giọng'" style="flex: 1;">
+                <el-input v-model="voice.name" maxlength="20" show-word-limit placeholder="VD: Giọng Mai"
+                  class="custom-input-bg" />
+              </el-form-item>
+              <el-form-item :label="$t('ttsModel.languageType') || 'Loại ngôn ngữ'" style="flex: 1;">
+                <el-input v-model="voice.language" placeholder="auto" class="custom-input-bg" />
+              </el-form-item>
+            </div>
+            <el-form-item label="API key" style="margin-bottom: 0;">
+              <el-input v-model="voice.api_key" type="password" show-password placeholder="vc_sk_live_..."
+                class="custom-input-bg" />
+            </el-form-item>
+          </el-form>
+        </div>
+
+        <el-button type="text" class="add-voice-btn" @click="addVoice">
+          + {{ $t('ttsModel.addNewVoice') || 'Thêm giọng nói mới' }}
+        </el-button>
+      </div>
     </div>
 
     <div style="display: flex;justify-content: center;">
@@ -110,6 +148,10 @@ export default {
       providersLoaded: false,
       providerFields: [],
       currentProvider: null,
+      // ── Voice Oriagent (đa giọng — mỗi API key một giọng) ──
+      oriagentDefaultUrl: 'https://voice.oriagent.com/api/v1',
+      oriagentConfig: { api_url: 'https://voice.oriagent.com/api/v1' },
+      oriagentVoices: [{ name: '', language: 'auto', api_key: '' }],
       formData: {
         id: '',
         modelName: '',
@@ -136,10 +178,17 @@ export default {
     'formData.supplier'(newVal) {
       this.currentProvider = this.providers.find(p => p.value === newVal);
       this.providerFields = this.currentProvider?.fields || [];
-      this.initDynamicConfig();
+      if (newVal === 'oriagent_voice') {
+        this.initOriagentVoice();
+      } else {
+        this.initDynamicConfig();
+      }
     }
   },
   computed: {
+    isOriagentVoice() {
+      return this.formData.supplier === 'oriagent_voice';
+    },
     dynamicCallInfoFields() {
       return this.providerFields;
     },
@@ -197,6 +246,45 @@ export default {
       });
       this.formData.configJson = newConfig;
     },
+    // ── Voice Oriagent: khởi tạo form đa giọng (n = 1) ──
+    initOriagentVoice() {
+      this.oriagentConfig = { api_url: this.oriagentDefaultUrl };
+      this.oriagentVoices = [{ name: '', language: 'auto', api_key: '' }];
+    },
+    addVoice() {
+      this.oriagentVoices.push({ name: '', language: 'auto', api_key: '' });
+    },
+    removeVoice(index) {
+      if (this.oriagentVoices.length > 1) {
+        this.oriagentVoices.splice(index, 1);
+      }
+    },
+    // Gom URL + danh sách giọng thành configJson; trả null nếu validate fail.
+    buildOriagentConfigJson() {
+      const apiUrl = (this.oriagentConfig.api_url || '').trim() || this.oriagentDefaultUrl;
+      const voices = [];
+      const names = new Set();
+      for (const v of this.oriagentVoices) {
+        const name = (v.name || '').trim();
+        const apiKey = (v.api_key || '').trim();
+        const language = (v.language || '').trim() || 'auto';
+        if (!name || !apiKey) {
+          this.$message.error(this.$t('ttsModel.voiceNameKeyRequired') || 'Mỗi giọng cần Tên giọng và API key');
+          return null;
+        }
+        if (name.length > 20) {
+          this.$message.error(this.$t('ttsModel.voiceNameTooLong') || 'Tên giọng tối đa 20 ký tự');
+          return null;
+        }
+        if (names.has(name)) {
+          this.$message.error(this.$t('ttsModel.voiceNameDuplicate') || 'Tên giọng bị trùng');
+          return null;
+        }
+        names.add(name);
+        voices.push({ name, language, api_key: apiKey });
+      }
+      return { type: 'oriagent_voice', api_url: apiUrl, voices };
+    },
     confirm() {
       this.saving = true;
 
@@ -213,6 +301,17 @@ export default {
         return;
       }
 
+      let configJson;
+      if (this.isOriagentVoice) {
+        configJson = this.buildOriagentConfigJson();
+        if (!configJson) {
+          this.saving = false;
+          return;
+        }
+      } else {
+        configJson = { ...this.formData.configJson, type: this.formData.supplier };
+      }
+
       const submitData = {
         id: this.formData.id || '',
         modelName: this.formData.modelName || '',
@@ -224,10 +323,7 @@ export default {
         isEnabled: this.formData.isEnabled ? 1 : 0,
         isDefault: this.formData.isDefault ? 1 : 0,
         provideCode: this.formData.supplier,
-        configJson: {
-          ...this.formData.configJson,
-          type: this.formData.supplier
-        }
+        configJson
       };
 
       try {
@@ -260,6 +356,9 @@ export default {
       // 重置字段配置
       this.providerFields = [];
       this.currentProvider = null;
+      // reset form đa giọng Oriagent
+      this.oriagentConfig = { api_url: this.oriagentDefaultUrl };
+      this.oriagentVoices = [{ name: '', language: 'auto', api_key: '' }];
     },
     
     // 校验模型ID：不能为纯文字或空格
@@ -461,5 +560,37 @@ export default {
 
 .custom-input-bg .el-input__inner {
   height: 32px;
+}
+
+/* ── Voice Oriagent: nhóm cấu hình giọng ── */
+.oriagent-voice-form .voice-group {
+  border: 1px solid #e6e8f0;
+  border-radius: 10px;
+  padding: 14px 16px 4px;
+  margin-bottom: 14px;
+  background: #fafbff;
+}
+
+.oriagent-voice-form .voice-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.oriagent-voice-form .voice-group-title {
+  font-weight: bold;
+  color: #3d4566;
+}
+
+.oriagent-voice-form .voice-remove-btn {
+  color: #f56c6c;
+  padding: 0;
+}
+
+.oriagent-voice-form .add-voice-btn {
+  color: #237ff4;
+  font-size: 15px;
+  padding: 4px 0;
 }
 </style>

@@ -8,6 +8,7 @@ import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 
+import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 
 /**
@@ -78,6 +79,17 @@ public class SensitiveDataUtils {
                 result.put(key, maskMiddle((String) value));
             } else if (value instanceof JSONObject) {
                 result.put(key, maskSensitiveFields((JSONObject) value));
+            } else if (value instanceof JSONArray) {
+                // Mask cả các phần tử object trong mảng (vd voices[].api_key của Oriagent)
+                JSONArray maskedArr = new JSONArray();
+                for (Object el : (JSONArray) value) {
+                    if (el instanceof JSONObject) {
+                        maskedArr.add(maskSensitiveFields((JSONObject) el));
+                    } else {
+                        maskedArr.add(el);
+                    }
+                }
+                result.put(key, maskedArr);
             } else {
                 result.put(key, value);
             }

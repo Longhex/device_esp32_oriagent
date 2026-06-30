@@ -2,8 +2,10 @@ package xiaozhi.modules.model.service.impl;
 
 import java.io.Serializable;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
@@ -17,6 +19,7 @@ import com.baomidou.mybatisplus.core.metadata.OrderItem;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import lombok.AllArgsConstructor;
 import xiaozhi.common.constant.Constant;
@@ -39,6 +42,8 @@ import xiaozhi.modules.model.dto.ModelProviderDTO;
 import xiaozhi.modules.model.entity.ModelConfigEntity;
 import xiaozhi.modules.model.service.ModelConfigService;
 import xiaozhi.modules.model.service.ModelProviderService;
+import xiaozhi.modules.timbre.dao.TimbreDao;
+import xiaozhi.modules.timbre.entity.TimbreEntity;
 
 @Service
 @AllArgsConstructor
@@ -49,6 +54,10 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
     private final ModelProviderService modelProviderService;
     private final RedisUtils redisUtils;
     private final AgentDao agentDao;
+    private final TimbreDao timbreDao;
+
+    /** Provider code của Voice Oriagent (đa giọng — mỗi API key một giọng). */
+    private static final String ORIAGENT_VOICE_TYPE = "oriagent_voice";
 
     @Override
     public List<ModelBasicInfoDTO> getModelCodeList(String modelType, String modelName) {
@@ -123,6 +132,9 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
         // 6. 执行数据库更新
         modelConfigDao.updateById(modelConfigEntity);
 
+        // 6.1 Voice Oriagent: đồng bộ lại danh sách giọng -> bảng ai_tts_voice.
+        syncOriagentVoices(id, provideCode, modelConfigEntity.getConfigJson());
+
         // 7. 清除缓存
         clearModelCache(id);
 
@@ -139,6 +151,9 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
         ModelConfigEntity modelConfigEntity = prepareAddEntity(modelConfigBodyDTO, modelType);
 
         modelConfigDao.insert(modelConfigEntity);
+
+        // Voice Oriagent: tự đồng bộ danh sách giọng -> bảng ai_tts_voice (api_key giữ trong config).
+        syncOriagentVoices(modelConfigEntity.getId(), provideCode, modelConfigEntity.getConfigJson());
 
         return buildResponseDTO(modelConfigEntity);
     }
@@ -158,6 +173,11 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
         checkIntentConfigReference(id);
 
         modelConfigDao.deleteById(id);
+
+        // Voice Oriagent: xóa kèm các giọng đã auto-sync trong ai_tts_voice.
+        if (modelConfig != null && isOriagentVoiceConfig(modelConfig.getConfigJson())) {
+            timbreDao.delete(new QueryWrapper<TimbreEntity>().eq("tts_model_id", id));
+        }
 
         clearModelCache(id);
     }
@@ -367,6 +387,10 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
                     if (value instanceof String && !SensitiveDataUtils.isMaskedValue((String) value)) {
                         updatedJson.put(key, value);
                     }
+                } else if ("voices".equals(key) && value instanceof JSONArray) {
+                    // Voice Oriagent: merge mảng giọng, giữ api_key gốc khi giá trị gửi lên là mask.
+                    updatedJson.set("voices",
+                            mergeVoices(originalJson.getJSONArray("voices"), (JSONArray) value));
                 } else if (value instanceof JSONObject) {
                     // 递归处理嵌套JSON
                     mergeJson(updatedJson, key, (JSONObject) value);
@@ -418,6 +442,111 @@ public class ModelConfigServiceImpl extends BaseServiceImpl<ModelConfigDao, Mode
         modelConfigEntity.setModelType(modelType);
         modelConfigEntity.setIsDefault(0);
         return modelConfigEntity;
+    }
+
+    /** Kiểm tra config có phải Voice Oriagent (đa giọng) không. */
+    private boolean isOriagentVoiceConfig(JSONObject configJson) {
+        return configJson != null && ORIAGENT_VOICE_TYPE.equals(configJson.getStr("type"));
+    }
+
+    /**
+     * Merge mảng voices khi cập nhật: nếu api_key gửi lên là giá trị mask (****),
+     * khôi phục api_key gốc theo tên giọng để không ghi đè key thật bằng mask.
+     */
+    private JSONArray mergeVoices(JSONArray original, JSONArray incoming) {
+        Map<String, String> originalKeyByName = new HashMap<>();
+        if (original != null) {
+            for (Object o : original) {
+                if (o instanceof JSONObject) {
+                    JSONObject v = (JSONObject) o;
+                    originalKeyByName.put(v.getStr("name"), v.getStr("api_key"));
+                }
+            }
+        }
+        JSONArray result = new JSONArray();
+        if (incoming != null) {
+            for (Object o : incoming) {
+                if (o instanceof JSONObject) {
+                    JSONObject v = new JSONObject((JSONObject) o);
+                    String apiKey = v.getStr("api_key");
+                    if (apiKey != null && SensitiveDataUtils.isMaskedValue(apiKey)) {
+                        String orig = originalKeyByName.get(v.getStr("name"));
+                        if (StringUtils.isNotBlank(orig)) {
+                            v.set("api_key", orig);
+                        }
+                    }
+                    result.add(v);
+                } else {
+                    result.add(o);
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Đồng bộ danh sách giọng của model Voice Oriagent vào bảng ai_tts_voice.
+     * - Mỗi giọng -> 1 bản ghi (name = tts_voice = tên giọng, languages = ngôn ngữ).
+     * - api_key KHÔNG lưu ở đây (chỉ nằm trong config model, đã mask khi đọc).
+     * - Match theo tên để giữ nguyên id (agent đang tham chiếu không bị vỡ); xóa giọng đã bỏ.
+     */
+    private void syncOriagentVoices(String modelId, String provideCode, JSONObject configJson) {
+        boolean isOriagent = ORIAGENT_VOICE_TYPE.equals(provideCode) || isOriagentVoiceConfig(configJson);
+        if (!isOriagent || StringUtils.isBlank(modelId)) {
+            return;
+        }
+        JSONArray voices = configJson == null ? null : configJson.getJSONArray("voices");
+
+        List<TimbreEntity> existing = timbreDao.selectList(
+                new QueryWrapper<TimbreEntity>().eq("tts_model_id", modelId));
+        Map<String, TimbreEntity> byName = new HashMap<>();
+        for (TimbreEntity e : existing) {
+            byName.put(e.getName(), e);
+        }
+
+        Set<String> keepNames = new HashSet<>();
+        long sort = 1;
+        if (voices != null) {
+            for (Object o : voices) {
+                if (!(o instanceof JSONObject)) {
+                    continue;
+                }
+                JSONObject v = (JSONObject) o;
+                String name = v.getStr("name");
+                if (StringUtils.isBlank(name)) {
+                    continue;
+                }
+                String language = StringUtils.defaultIfBlank(v.getStr("language"), "auto");
+                keepNames.add(name);
+                TimbreEntity row = byName.get(name);
+                if (row == null) {
+                    row = new TimbreEntity();
+                    row.setId(DefaultIdentifierGenerator.getInstance().nextUUID(TimbreEntity.class));
+                    row.setTtsModelId(modelId);
+                    row.setName(name);
+                    row.setTtsVoice(name);
+                    row.setLanguages(language);
+                    row.setSort(sort);
+                    timbreDao.insert(row);
+                } else {
+                    row.setTtsVoice(name);
+                    row.setLanguages(language);
+                    row.setSort(sort);
+                    timbreDao.updateById(row);
+                    redisUtils.delete(RedisKeys.getTimbreDetailsKey(row.getId()));
+                    redisUtils.delete(RedisKeys.getTimbreNameById(row.getId()));
+                }
+                sort++;
+            }
+        }
+
+        for (TimbreEntity e : existing) {
+            if (!keepNames.contains(e.getName())) {
+                timbreDao.deleteById(e.getId());
+                redisUtils.delete(RedisKeys.getTimbreDetailsKey(e.getId()));
+                redisUtils.delete(RedisKeys.getTimbreNameById(e.getId()));
+            }
+        }
     }
 
     /**
