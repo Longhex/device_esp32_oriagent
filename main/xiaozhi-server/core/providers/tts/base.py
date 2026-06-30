@@ -514,10 +514,14 @@ class TTSProviderBase(ABC):
 
         if last_punct_pos != -1:
             segment_text_raw = current_text[: last_punct_pos + 1]
+            self.processed_chars += len(segment_text_raw)  # 更新已处理字符位置
+            
+            # Clean markdown BEFORE stripping edge punctuation to prevent corrupting markdown links (e.g. stripping '![')
+            segment_text_raw = MarkdownCleaner.clean_markdown(segment_text_raw)
+            
             segment_text = textUtils.get_string_no_punctuation_or_emoji(
                 segment_text_raw
             )
-            self.processed_chars += len(segment_text_raw)  # 更新已处理字符位置
 
             # 如果是第一句话，在找到第一个逗号后，将标志设置为False
             if self.is_first_sentence:
@@ -572,6 +576,8 @@ class TTSProviderBase(ABC):
         full_text = "".join(self.tts_text_buff)
         remaining_text = full_text[self.processed_chars :]
         if remaining_text:
+            # Clean markdown BEFORE stripping edge punctuation to prevent corrupting markdown links (e.g. stripping '![')
+            remaining_text = MarkdownCleaner.clean_markdown(remaining_text)
             segment_text = textUtils.get_string_no_punctuation_or_emoji(remaining_text)
             if segment_text:
                 self.to_tts_stream(strip_language_tags(segment_text), opus_handler=opus_handler)
