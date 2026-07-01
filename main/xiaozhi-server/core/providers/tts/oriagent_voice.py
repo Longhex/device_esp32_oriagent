@@ -13,6 +13,7 @@ from config.logger import setup_logging
 from core.utils import perf_metrics
 from core.providers.tts.dto.dto import SentenceType, ContentType, InterfaceType
 from core.providers.tts.base import TTSProviderBase
+from core.utils.tts import MarkdownCleaner
 from core.handle.sendAudioHandle import send_tts_message
 
 TAG = __name__
@@ -618,6 +619,9 @@ class TTSProvider(TTSProviderBase):
                         segment = self._get_smart_segment()
                         if not segment:
                             break
+                        segment = MarkdownCleaner.clean_markdown(segment)
+                        if not segment:
+                            continue
                         idx = self.segment_counter
                         self.segment_counter += 1
                         task_id = f"{self.current_session_id}_{idx}"
@@ -634,7 +638,8 @@ class TTSProvider(TTSProviderBase):
                 if message.sentence_type == SentenceType.LAST:
                     full_text = "".join(self.tts_text_buff)
                     remaining = full_text[self.processed_chars:]
-                    if remaining.strip() and not self.conn.client_abort:
+                    remaining = MarkdownCleaner.clean_markdown(remaining)
+                    if remaining and remaining.strip() and not self.conn.client_abort:
                         idx = self.segment_counter
                         self.segment_counter += 1
                         task_id = f"{self.current_session_id}_{idx}"
