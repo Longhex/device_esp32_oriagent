@@ -628,5 +628,6 @@ TTS:
     language: "vi"
     normalization: "basic"
     domain: "api.blaze.vn"
-    initial_opus_chunks: 2                       # buffer 2 chunks (~60ms) trước khi phát
+    pool_size: 4                                 # số kết nối WS song song (pre-warm)
+    initial_opus_chunks: 0                       # 0 = forward ngay (firmware tự buffer); >0 = gom N gói opus đầu
     verify_ssl: true

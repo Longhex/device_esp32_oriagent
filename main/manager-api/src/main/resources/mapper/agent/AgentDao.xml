@@ -24,6 +24,9 @@
         <result column="intentModelId" property="intentModelId"/>
         <result column="oriagentApiKey" property="oriagentApiKey"/>
         <result column="oriagentModelName" property="oriagentModelName"/>
+        <result column="fillerEnabled" property="fillerEnabled"/>
+        <result column="fillerDelayMs" property="fillerDelayMs"/>
+        <result column="fillerPhrases" property="fillerPhrases"/>
 
         <result column="functions" property="functions"
                 typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
@@ -59,6 +62,9 @@
                a.intent_model_id   AS intentModelId,
                a.oriagent_api_key  AS oriagentApiKey,
                a.oriagent_model_name AS oriagentModelName,
+               a.filler_enabled    AS fillerEnabled,
+               a.filler_delay_ms   AS fillerDelayMs,
+               a.filler_phrases    AS fillerPhrases,
                COALESCE(
                        (SELECT JSON_ARRAYAGG(
                                        JSON_OBJECT(

@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+import time
 import queue
 import asyncio
 import threading
@@ -41,6 +42,11 @@ class TTSProviderBase(ABC):
         self.tts_audio_first_sentence = True
         self.before_stop_play_files = []
         self.report_on_last = False
+        # Filler render-capture (thinking-buffer toàn hệ thống). Khi != None,
+        # audio provider sinh ra được "bắt" vào queue này (qua queue-swap) thay vì
+        # gửi xuống thiết bị — dùng để pre-render câu đệm ĐÚNG GIỌNG provider.
+        self._render_capture = None
+        self._render_lock = threading.Lock()
 
         self.tts_text_buff = []
         self.punctuations = (
@@ -255,6 +261,81 @@ class TTSProviderBase(ABC):
                 )
             )
 
+    def render_phrase_to_opus(self, text, timeout=8.0):
+        """
+        Render MỘT câu (filler/thinking-buffer) qua CHÍNH provider này để lấy
+        các gói opus ĐÚNG GIỌNG đang dùng. Provider-agnostic: mọi audio đều đi
+        qua self.tts_audio_queue, nên ta queue-swap để hứng riêng (play-thread
+        bị pause), feed FIRST→TEXT→LAST và gom opus tới khi gặp LAST.
+
+        AN TOÀN: render dùng CHUNG pipeline với turn thật, nên TUYỆT ĐỐI không
+        được chạy đè lên một turn (sẽ bắt nhầm audio câu trả lời vào cache).
+        `client_is_speaking` được bật ngay đầu turn (trong send_stt_message,
+        TRƯỚC khi turn ra audio), nên ta dựa vào cờ này để huỷ kịp thời.
+        Trả list[bytes] opus, hoặc [] nếu huỷ (sẽ render lại lúc rảnh sau).
+        """
+        if self.conn is None or not text:
+            return []
+        # Có turn đang chạy → không render.
+        if getattr(self.conn, "client_is_speaking", False):
+            return []
+        with self._render_lock:
+            capture = queue.Queue()
+            real_q = self.tts_audio_queue
+            self._render_capture = capture
+            time.sleep(0.12)  # để play-thread vào nhánh pause trước khi swap
+            # Re-check: một turn vừa bắt đầu trong lúc settle → huỷ, KHÔNG swap.
+            if getattr(self.conn, "client_is_speaking", False):
+                self._render_capture = None
+                return []
+            self.tts_audio_queue = capture
+            frames = []
+            aborted = False
+            try:
+                sid = uuid.uuid4().hex
+                self.tts_text_queue.put(
+                    TTSMessageDTO(sid, SentenceType.FIRST, ContentType.ACTION)
+                )
+                self.tts_text_queue.put(
+                    TTSMessageDTO(
+                        sid, SentenceType.MIDDLE, ContentType.TEXT, content_detail=text
+                    )
+                )
+                self.tts_text_queue.put(
+                    TTSMessageDTO(sid, SentenceType.LAST, ContentType.TEXT)
+                )
+                deadline = time.monotonic() + timeout
+                while time.monotonic() < deadline:
+                    # Turn thật bắt đầu giữa chừng → HUỶ + bỏ toàn bộ capture để
+                    # KHÔNG bao giờ cache nhầm audio của câu trả lời.
+                    if getattr(self.conn, "client_is_speaking", False):
+                        aborted = True
+                        break
+                    try:
+                        st, audio, _t = capture.get(timeout=0.2)
+                    except queue.Empty:
+                        continue
+                    if isinstance(audio, (bytes, bytearray)):
+                        frames.append(bytes(audio))
+                    elif isinstance(audio, list):
+                        frames.extend(
+                            bytes(a) for a in audio if isinstance(a, (bytes, bytearray))
+                        )
+                    if st == SentenceType.LAST:
+                        break
+            except Exception as e:
+                logger.bind(tag=TAG).warning(f"render_phrase_to_opus failed: {e}")
+                aborted = True
+            finally:
+                self.tts_audio_queue = real_q  # khôi phục TRƯỚC khi bỏ pause
+                self._render_capture = None
+            if aborted:
+                logger.bind(tag=TAG).debug(
+                    "Filler render huỷ vì có turn thật — bỏ capture, sẽ render lại lúc rảnh"
+                )
+                return []
+            return frames
+
     async def open_audio_channels(self, conn):
         self.conn = conn
 
@@ -326,6 +407,11 @@ class TTSProviderBase(ABC):
         enqueue_audio = []
         while not self.conn.stop_event.is_set():
             text = None
+            # Đang pre-render filler (capture qua queue-swap) → tạm ngừng gửi
+            # xuống thiết bị để không "ăn" mất các gói opus của câu đệm.
+            if self._render_capture is not None:
+                time.sleep(0.05)
+                continue
             try:
                 try:
                     sentence_type, audio_datas, text = self.tts_audio_queue.get(
@@ -362,6 +448,13 @@ class TTSProviderBase(ABC):
                 # 收集上报音频数据
                 if isinstance(audio_datas, bytes):
                     enqueue_audio.append(audio_datas)
+
+                # Đánh dấu turn đã có audio THẬT phát ra → filler không cần đệm nữa.
+                if self.conn is not None and (
+                    isinstance(audio_datas, (bytes, bytearray))
+                    or (isinstance(audio_datas, list) and len(audio_datas) > 0)
+                ):
+                    self.conn.tts_first_audio_sent = True
 
                 # 发送音频
                 future = asyncio.run_coroutine_threadsafe(
@@ -400,9 +493,20 @@ class TTSProviderBase(ABC):
             if self.is_first_sentence
             else self.punctuations
         )
+        
+        import re
+        url_matches = list(re.finditer(r'https?://[^\s<>"]+|www\.[^\s<>"]+', current_text))
+        url_ranges = [(m.start(), m.end()) for m in url_matches]
+        def is_inside_url(index):
+            for start, end in url_ranges:
+                if start <= index < end: return True
+            return False
 
         for punct in punctuations_to_use:
             pos = current_text.rfind(punct)
+            while pos != -1 and is_inside_url(pos):
+                pos = current_text.rfind(punct, 0, pos)
+                
             if (pos != -1 and last_punct_pos == -1) or (
                 pos != -1 and pos < last_punct_pos
             ):
@@ -410,10 +514,14 @@ class TTSProviderBase(ABC):
 
         if last_punct_pos != -1:
             segment_text_raw = current_text[: last_punct_pos + 1]
+            self.processed_chars += len(segment_text_raw)  # 更新已处理字符位置
+            
+            # Clean markdown BEFORE stripping edge punctuation to prevent corrupting markdown links (e.g. stripping '![')
+            segment_text_raw = MarkdownCleaner.clean_markdown(segment_text_raw)
+            
             segment_text = textUtils.get_string_no_punctuation_or_emoji(
                 segment_text_raw
             )
-            self.processed_chars += len(segment_text_raw)  # 更新已处理字符位置
 
             # 如果是第一句话，在找到第一个逗号后，将标志设置为False
             if self.is_first_sentence:
@@ -468,6 +576,8 @@ class TTSProviderBase(ABC):
         full_text = "".join(self.tts_text_buff)
         remaining_text = full_text[self.processed_chars :]
         if remaining_text:
+            # Clean markdown BEFORE stripping edge punctuation to prevent corrupting markdown links (e.g. stripping '![')
+            remaining_text = MarkdownCleaner.clean_markdown(remaining_text)
             segment_text = textUtils.get_string_no_punctuation_or_emoji(remaining_text)
             if segment_text:
                 self.to_tts_stream(strip_language_tags(segment_text), opus_handler=opus_handler)

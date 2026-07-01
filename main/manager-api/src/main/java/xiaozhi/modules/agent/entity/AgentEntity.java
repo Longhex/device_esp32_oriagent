@@ -98,6 +98,15 @@ public class AgentEntity {
     @Schema(description = "Oriagent Model Name")
     private String oriagentModelName;
 
+    @Schema(description = "Câu đệm suy nghĩ: bật/tắt (NULL = theo mặc định toàn cục)")
+    private Integer fillerEnabled;
+
+    @Schema(description = "Câu đệm: thời gian đợi (ms) trước khi phát")
+    private Integer fillerDelayMs;
+
+    @Schema(description = "Câu đệm: danh sách câu (mỗi câu 1 dòng hoặc ngăn bằng |)")
+    private String fillerPhrases;
+
     @Schema(description = "更新时间")
     private Date updatedAt;
 }

@@ -111,17 +111,18 @@ class MarkdownCleaner:
         # Heading markdown
         (re.compile(r"^#+\s*", re.MULTILINE), ""),
 
-        # Markdown image đầy đủ: giữ alt text
-        (re.compile(r"!\[([^\]]*)\]\((https?://[^)\s]+)[^)]*\)"), r"\1"),
+        # Markdown image đầy đủ: XÓA SẠCH (không giữ lại alt text để loa khỏi đọc tên ảnh)
+        (re.compile(r"!\[([^\]]*)\]\((https?://[^)\s]+)[^)]*\)"), ""),
 
-        # Markdown link đầy đủ: giữ title
-        (re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)[^)]*\)"), r"\1"),
+        # Markdown link đầy đủ: XÓA SẠCH
+        (re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)[^)]*\)"), ""),
 
         # Mảnh markdown bị vỡ: ](https://...)
         (re.compile(r"\]\s*\(\s*https?://[^)\s]+[^)]*\)"), ""),
         
-        # Mảnh markdown còn sót dạng [text] ở cuối segment
-        (re.compile(r"\[\s*([^\]]+)\s*\]\s*$"), r"\1"),
+
+        # Xóa triệt để mọi nội dung nằm trong ngoặc vuông còn lại (như [en], [laugh]...)
+        (re.compile(r"\[[^\]]*\]"), ""),
 
         # URL thô http/https
         (re.compile(r"https?://[^\s<>\"\]]+"), ""),

@@ -355,6 +355,15 @@ public class AgentServiceImpl extends BaseServiceImpl<AgentDao, AgentEntity> imp
         if (dto.getOriagentModelName() != null) {
             existingEntity.setOriagentModelName(dto.getOriagentModelName());
         }
+        if (dto.getFillerEnabled() != null) {
+            existingEntity.setFillerEnabled(dto.getFillerEnabled());
+        }
+        if (dto.getFillerDelayMs() != null) {
+            existingEntity.setFillerDelayMs(dto.getFillerDelayMs());
+        }
+        if (dto.getFillerPhrases() != null) {
+            existingEntity.setFillerPhrases(dto.getFillerPhrases());
+        }
 
         // 更新函数插件信息
         List<AgentUpdateDTO.FunctionInfo> functions = dto.getFunctions();

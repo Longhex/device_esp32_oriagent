@@ -88,6 +88,15 @@ public class AgentUpdateDTO implements Serializable {
     @Schema(description = "Oriagent Model Name", example = "gpt-4o", nullable = true)
     private String oriagentModelName;
 
+    @Schema(description = "Câu đệm suy nghĩ: bật/tắt (1/0)", example = "1", nullable = true)
+    private Integer fillerEnabled;
+
+    @Schema(description = "Câu đệm: thời gian đợi (ms)", example = "700", nullable = true)
+    private Integer fillerDelayMs;
+
+    @Schema(description = "Câu đệm: danh sách câu (mỗi câu 1 dòng hoặc ngăn bằng |)", nullable = true)
+    private String fillerPhrases;
+
     @Schema(description = "上下文源配置", nullable = true)
     private List<ContextProviderDTO> contextProviders;
 
