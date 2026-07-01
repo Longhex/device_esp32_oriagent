@@ -607,11 +607,6 @@ class TTSProvider(TTSProviderBase):
                     self.processed_chars = 0
                     self.segment_counter = 0
                     self._flush_pipeline()
-                    while not self.tts_text_queue.empty():
-                        try:
-                            self.tts_text_queue.get_nowait()
-                        except Exception:
-                            break
                     logger.bind(tag=TAG).info(f"Reset SID: {self.current_session_id}")
 
                 if self.conn.client_abort:
