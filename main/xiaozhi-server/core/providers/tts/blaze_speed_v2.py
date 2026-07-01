@@ -671,7 +671,8 @@ class TTSProvider(TTSProviderBase):
                             self.conn.loop,
                         )
                         self._schedule_fetch(idx, remaining, self.current_session_id, True)
-                    self.conn.executor.submit(self._wait_for_all_and_finish, message.content_detail)
+                    target_q = self.tts_audio_queue
+                    self.conn.executor.submit(self._wait_for_all_and_finish, message.content_detail, self.current_session_id, target_q)
             except queue.Empty: continue
             except Exception as e: logger.bind(tag=TAG).error(f"V2 Master Error: {e}")
 
@@ -733,7 +734,11 @@ class TTSProvider(TTSProviderBase):
                 return seg
         return None
 
-    def _wait_for_all_and_finish(self, content_detail):
+    def _wait_for_all_and_finish(self, content_detail, session_id=None, target_q=None):
+        if session_id and session_id != getattr(self, "current_session_id", None):
+            return
+        if target_q is None:
+            target_q = self.tts_audio_queue
         async def wait_loop():
             if self.playback_queue:
                 await self.playback_queue.put("END_OF_SESSION")
@@ -743,7 +748,7 @@ class TTSProvider(TTSProviderBase):
         future = asyncio.run_coroutine_threadsafe(wait_loop(), self.conn.loop)
         try: future.result(timeout=PLAYBACK_JOIN_TIMEOUT + 2)
         except: pass
-        self.tts_audio_queue.put((SentenceType.LAST, [], content_detail))
+        target_q.put((SentenceType.LAST, [], content_detail))
 
     def text_to_speak(self, text, _): pass
     def to_tts(self, text: str) -> list: return [{"type": "tts", "text": text}]

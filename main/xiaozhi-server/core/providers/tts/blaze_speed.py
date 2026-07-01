@@ -315,14 +315,10 @@ class TTSProvider(TTSProviderBase):
                         self.segment_counter += 1
 
                         self.segment_queues[idx] = asyncio.Queue()
-                        asyncio.run_coroutine_threadsafe(
-                            self.playback_queue.put((idx, self.is_first_segment, remaining)), 
-                            self.conn.loop
-                        )
-                        self.is_first_segment = False
-                        asyncio.run_coroutine_threadsafe(self._fetch_segment(idx, remaining, True), self.conn.loop)
-
-                    self.conn.executor.submit(self._wait_for_all_and_finish, message.content_detail)
+                    if remaining and remaining.strip() and not self.conn.client_abort:
+                        self.process_segment(remaining, self.current_session_id, is_last=True)
+                    target_q = self.tts_audio_queue
+                    self.conn.executor.submit(self._wait_for_all_and_finish, message.content_detail, self.current_session_id, target_q)
 
             except queue.Empty: continue
             except Exception as e:
@@ -364,28 +360,28 @@ class TTSProvider(TTSProviderBase):
 
         return None
 
-    def _wait_for_all_and_finish(self, content_detail):
+    def _wait_for_all_and_finish(self, content_detail, session_id=None, target_q=None):
+        if session_id and session_id != getattr(self, "current_session_id", None):
+            return
+        if target_q is None:
+            target_q = self.tts_audio_queue
         async def wait_loop():
             if self.playback_queue:
-                await self.playback_queue.put('END_OF_SESSION')
+                await self.playback_queue.put("END_OF_SESSION")
                 try:
-                    await asyncio.wait_for(self.playback_queue.join(), timeout=5.0)
-                except asyncio.TimeoutError:
-                    logger.bind(tag=TAG).warning("Blaze Speed TTS: playback_queue.join() timeout!")
-                await asyncio.sleep(0.5)
+                    await asyncio.wait_for(self.playback_queue.join(), timeout=PLAYBACK_JOIN_TIMEOUT)
+                except Exception:
+                    pass
+                await asyncio.sleep(0.2)
 
-        task = self.conn.loop.create_task(wait_loop())
-        self.pending_tasks.add(task)
-        task.add_done_callback(lambda t: self.pending_tasks.discard(t))
-
-        future = asyncio.run_coroutine_threadsafe(asyncio.wait_for(task, timeout=10.0), self.conn.loop)
+        future = asyncio.run_coroutine_threadsafe(wait_loop(), self.conn.loop)
         try:
-            future.result(timeout=12) 
+            future.result(timeout=PLAYBACK_JOIN_TIMEOUT + 2)
         except Exception:
             if self._playback_active and not self.conn.stop_event.is_set():
                 logger.bind(tag=TAG).warning("Blaze Speed TTS: Wait loop timeout!")
 
-        self.tts_audio_queue.put((SentenceType.LAST, [], content_detail))
+        target_q.put((SentenceType.LAST, [], content_detail))
 
     def text_to_speak(self, text, _):
         pass

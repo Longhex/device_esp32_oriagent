@@ -650,7 +650,8 @@ class TTSProvider(TTSProviderBase):
                         )
                         fetch_text = "  " + remaining if idx == 0 else remaining
                         self._schedule_fetch(idx, fetch_text, self.current_session_id, True)
-                    self.conn.executor.submit(self._wait_for_all_and_finish, message.content_detail)
+                    target_q = self.tts_audio_queue
+                    self.conn.executor.submit(self._wait_for_all_and_finish, message.content_detail, self.current_session_id, target_q)
             except queue.Empty:
                 continue
             except Exception as e:
@@ -700,7 +701,11 @@ class TTSProvider(TTSProviderBase):
                 return seg
         return None
 
-    def _wait_for_all_and_finish(self, content_detail):
+    def _wait_for_all_and_finish(self, content_detail, session_id=None, target_q=None):
+        if session_id and session_id != getattr(self, "current_session_id", None):
+            return
+        if target_q is None:
+            target_q = self.tts_audio_queue
         async def wait_loop():
             if self.playback_queue:
                 await self.playback_queue.put("END_OF_SESSION")
@@ -715,7 +720,7 @@ class TTSProvider(TTSProviderBase):
             future.result(timeout=PLAYBACK_JOIN_TIMEOUT + 2)
         except Exception:
             pass
-        self.tts_audio_queue.put((SentenceType.LAST, [], content_detail))
+        target_q.put((SentenceType.LAST, [], content_detail))
 
     def text_to_speak(self, text, _):
         pass
