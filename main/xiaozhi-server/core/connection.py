@@ -131,6 +131,12 @@ class ConnectionHandler:
         self.client_is_speaking = False
         self.client_listen_mode = "auto"
 
+        # Thinking-buffer (filler) — toàn hệ thống, độc lập TTS provider.
+        self.filler = None              # dict {enabled, delay_ms, phrases} hoặc None
+        self.tts_first_audio_sent = False  # turn này đã có audio thật chưa
+        self._filler_task = None        # concurrent.futures.Future của timer
+        self._filler_idx = 0            # con trỏ xoay vòng câu đệm
+
         # 线程任务相关
         self.loop = None  # 在 handle_connection 中获取运行中的事件循环
         self.stop_event = threading.Event()
@@ -573,6 +579,14 @@ class ConnectionHandler:
             """System prompt update"""
             self._init_prompt_enhancement()
 
+            # Pre-render câu đệm NGAY khi mở kết nối (lúc rảnh) để turn ĐẦU đã
+            # có sẵn filler — tránh tình trạng turn 1 chưa kịp cache nên bỏ qua.
+            try:
+                from core.handle.fillerHandle import schedule_prewarm
+                schedule_prewarm(self)
+            except Exception as _filler_err:
+                self.logger.bind(tag=TAG).debug(f"filler prewarm skip: {_filler_err}")
+
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"Failed to instantiate components: {e}")
 
@@ -748,6 +762,12 @@ class ConnectionHandler:
             self.config["mcp_endpoint"] = private_config["mcp_endpoint"]
         if private_config.get("context_providers", None) is not None:
             self.config["context_providers"] = private_config["context_providers"]
+        # Filler (thinking-buffer): chuyển khối config từ manager-api vào self.config
+        # để fillerHandle.build_filler_config đọc (per-agent đè default toàn cục).
+        if private_config.get("filler", None) is not None:
+            self.config["filler"] = private_config["filler"]
+        if private_config.get("filler_default", None) is not None:
+            self.config["filler_default"] = private_config["filler_default"]
 
         try:
             modules = await self.loop.run_in_executor(
@@ -877,6 +897,14 @@ class ConnectionHandler:
 
         # 为最顶层时新建会话ID和发送FIRST请求
         if depth == 0:
+            # Nếu đang pre-render filler (dùng chung pipeline TTS), chờ nó xong
+            # trước khi turn này feed FIRST — tránh đụng phiên. Bounded ~2.5s.
+            _r0 = time.monotonic()
+            while (
+                getattr(self.tts, "_render_capture", None) is not None
+                and time.monotonic() - _r0 < 2.5
+            ):
+                time.sleep(0.05)
             self.sentence_id = str(uuid.uuid4().hex)
             self.dialogue.put(Message(role="user", content=query))
             self.tts.tts_text_queue.put(
@@ -886,6 +914,13 @@ class ConnectionHandler:
                     content_type=ContentType.ACTION,
                 )
             )
+            # Bật câu đệm suy nghĩ (nếu cấu hình): chờ ngưỡng, nếu chưa có audio
+            # thật thì phát filler đã pre-render để che độ trễ. Độc lập TTS provider.
+            try:
+                from core.handle.fillerHandle import start_turn_filler
+                start_turn_filler(self)
+            except Exception as _filler_err:
+                self.logger.bind(tag=TAG).debug(f"start_turn_filler skipped: {_filler_err}")
 
         # Fire memory query ngay lập tức (async, không block) để chạy song song
         # với toàn bộ phần setup functions/tools bên dưới (~50-150ms overlap)
