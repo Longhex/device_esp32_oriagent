@@ -1671,24 +1671,13 @@ class ConnectionHandler:
                     close_connection_no_voice_time = int(self.config.get("close_connection_no_voice_time", 120))
                     hard_timeout_seconds = close_connection_no_voice_time + 60
                     
-                    # Layer 1: 触发“下班/再见”提示
+                    # Layer 1: 超时无活动，直接关闭连接
                     if not self.close_after_chat and elapsed_ms > close_connection_no_voice_time * 1000:
-                        self.logger.bind(tag=TAG).info(f"检测到 {close_connection_no_voice_time}s 无活动，准备触发结束语")
+                        self.logger.bind(tag=TAG).info(f"检测到 {close_connection_no_voice_time}s 无活动，直接关闭连接")
                         self.close_after_chat = True
                         self.client_abort = False
-                        
-                        end_prompt = self.config.get("end_prompt", {})
-                        if end_prompt and end_prompt.get("enable", True) is False:
-                            self.logger.bind(tag=TAG).info("配置已禁用结束语，直接关闭连接")
-                            await self.close(self.websocket)
-                            break
-                        
-                        prompt = end_prompt.get("prompt")
-                        if not prompt:
-                            prompt = "Kết thúc trò chuyện"
-                        
-                        # 异步提交聊天任务
-                        self.executor.submit(self.chat, prompt)
+                        await self.close(self.websocket)
+                        break
                     
                     # Layer 2: 强制关闭（防止 LLM 挂起或异常）
                     if elapsed_ms > hard_timeout_seconds * 1000:

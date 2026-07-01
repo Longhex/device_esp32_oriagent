@@ -179,6 +179,7 @@ uploadfile
 .cursor
 docs_ThanhVV/
 claude.md 
+Dev_realtime/
  
 # deploy data
 deploy/models/
