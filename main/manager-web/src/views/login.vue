@@ -2,91 +2,108 @@
   <div class="split-layout">
     <div class="split-left">
     </div>
-    
+
     <div class="split-right">
+      <!-- Logo top-left -->
       <div class="logo-area">
-        <img src="@/assets/logo_oriagent.svg" alt="Oriagent" style="height: 38px; width: auto; cursor: pointer" @click="goToPage('/home')" />
+        <img src="@/assets/login-v2/logo.svg" alt="Oriagent" class="logo-img" />
       </div>
-      <div class="login-box-container">
-        <div class="login-box" @keyup.enter="login">
-          <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 39px; padding: 0 30px;">
-            <img loading="lazy" alt="" src="@/assets/login/hi.png" style="width: 34px; height: 34px" />
-            <div class="login-text">{{ $t("login.title") }}</div>
-            <div class="login-welcome">{{ $t("login.welcome") }}</div>
 
-            <!-- 语言切换下拉菜单 -->
-            <el-dropdown trigger="click" class="title-language-dropdown" @visible-change="handleLanguageDropdownVisibleChange">
-              <span class="el-dropdown-link">
-                <span class="current-language-text">{{ currentLanguageText }}</span>
-                <i class="el-icon-arrow-down el-icon--right" :class="{ 'rotate-down': languageDropdownVisible }"></i>
-              </span>
-              <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item @click.native="changeLanguage('zh_CN')">{{ $t("language.zhCN") }}</el-dropdown-item>
-                <el-dropdown-item @click.native="changeLanguage('zh_TW')">{{ $t("language.zhTW") }}</el-dropdown-item>
-                <el-dropdown-item @click.native="changeLanguage('en')">{{ $t("language.en") }}</el-dropdown-item>
-                <el-dropdown-item @click.native="changeLanguage('de')">{{ $t("language.de") }}</el-dropdown-item>
-                <el-dropdown-item @click.native="changeLanguage('vi')">{{ $t("language.vi") }}</el-dropdown-item>
-                <el-dropdown-item @click.native="changeLanguage('pt_BR')">{{ $t("language.ptBR") }}</el-dropdown-item>
-              </el-dropdown-menu>
-            </el-dropdown>
+      <!-- Language pill top-right -->
+      <div class="language-area">
+        <el-dropdown trigger="click" @visible-change="handleLanguageDropdownVisibleChange">
+          <span class="language-pill">
+            <span class="language-flag">{{ currentLanguageFlag }}</span>
+            <span class="language-text">{{ currentLanguageText }}</span>
+            <i class="el-icon-arrow-down" :class="{ 'rotate-down': languageDropdownVisible }"></i>
+          </span>
+          <el-dropdown-menu slot="dropdown">
+            <el-dropdown-item @click.native="changeLanguage('zh_CN')">{{ $t("language.zhCN") }}</el-dropdown-item>
+            <el-dropdown-item @click.native="changeLanguage('zh_TW')">{{ $t("language.zhTW") }}</el-dropdown-item>
+            <el-dropdown-item @click.native="changeLanguage('en')">{{ $t("language.en") }}</el-dropdown-item>
+            <el-dropdown-item @click.native="changeLanguage('de')">{{ $t("language.de") }}</el-dropdown-item>
+            <el-dropdown-item @click.native="changeLanguage('vi')">{{ $t("language.vi") }}</el-dropdown-item>
+            <el-dropdown-item @click.native="changeLanguage('pt_BR')">{{ $t("language.ptBR") }}</el-dropdown-item>
+          </el-dropdown-menu>
+        </el-dropdown>
+      </div>
+
+      <!-- Form center -->
+      <div class="form-center" @keyup.enter="login">
+        <h1 class="form-title">{{ $t("login.title") }}</h1>
+        <p class="form-subtitle">{{ $t("login.welcome") }}</p>
+
+        <!-- Google Login Button -->
+        <div v-if="googleOAuthEnabled" class="google-btn" @click="handleGoogleLogin">
+          <img src="@/assets/login-v2/icon-google.svg" alt="Google" class="google-icon" />
+          <span>{{ $t("login.googleLogin") }}</span>
+        </div>
+
+        <!-- Divider -->
+        <div v-if="googleOAuthEnabled" class="divider">
+          <span>{{ $t("login.orDivider") }}</span>
+        </div>
+
+        <!-- Username / Mobile login -->
+        <template v-if="!isMobileLogin">
+          <label class="input-label">{{ $t("login.emailLabel") }}</label>
+          <div class="auth-input">
+            <el-input v-model="form.username" :placeholder="$t('login.usernamePlaceholder')" />
           </div>
-          
-          <div style="padding: 0 30px">
-            <!-- 用户名登录 -->
-            <template v-if="!isMobileLogin">
-              <div class="input-box">
-                <img loading="lazy" alt="" class="input-icon" src="@/assets/login/username.png" />
-                <el-input v-model="form.username" :placeholder="$t('login.usernamePlaceholder')" />
-              </div>
-            </template>
+        </template>
 
-            <!-- 手机号登录 -->
-            <template v-else>
-              <div class="input-box">
-                <div style="display: flex; align-items: center; width: 100%">
-                  <el-select v-model="form.areaCode" style="width: 220px; margin-right: 10px">
-                    <el-option v-for="item in mobileAreaList" :key="item.key" :label="`${item.name} (${item.key})`" :value="item.key" />
-                  </el-select>
-                  <el-input v-model="form.mobile" :placeholder="$t('login.mobilePlaceholder')" />
-                </div>
-              </div>
-            </template>
-
-            <div class="input-box">
-              <img loading="lazy" alt="" class="input-icon" src="@/assets/login/password.png" />
-              <el-input v-model="form.password" :placeholder="$t('login.passwordPlaceholder')" type="password" show-password />
-            </div>
-            
-
-            
-            <div style="font-weight: 400; font-size: 14px; text-align: left; color: #000000; display: flex; justify-content: space-between; margin-top: 20px;">
-              <div v-if="allowUserRegister" style="cursor: pointer" @click="goToRegister">{{ $t("login.register") }}</div>
-              <div style="cursor: pointer" @click="goToForgetPassword" v-if="enableMobileRegister">{{ $t("login.forgetPassword") }}</div>
-            </div>
+        <template v-else>
+          <label class="input-label">{{ $t("login.mobileLabel") }}</label>
+          <div class="auth-input mobile-input">
+            <el-select v-model="form.areaCode" class="area-code-select">
+              <el-option v-for="item in mobileAreaList" :key="item.key" :label="`${item.name} (${item.key})`" :value="item.key" />
+            </el-select>
+            <el-input v-model="form.mobile" :placeholder="$t('login.mobilePlaceholder')" />
           </div>
-          
-          <div class="login-btn" @click="login">{{ $t("login.login") }}</div>
+        </template>
 
-          <!-- 登录方式切换按钮 -->
-          <div class="login-type-container" v-if="enableMobileRegister">
-            <div style="display: flex; gap: 10px">
-              <el-tooltip :content="$t('login.mobileLogin')" placement="bottom">
-                <el-button :type="isMobileLogin ? 'primary' : 'default'" icon="el-icon-mobile" circle @click="switchLoginType('mobile')"></el-button>
-              </el-tooltip>
-              <el-tooltip :content="$t('login.usernameLogin')" placement="bottom">
-                <el-button :type="!isMobileLogin ? 'primary' : 'default'" icon="el-icon-user" circle @click="switchLoginType('username')"></el-button>
-              </el-tooltip>
-            </div>
+        <!-- Password -->
+        <label class="input-label">{{ $t("login.password") }}</label>
+        <div class="auth-input">
+          <el-input v-model="form.password" :placeholder="$t('login.passwordPlaceholder')" type="password" show-password />
+        </div>
+
+        <!-- Register / Forgot links -->
+        <div class="form-links">
+          <div v-if="allowUserRegister" class="register-link">
+            {{ $t("login.noAccount") }}
+            <span class="link-action" @click="goToRegister">{{ $t("login.registerNow") }}</span>
           </div>
-          
-          <div style="font-size: 14px; color: #979db1; text-align: center; margin-top: 20px;">
-            {{ $t("login.agreeTo") }}
-            <div style="display: inline-block; color: #000000; cursor: pointer" @click="openPage('/user-agreement.html')">{{ $t("login.userAgreement") }}</div>
-            {{ $t("login.and") }}
-            <div style="display: inline-block; color: #000000; cursor: pointer" @click="openPage('/privacy-policy.html')">{{ $t("login.privacyPolicy") }}</div>
+          <div v-if="enableMobileRegister" class="forgot-link" @click="goToForgetPassword">
+            {{ $t("login.forgetPassword") }}
           </div>
         </div>
+
+        <!-- Login button -->
+        <div class="auth-btn" @click="login">{{ $t("login.login") }}</div>
+
+        <!-- Login type toggle -->
+        <div class="login-type-container" v-if="enableMobileRegister">
+          <div style="display: flex; gap: 10px">
+            <el-tooltip :content="$t('login.mobileLogin')" placement="bottom">
+              <el-button :type="isMobileLogin ? 'primary' : 'default'" icon="el-icon-mobile" circle @click="switchLoginType('mobile')"></el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('login.usernameLogin')" placement="bottom">
+              <el-button :type="!isMobileLogin ? 'primary' : 'default'" icon="el-icon-user" circle @click="switchLoginType('username')"></el-button>
+            </el-tooltip>
+          </div>
+        </div>
+
+        <!-- Agreement -->
+        <div class="agreement-text">
+          {{ $t("login.agreeTo") }}
+          <span class="link-action" @click="openPage('/user-agreement.html')">{{ $t("login.userAgreement") }}</span>
+          {{ $t("login.and") }}
+          <span class="link-action" @click="openPage('/privacy-policy.html')">{{ $t("login.privacyPolicy") }}</span>
+        </div>
       </div>
+
+      <!-- Footer -->
       <div class="footer-area">
         <version-footer />
       </div>
@@ -113,6 +130,7 @@ export default {
       enableMobileRegister: (state) => state.pubConfig.enableMobileRegister,
       mobileAreaList: (state) => state.pubConfig.mobileAreaList,
       sm2PublicKey: (state) => state.pubConfig.sm2PublicKey,
+      googleOAuthEnabled: (state) => state.pubConfig.googleOAuthEnabled || false,
     }),
     // 获取当前语言
     currentLanguage() {
@@ -137,6 +155,18 @@ export default {
         default:
           return this.$t("language.zhCN");
       }
+    },
+    currentLanguageFlag() {
+      const currentLang = this.currentLanguage;
+      const flags = {
+        'zh_CN': '🇨🇳',
+        'zh_TW': '🇹🇼',
+        'en': '🇺🇸',
+        'de': '🇩🇪',
+        'vi': '🇻🇳',
+        'pt_BR': '🇧🇷',
+      };
+      return flags[currentLang] || '🇨🇳';
     },
     // 根据当前语言获取对应的xiaozhi-ai图标
     xiaozhiAiIcon() {
@@ -185,7 +215,6 @@ export default {
       window.open(url, '_blank');
     },
 
-
     // 切换语言下拉菜单的可见状态变化
     handleLanguageDropdownVisibleChange(visible) {
       this.languageDropdownVisible = visible;
@@ -218,7 +247,7 @@ export default {
       }
       return true;
     },
-    
+
     getUserInfo() {
       Api.user.getUserInfo(({ data }) => {
         if (data.code === 0) {
@@ -285,6 +314,27 @@ export default {
 
     },
 
+    handleGoogleLogin() {
+      const redirectUri = this.getOAuthCallbackRedirectUri()
+      Api.user.getGoogleAuthUrl(
+        redirectUri,
+        ({ data }) => {
+          const authUrl = data.data ? data.data.authUrl : data.authUrl
+          window.location.href = authUrl
+        },
+        (err) => {
+          const errorMessage = err && err.data && err.data.msg ? err.data.msg : this.$t('login.googleLoginFailed')
+          showDanger(errorMessage)
+        }
+      )
+    },
+
+    getOAuthCallbackRedirectUri() {
+      const publicPath = process.env.VUE_APP_PUBLIC_PATH || '/'
+      const normalizedPublicPath = publicPath.endsWith('/') ? publicPath : `${publicPath}/`
+      return `${window.location.origin}${normalizedPublicPath}oauth-callback.html`
+    },
+
     goToRegister() {
       goToPage("/register");
     },
@@ -298,33 +348,9 @@ export default {
 @import "./auth.scss";
 
 .login-type-container {
-  margin: 10px 20px;
+  margin: 15px 0;
   display: flex;
   justify-content: center;
-}
-
-.title-language-dropdown {
-  margin-left: auto;
-}
-
-.current-language-text {
-  margin-left: 4px;
-  margin-right: 4px;
-  font-size: 12px;
-  color: #3d4566;
-}
-
-.language-dropdown {
-  margin-left: auto;
-}
-
-.rotate-down {
-  transform: rotate(180deg);
-  transition: transform 0.3s ease;
-}
-
-.el-icon-arrow-down {
-  transition: transform 0.3s ease;
 }
 
 :deep(.el-button--primary) {
