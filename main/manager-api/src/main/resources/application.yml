@@ -64,3 +64,8 @@ mybatis-plus:
     prefix:
     blobType: BLOB
     boolValue: TRUE
+oauth:
+  google:
+    enabled: ${GOOGLE_OAUTH_ENABLED:false}
+    clientId: ${GOOGLE_CLIENT_ID:}
+    clientSecret: ${GOOGLE_CLIENT_SECRET:}
