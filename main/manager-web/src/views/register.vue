@@ -2,111 +2,131 @@
   <div class="split-layout" @keyup.enter="register">
     <div class="split-left"></div>
     <div class="split-right">
+      <!-- Logo top-left -->
       <div class="logo-area">
-        <img src="@/assets/logo_oriagent.svg" alt="Oriagent" style="height: 38px; width: auto; cursor: pointer" @click="goToLogin" />
+        <img src="@/assets/login-v2/logo.svg" alt="Oriagent" class="logo-img" @click="goToLogin" style="cursor: pointer" />
       </div>
-      <div class="login-box-container">
-        <div class="login-box">
-          <!-- 修改标题部分 -->
-          <div style="display: flex;align-items: center;gap: 20px;margin-bottom: 39px;padding: 0 30px;">
-            <img loading="lazy" alt="" src="@/assets/login/hi.png" style="width: 34px;height: 34px;" />
-            <div class="login-text">{{ $t('register.title') }}</div>
-            <div class="login-welcome">
-              {{ $t('register.welcome') }}
+
+      <!-- Language pill top-right -->
+      <div class="language-area">
+        <el-dropdown trigger="click" @visible-change="handleLanguageDropdownVisibleChange">
+          <span class="language-pill">
+            <span class="language-flag">{{ currentLanguageFlag }}</span>
+            <span class="language-text">{{ currentLanguageText }}</span>
+            <i class="el-icon-arrow-down" :class="{ 'rotate-down': languageDropdownVisible }"></i>
+          </span>
+          <el-dropdown-menu slot="dropdown">
+            <el-dropdown-item @click.native="changeLanguage('zh_CN')">{{ $t("language.zhCN") }}</el-dropdown-item>
+            <el-dropdown-item @click.native="changeLanguage('zh_TW')">{{ $t("language.zhTW") }}</el-dropdown-item>
+            <el-dropdown-item @click.native="changeLanguage('en')">{{ $t("language.en") }}</el-dropdown-item>
+            <el-dropdown-item @click.native="changeLanguage('de')">{{ $t("language.de") }}</el-dropdown-item>
+            <el-dropdown-item @click.native="changeLanguage('vi')">{{ $t("language.vi") }}</el-dropdown-item>
+            <el-dropdown-item @click.native="changeLanguage('pt_BR')">{{ $t("language.ptBR") }}</el-dropdown-item>
+          </el-dropdown-menu>
+        </el-dropdown>
+      </div>
+
+      <!-- Form center -->
+      <div class="form-center">
+        <h1 class="form-title">{{ $t("register.title") }}</h1>
+        <p class="form-subtitle">{{ $t("register.welcome") }}</p>
+
+        <!-- Google Register Button -->
+        <div v-if="googleOAuthEnabled" class="google-btn" @click="handleGoogleLogin">
+          <img src="@/assets/login-v2/icon-google.svg" alt="Google" class="google-icon" />
+          <span>{{ $t("register.googleRegister") }}</span>
+        </div>
+
+        <!-- Divider -->
+        <div v-if="googleOAuthEnabled" class="divider">
+          <span>{{ $t("login.orDivider") }}</span>
+        </div>
+
+        <form @submit.prevent="register">
+          <!-- Username / Mobile input -->
+          <div v-if="!enableMobileRegister">
+            <label class="input-label">{{ $t("login.emailLabel") }}</label>
+            <div class="auth-input">
+              <el-input v-model="form.username" :placeholder="$t('register.usernamePlaceholder')" />
             </div>
           </div>
 
-          <div style="padding: 0 30px;">
-            <form @submit.prevent="register">
-              <!-- 用户名/手机号输入框 -->
-              <div class="input-box" v-if="!enableMobileRegister">
-                <img loading="lazy" alt="" class="input-icon" src="@/assets/login/username.png" />
-                <el-input v-model="form.username" :placeholder="$t('register.usernamePlaceholder')" />
+          <!-- Mobile Registration Flow -->
+          <template v-if="enableMobileRegister">
+            <label class="input-label">{{ $t("login.mobileLabel") }}</label>
+            <div class="auth-input mobile-input">
+              <el-select v-model="form.areaCode" class="area-code-select">
+                <el-option v-for="item in mobileAreaList" :key="item.key" :label="`${item.name} (${item.key})`" :value="item.key" />
+              </el-select>
+              <el-input v-model="form.mobile" :placeholder="$t('register.mobilePlaceholder')" />
+            </div>
+
+            <!-- Graphic Captcha for Mobile -->
+            <label class="input-label">{{ $t("register.captcha") }}</label>
+            <div style="display: flex; gap: 10px; align-items: stretch;">
+              <div class="auth-input" style="flex: 1;">
+                <el-input v-model="form.captcha" :placeholder="$t('register.captchaPlaceholder')" />
               </div>
+              <img v-if="captchaUrl" :src="captchaUrl" alt="Captcha" class="captcha-img" @click="fetchCaptcha" />
+            </div>
 
-              <!-- 手机号注册部分 -->
-              <template v-if="enableMobileRegister">
-                <div class="input-box">
-                  <div style="display: flex; align-items: center; width: 100%;">
-                    <el-select v-model="form.areaCode" style="width: 220px; margin-right: 10px;">
-                      <el-option v-for="item in mobileAreaList" :key="item.key" :label="`${item.name} (${item.key})`"
-                        :value="item.key" />
-                    </el-select>
-                    <el-input v-model="form.mobile" :placeholder="$t('register.mobilePlaceholder')" />
-                  </div>
-                </div>
-
-                <div style="display: flex; align-items: center; margin-top: 20px; width: 100%; gap: 10px;">
-                  <div class="input-box" style="width: calc(100% - 130px); margin-top: 0;">
-                    <img loading="lazy" alt="" class="input-icon" src="@/assets/login/shield.png" />
-                    <el-input v-model="form.captcha" :placeholder="$t('register.captchaPlaceholder')"
-                      style="flex: 1;" />
-                  </div>
-                  <img loading="lazy" v-if="captchaUrl" :src="captchaUrl" alt="验证码"
-                    style="width: 150px; height: 40px; cursor: pointer;" @click="fetchCaptcha" />
-                </div>
-
-                <!-- 手机验证码 -->
-
-                <div style="display: flex; align-items: center; margin-top: 20px; width: 100%; gap: 10px;">
-                  <div class="input-box" style="width: calc(100% - 130px); margin-top: 0;">
-                    <img loading="lazy" alt="" class="input-icon" src="@/assets/login/phone.png" />
-                    <el-input v-model="form.mobileCaptcha" :placeholder="$t('register.mobileCaptchaPlaceholder')"
-                      style="flex: 1;" maxlength="6" />
-                  </div>
-                  <el-button type="primary" class="send-captcha-btn" :disabled="!canSendMobileCaptcha"
-                    @click="sendMobileCaptcha">
-                    <span>
-                      {{ countdown > 0 ? `${countdown}${$t('register.secondsLater')}` : $t('register.sendCaptcha') }}
-                    </span>
-                  </el-button>
-                </div>
-              </template>
-
-              <!-- 密码输入框 -->
-              <div class="input-box">
-                <img loading="lazy" alt="" class="input-icon" src="@/assets/login/password.png" />
-                <el-input v-model="form.password" :placeholder="$t('register.passwordPlaceholder')" type="password"
-                  show-password />
+            <!-- SMS Verification -->
+            <label class="input-label">{{ $t("register.mobileCaptcha") }}</label>
+            <div style="display: flex; gap: 10px; align-items: stretch;">
+              <div class="auth-input" style="flex: 1;">
+                <el-input v-model="form.mobileCaptcha" :placeholder="$t('register.mobileCaptchaPlaceholder')" maxlength="6" />
               </div>
+              <button type="button" class="send-captcha-btn" :disabled="!canSendMobileCaptcha" @click="sendMobileCaptcha">
+                {{ countdown > 0 ? `${countdown}${$t('register.secondsLater')}` : $t('register.sendCaptcha') }}
+              </button>
+            </div>
+          </template>
 
-              <!-- 新增确认密码 -->
-              <div class="input-box">
-                <img loading="lazy" alt="" class="input-icon" src="@/assets/login/password.png" />
-                <el-input v-model="form.confirmPassword" :placeholder="$t('register.confirmPasswordPlaceholder')"
-                  type="password" show-password />
-              </div>
-
-              <!-- 验证码部分保持相同 -->
-              <div v-if="!enableMobileRegister"
-                style="display: flex; align-items: center; margin-top: 20px; width: 100%; gap: 10px;">
-                <div class="input-box" style="width: calc(100% - 130px); margin-top: 0;">
-                  <img loading="lazy" alt="" class="input-icon" src="@/assets/login/shield.png" />
-                  <el-input v-model="form.captcha" :placeholder="$t('register.captchaPlaceholder')" style="flex: 1;" />
-                </div>
-                <img loading="lazy" v-if="captchaUrl" :src="captchaUrl" alt="验证码"
-                  style="width: 150px; height: 40px; cursor: pointer;" @click="fetchCaptcha" />
-              </div>
-
-              <!-- 修改底部链接 -->
-              <div style="font-weight: 400;font-size: 14px;text-align: left;color: #000000;margin-top: 20px;">
-                <div style="cursor: pointer;" @click="goToLogin">{{ $t('register.goToLogin') }}</div>
-              </div>
-            </form>
+          <!-- Password -->
+          <label class="input-label">{{ $t("login.password") }}</label>
+          <div class="auth-input">
+            <el-input v-model="form.password" :placeholder="$t('register.passwordPlaceholder')" type="password" show-password />
           </div>
 
-          <!-- 修改按钮文本 -->
-          <div class="login-btn" @click="register">{{ $t('register.registerButton') }}</div>
-
-          <!-- 保持相同的协议声明 -->
-          <div style="font-size: 14px;color: #979db1;">
-            {{ $t('register.agreeTo') }}
-            <div style="display: inline-block;color: #000000;cursor: pointer;" @click="openPage('/user-agreement.html')">{{ $t('register.userAgreement') }}</div>
-            {{ $t('login.and') }}
-            <div style="display: inline-block;color: #000000;cursor: pointer;" @click="openPage('/privacy-policy.html')">{{ $t('register.privacyPolicy') }}</div>
+          <!-- Confirm Password -->
+          <label class="input-label">{{ $t("register.confirmPassword") }}</label>
+          <div class="auth-input">
+            <el-input v-model="form.confirmPassword" :placeholder="$t('register.confirmPasswordPlaceholder')" type="password" show-password />
           </div>
+
+          <!-- Graphic Captcha for Username Register -->
+          <template v-if="!enableMobileRegister">
+            <label class="input-label">{{ $t("register.captcha") }}</label>
+            <div style="display: flex; gap: 10px; align-items: stretch;">
+              <div class="auth-input" style="flex: 1;">
+                <el-input v-model="form.captcha" :placeholder="$t('register.captchaPlaceholder')" />
+              </div>
+              <img v-if="captchaUrl" :src="captchaUrl" alt="Captcha" class="captcha-img" @click="fetchCaptcha" />
+            </div>
+          </template>
+
+          <!-- Links -->
+          <div class="form-links">
+            <div class="register-link">
+              {{ $t("register.hasAccount") }}
+              <span class="link-action" @click="goToLogin">{{ $t("register.goToLogin") }}</span>
+            </div>
+          </div>
+        </form>
+
+        <!-- Register button -->
+        <div class="auth-btn" @click="register">{{ $t("register.registerButton") }}</div>
+
+        <!-- Agreement -->
+        <div class="agreement-text">
+          {{ $t("register.agreeTo") }}
+          <span class="link-action" @click="openPage('/user-agreement.html')">{{ $t("register.userAgreement") }}</span>
+          {{ $t("login.and") }}
+          <span class="link-action" @click="openPage('/privacy-policy.html')">{{ $t("register.privacyPolicy") }}</span>
         </div>
       </div>
+
+      <!-- Footer -->
       <div class="footer-area">
         <version-footer />
       </div>
@@ -119,9 +139,7 @@ import Api from '@/apis/api';
 import VersionFooter from '@/components/VersionFooter.vue';
 import { getUUID, goToPage, showDanger, showSuccess, sm2Encrypt, validateMobile } from '@/utils';
 import { mapState } from 'vuex';
-import i18n from '@/i18n';
-
-// 导入语言切换功能
+import i18n, { changeLanguage } from '@/i18n';
 
 export default {
   name: 'register',
@@ -134,28 +152,29 @@ export default {
       enableMobileRegister: state => state.pubConfig.enableMobileRegister,
       mobileAreaList: state => state.pubConfig.mobileAreaList,
       sm2PublicKey: state => state.pubConfig.sm2PublicKey,
+      googleOAuthEnabled: state => state.pubConfig.googleOAuthEnabled || false,
     }),
-    // 获取当前语言
     currentLanguage() {
       return i18n.locale || "zh_CN";
     },
-    // 根据当前语言获取对应的xiaozhi-ai图标
-    xiaozhiAiIcon() {
+    currentLanguageText() {
       const currentLang = this.currentLanguage;
       switch (currentLang) {
-        case "zh_CN":
-          return require("@/assets/xiaozhi-ai.png");
-        case "zh_TW":
-          return require("@/assets/xiaozhi-ai_zh_TW.png");
-        case "en":
-          return require("@/assets/xiaozhi-ai_en.png");
-        case "de":
-          return require("@/assets/xiaozhi-ai_de.png");
-        case "vi":
-          return require("@/assets/xiaozhi-ai_vi.png");
-        default:
-          return require("@/assets/xiaozhi-ai.png");
+        case "zh_CN": return this.$t("language.zhCN");
+        case "zh_TW": return this.$t("language.zhTW");
+        case "en": return this.$t("language.en");
+        case "de": return this.$t("language.de");
+        case "vi": return this.$t("language.vi");
+        case "pt_BR": return this.$t("language.ptBR");
+        default: return this.$t("language.zhCN");
       }
+    },
+    currentLanguageFlag() {
+      const currentLang = this.currentLanguage;
+      const flags = {
+        'zh_CN': '🇨🇳', 'zh_TW': '🇹🇼', 'en': '🇺🇸', 'de': '🇩🇪', 'vi': '🇻🇳', 'pt_BR': '🇧🇷',
+      };
+      return flags[currentLang] || '🇨🇳';
     },
     canSendMobileCaptcha() {
       return this.countdown === 0 && validateMobile(this.form.mobile, this.form.areaCode);
@@ -176,6 +195,7 @@ export default {
       captchaUrl: '',
       countdown: 0,
       timer: null,
+      languageDropdownVisible: false,
     }
   },
   mounted() {
@@ -197,22 +217,29 @@ export default {
       }
       window.open(url, '_blank');
     },
-    // 复用验证码获取方法
+    handleLanguageDropdownVisibleChange(visible) {
+      this.languageDropdownVisible = visible;
+    },
+    changeLanguage(lang) {
+      changeLanguage(lang);
+      this.languageDropdownVisible = false;
+      this.$message.success({
+        message: this.$t("message.success"),
+        showClose: true,
+      });
+    },
     fetchCaptcha() {
       this.form.captchaId = getUUID();
       Api.user.getCaptcha(this.form.captchaId, (res) => {
         if (res.status === 200) {
           const blob = new Blob([res.data], { type: res.data.type });
           this.captchaUrl = URL.createObjectURL(blob);
-
         } else {
-          console.error('验证码加载异常:', error);
+          console.error('验证码加载异常:', res);
           showDanger(this.$t('register.captchaLoadFailed'));
         }
       });
     },
-
-    // 封装输入验证逻辑
     validateInput(input, message) {
       if (!input.trim()) {
         showDanger(message);
@@ -220,27 +247,21 @@ export default {
       }
       return true;
     },
-
-    // 发送手机验证码
     sendMobileCaptcha() {
       if (!validateMobile(this.form.mobile, this.form.areaCode)) {
         showDanger(this.$t('register.inputCorrectMobile'));
         return;
       }
-
-      // 验证图形验证码
       if (!this.validateInput(this.form.captcha, this.$t('register.inputCaptcha'))) {
         this.fetchCaptcha();
         return;
       }
 
-      // 清除可能存在的旧定时器
       if (this.timer) {
         clearInterval(this.timer);
         this.timer = null;
       }
 
-      // 开始倒计时
       this.countdown = 60;
       this.timer = setInterval(() => {
         if (this.countdown > 0) {
@@ -251,7 +272,6 @@ export default {
         }
       }, 1000);
 
-      // 调用发送验证码接口
       Api.user.sendSmsVerification({
         phone: this.form.areaCode + this.form.mobile,
         captcha: this.form.captcha,
@@ -264,11 +284,8 @@ export default {
         this.fetchCaptcha();
       });
     },
-
-    // 注册逻辑
     async register() {
       if (this.enableMobileRegister) {
-        // 手机号注册验证
         if (!validateMobile(this.form.mobile, this.form.areaCode)) {
           showDanger(this.$t('register.inputCorrectMobile'));
           return;
@@ -278,13 +295,11 @@ export default {
           return;
         }
       } else {
-        // 用户名注册验证
         if (!this.validateInput(this.form.username, this.$t('register.requiredUsername'))) {
           return;
         }
       }
 
-      // 验证密码
       if (!this.validateInput(this.form.password, this.$t('register.requiredPassword'))) {
         return;
       }
@@ -292,14 +307,12 @@ export default {
         showDanger(this.$t('register.passwordsNotMatch'))
         return
       }
-      // 验证验证码
       if (!this.validateInput(this.form.captcha, this.$t('register.requiredCaptcha'))) {
         return;
       }
-      // 加密
+
       let encryptedPassword;
       try {
-        // 拼接验证码和密码
         const captchaAndPassword = this.form.captcha + this.form.password;
         encryptedPassword = sm2Encrypt(this.sm2PublicKey, captchaAndPassword);
       } catch (error) {
@@ -315,7 +328,6 @@ export default {
         plainUsername = this.form.username;
       }
 
-      // 准备注册数据
       const registerData = {
         username: plainUsername,
         password: encryptedPassword,
@@ -333,7 +345,25 @@ export default {
         }
       })
     },
-
+    handleGoogleLogin() {
+      const redirectUri = this.getOAuthCallbackRedirectUri()
+      Api.user.getGoogleAuthUrl(
+        redirectUri,
+        ({ data }) => {
+          const authUrl = data.data ? data.data.authUrl : data.authUrl
+          window.location.href = authUrl
+        },
+        (err) => {
+          const errorMessage = err && err.data && err.data.msg ? err.data.msg : this.$t('login.googleLoginFailed')
+          showDanger(errorMessage)
+        }
+      )
+    },
+    getOAuthCallbackRedirectUri() {
+      const publicPath = process.env.VUE_APP_PUBLIC_PATH || '/'
+      const normalizedPublicPath = publicPath.endsWith('/') ? publicPath : `${publicPath}/`
+      return `${window.location.origin}${normalizedPublicPath}oauth-callback.html`
+    },
     goToLogin() {
       goToPage('/login')
     }
@@ -349,16 +379,28 @@ export default {
 <style lang="scss" scoped>
 @import './auth.scss';
 
+.captcha-img {
+  width: 140px;
+  height: 48px;
+  border-radius: 10px;
+  cursor: pointer;
+  object-fit: cover;
+}
+
 .send-captcha-btn {
-  margin-right: -5px;
-  min-width: 100px;
-  height: 40px;
-  line-height: 40px;
-  border-radius: 4px;
+  width: 140px;
+  height: 48px;
+  border-radius: 10px;
   font-size: 14px;
-  background: rgb(0, 0, 0);
+  background: #1a1a1a;
+  color: #fff;
   border: none;
-  padding: 0px;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #333;
+  }
 
   &:disabled {
     background: #c0c4cc;
