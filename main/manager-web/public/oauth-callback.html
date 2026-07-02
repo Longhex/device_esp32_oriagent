@@ -1,0 +1,16 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Google OAuth Callback</title>
+</head>
+<body>
+<script>
+  (function () {
+    var search = window.location.search || ''
+    var basePath = window.location.pathname.replace(/oauth-callback\.html$/, '')
+    window.location.replace(window.location.origin + basePath + '#/google/callback' + search)
+  })()
+</script>
+</body>
+</html>

@@ -200,5 +200,43 @@ export default {
                 });
             }).send()
     },
-
+    // 获取Google Auth URL
+    getGoogleAuthUrl(redirectUri, callback, failCallback) {
+        RequestService.sendRequest()
+            .url(`${getServiceUrl()}/user/google/auth-url?redirectUri=${encodeURIComponent(redirectUri)}`)
+            .method('GET')
+            .success((res) => {
+                RequestService.clearRequestTime()
+                callback(res)
+            })
+            .fail((err) => {
+                RequestService.clearRequestTime()
+                if (failCallback) failCallback(err)
+            })
+            .networkFail(() => {
+                RequestService.reAjaxFun(() => {
+                    this.getGoogleAuthUrl(redirectUri, callback, failCallback)
+                })
+            }).send()
+    },
+    // Google 回调登录
+    googleCallback(data, callback, failCallback) {
+        RequestService.sendRequest()
+            .url(`${getServiceUrl()}/user/google/callback`)
+            .method('POST')
+            .data(data)
+            .success((res) => {
+                RequestService.clearRequestTime()
+                callback(res)
+            })
+            .fail((err) => {
+                RequestService.clearRequestTime()
+                if (failCallback) failCallback(err)
+            })
+            .networkFail(() => {
+                RequestService.reAjaxFun(() => {
+                    this.googleCallback(data, callback, failCallback)
+                })
+            }).send()
+    }
 }

@@ -46,6 +46,13 @@ const routes = [
       return import('../views/retrievePassword.vue')
     }
   },
+  {
+    path: '/google/callback',
+    name: 'GoogleCallback',
+    component: function () {
+      return import('../views/GoogleCallback.vue')
+    }
+  },
   // 添加用户管理路由
   {
     path: '/user-management',
