@@ -1349,4 +1349,6 @@ export default {
   'feature.asr.name': 'Reconhecimento de Fala',
   'feature.asr.description': 'Converter fala em texto para habilitar a funcionalidade de interação por linguagem natural',
 
+  'login.googleLogin': 'Faça login com o Google',
+  'register.googleRegister': 'Inscreva-se no Google'
 }

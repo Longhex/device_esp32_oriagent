@@ -1460,4 +1460,6 @@ export default {
   'feature.asr.name': 'Speech Recognition',
   'feature.asr.description': 'Convert speech to text to enable natural language interaction functionality',
 
+  'login.googleLogin': 'Sign in with Google',
+  'register.googleRegister': 'Sign up with Google'
 }

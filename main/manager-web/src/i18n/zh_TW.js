@@ -1349,4 +1349,6 @@ export default {
   'feature.asr.name': '語音識別',
   'feature.asr.description': '將語音轉換為文本，實現自然語言交互功能',
 
+  'login.googleLogin': '使用Google登錄',
+  'register.googleRegister': '使用Google註冊'
 }
