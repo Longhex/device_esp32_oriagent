@@ -1349,4 +1349,6 @@ export default {
   'feature.asr.name': 'Spracherkennung',
   'feature.asr.description': 'Sprache in Text umwandeln, um natürliche Sprachinteraktionsfunktionalität zu ermöglichen',
 
+  'login.googleLogin': 'Mit Google anmelden',
+  'register.googleRegister': 'Mit Google registrieren'
 }

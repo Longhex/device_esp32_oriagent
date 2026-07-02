@@ -1460,4 +1460,6 @@ export default {
   'feature.asr.name': 'Nhận dạng giọng nói',
   'feature.asr.description': 'Chuyển đổi giọng nói thành văn bản, thực hiện chức năng tương tác ngôn ngữ tự nhiên',
 
+  'login.googleLogin': 'Đăng nhập bằng Google',
+  'register.googleRegister': 'Đăng ký bằng Google'
 }

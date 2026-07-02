@@ -1443,4 +1443,6 @@ export default {
   'feature.asr.name': '语音识别',
   'feature.asr.description': '将语音转换为文本，实现自然语言交互功能',
 
+  'login.googleLogin': '使用Google登录',
+  'register.googleRegister': '使用Google注册'
 }
