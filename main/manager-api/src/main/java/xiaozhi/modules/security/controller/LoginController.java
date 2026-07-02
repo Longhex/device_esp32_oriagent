@@ -42,6 +42,7 @@ import xiaozhi.modules.sys.service.SysDictDataService;
 import xiaozhi.modules.sys.service.SysParamsService;
 import xiaozhi.modules.sys.service.SysUserService;
 import xiaozhi.modules.sys.vo.SysDictDataItem;
+import xiaozhi.common.config.GoogleOAuthProperties;
 
 /**
  * 登录控制层
@@ -57,6 +58,7 @@ public class LoginController {
     private final CaptchaService captchaService;
     private final SysParamsService sysParamsService;
     private final SysDictDataService sysDictDataService;
+    private final GoogleOAuthProperties googleOAuthProperties;
 
     @GetMapping("/captcha")
     @Operation(summary = "验证码")
@@ -250,6 +252,8 @@ public class LoginController {
         if (StringUtils.isNotBlank(menuConfig)) {
             config.put("systemWebMenu", JsonUtils.parseObject(menuConfig, Object.class));
         }
+
+        config.put("googleOAuthEnabled", googleOAuthProperties.isEnabled());
 
         return new Result<Map<String, Object>>().ok(config);
     }
