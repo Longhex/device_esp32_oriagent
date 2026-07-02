@@ -48,6 +48,9 @@ services:
       SPRING_DATA_REDIS_HOST: xiaozhi-esp32-server-redis
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       SPRING_DATA_REDIS_PORT: 6379
+      GOOGLE_OAUTH_ENABLED: ${GOOGLE_OAUTH_ENABLED:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
     volumes:
       - ./uploadfile:/uploadfile
     ports:
