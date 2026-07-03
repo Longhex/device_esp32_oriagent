@@ -6,7 +6,7 @@
     <div class="split-right">
       <!-- Logo top-left -->
       <div class="logo-area">
-        <img src="@/assets/login-v2/logo.svg" alt="Oriagent" class="logo-img" />
+        <img src="@/assets/auth/logo.svg" alt="Oriagent" class="logo-img" />
       </div>
 
       <!-- Language pill top-right -->
@@ -30,25 +30,25 @@
 
       <!-- Form center -->
       <div class="form-center" @keyup.enter="login">
-        <h1 class="form-title">{{ $t("login.title") }}</h1>
-        <p class="form-subtitle">{{ $t("login.welcome") }}</p>
+        <h1 class="form-title">Quản lý thiết bị</h1>
+        <p class="form-subtitle">Kết nối thiết bị ESP32 vào hệ thống AI Agent</p>
 
         <!-- Google Login Button -->
         <div v-if="googleOAuthEnabled" class="google-btn" @click="handleGoogleLogin">
-          <img src="@/assets/login-v2/icon-google.svg" alt="Google" class="google-icon" />
-          <span>{{ $t("login.googleLogin") }}</span>
+          <img src="@/assets/auth/icon-google.svg" alt="Google" class="google-icon" />
+          <span>Đăng nhập hoặc đăng ký bằng Google</span>
         </div>
 
         <!-- Divider -->
         <div v-if="googleOAuthEnabled" class="divider">
-          <span>{{ $t("login.orDivider") }}</span>
+          <span>hoặc</span>
         </div>
 
         <!-- Username / Mobile login -->
         <template v-if="!isMobileLogin">
-          <label class="input-label">{{ $t("login.emailLabel") }}</label>
+          <label class="input-label">Địa chỉ Email</label>
           <div class="auth-input">
-            <el-input v-model="form.username" :placeholder="$t('login.usernamePlaceholder')" />
+            <el-input v-model="form.username" placeholder="Email của bạn" />
           </div>
         </template>
 
@@ -63,16 +63,16 @@
         </template>
 
         <!-- Password -->
-        <label class="input-label">{{ $t("login.password") }}</label>
+        <label class="input-label">Mật khẩu</label>
         <div class="auth-input">
-          <el-input v-model="form.password" :placeholder="$t('login.passwordPlaceholder')" type="password" show-password />
+          <el-input v-model="form.password" placeholder="Mật khẩu của bạn" type="password" show-password />
         </div>
 
         <!-- Register / Forgot links -->
         <div class="form-links">
           <div v-if="allowUserRegister" class="register-link">
-            {{ $t("login.noAccount") }}
-            <span class="link-action" @click="goToRegister">{{ $t("login.registerNow") }}</span>
+            Bạn chưa có tài khoản?
+            <span class="link-action" @click="goToRegister">Đăng ký ngay</span>
           </div>
           <div v-if="enableMobileRegister" class="forgot-link" @click="goToForgetPassword">
             {{ $t("login.forgetPassword") }}
@@ -80,7 +80,7 @@
         </div>
 
         <!-- Login button -->
-        <div class="auth-btn" @click="login">{{ $t("login.login") }}</div>
+        <div class="auth-btn" @click="login">Đăng nhập</div>
 
         <!-- Login type toggle -->
         <div class="login-type-container" v-if="enableMobileRegister">
@@ -94,13 +94,7 @@
           </div>
         </div>
 
-        <!-- Agreement -->
-        <div class="agreement-text">
-          {{ $t("login.agreeTo") }}
-          <span class="link-action" @click="openPage('/user-agreement.html')">{{ $t("login.userAgreement") }}</span>
-          {{ $t("login.and") }}
-          <span class="link-action" @click="openPage('/privacy-policy.html')">{{ $t("login.privacyPolicy") }}</span>
-        </div>
+
       </div>
 
       <!-- Footer -->
