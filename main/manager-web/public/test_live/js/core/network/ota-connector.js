@@ -29,6 +29,14 @@ export async function webSocketConnect(otaUrl, config) {
     // 使用OTA返回的websocket URL
     let connUrl = new URL(websocket.url);
 
+    // Dynamic rewrite for web test client to match current browser address
+    connUrl.hostname = window.location.hostname;
+    if (window.location.port) {
+        connUrl.port = window.location.port;
+    } else {
+        connUrl.port = '';
+    }
+
     // 添加token参数（从OTA响应中获取）
     if (websocket.token) {
         if (websocket.token.startsWith("Bearer ")) {
