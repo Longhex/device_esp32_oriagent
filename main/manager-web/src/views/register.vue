@@ -63,8 +63,8 @@
 
             <!-- Graphic Captcha for Mobile -->
             <label class="input-label">{{ $t("register.captcha") }}</label>
-            <div style="display: flex; gap: 10px; align-items: stretch;">
-              <div class="auth-input" style="flex: 1;">
+            <div class="captcha-row">
+              <div class="auth-input">
                 <el-input v-model="form.captcha" :placeholder="$t('register.captchaPlaceholder')" />
               </div>
               <img v-if="captchaUrl" :src="captchaUrl" alt="Captcha" class="captcha-img" @click="fetchCaptcha" />
@@ -72,8 +72,8 @@
 
             <!-- SMS Verification -->
             <label class="input-label">{{ $t("register.mobileCaptcha") }}</label>
-            <div style="display: flex; gap: 10px; align-items: stretch;">
-              <div class="auth-input" style="flex: 1;">
+            <div class="captcha-row">
+              <div class="auth-input">
                 <el-input v-model="form.mobileCaptcha" :placeholder="$t('register.mobileCaptchaPlaceholder')" maxlength="6" />
               </div>
               <button type="button" class="send-captcha-btn" :disabled="!canSendMobileCaptcha" @click="sendMobileCaptcha">
@@ -97,8 +97,8 @@
           <!-- Graphic Captcha for Username Register -->
           <template v-if="!enableMobileRegister">
             <label class="input-label">Mã xác nhận</label>
-            <div style="display: flex; gap: 10px; align-items: stretch;">
-              <div class="auth-input" style="flex: 1;">
+            <div class="captcha-row">
+              <div class="auth-input">
                 <el-input v-model="form.captcha" placeholder="Nhập mã xác nhận" />
               </div>
               <img v-if="captchaUrl" :src="captchaUrl" alt="Captcha" class="captcha-img" @click="fetchCaptcha" />
@@ -194,12 +194,16 @@ export default {
   },
   mounted() {
     this.$store.dispatch('fetchPubConfig').then(() => {
+      // Bỏ chặn redirect để phục vụ demo UI như yêu cầu. 
+      // Nếu backend chặn đăng ký thật thì gọi API register sẽ báo lỗi sau.
+      /*
       if (!this.allowUserRegister) {
         showDanger(this.$t('register.notAllowRegister'));
         setTimeout(() => {
           goToPage('/login');
         }, 1500);
       }
+      */
     });
     this.fetchCaptcha();
   },
@@ -373,18 +377,32 @@ export default {
 <style lang="scss" scoped>
 @import './auth.scss';
 
+.captcha-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  
+  .auth-input {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
 .captcha-img {
-  width: 140px;
+  flex: 0 0 112px;
+  width: 112px;
   height: 48px;
-  border-radius: 10px;
+  object-fit: contain;
+  border-radius: 8px;
   cursor: pointer;
-  object-fit: cover;
 }
 
 .send-captcha-btn {
-  width: 140px;
+  flex: 0 0 112px;
+  width: 112px;
   height: 48px;
-  border-radius: 10px;
+  border-radius: 8px;
   font-size: 14px;
   background: #1a1a1a;
   color: #fff;

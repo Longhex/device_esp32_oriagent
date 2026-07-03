@@ -70,7 +70,7 @@
 
         <!-- Register / Forgot links -->
         <div class="form-links">
-          <div v-if="allowUserRegister" class="register-link">
+          <div class="register-link">
             Bạn chưa có tài khoản?
             <span class="link-action" @click="goToRegister">Đăng ký ngay</span>
           </div>
