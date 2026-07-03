@@ -14,9 +14,8 @@
 
 .split-left {
   width: 42%;
-  min-width: 500px;
   flex-shrink: 0;
-  background-image: url("@/assets/login-v2/banner.png");
+  background-image: url("@/assets/auth/banner.png");
   background-size: cover;
   background-position: center;
   position: relative;
@@ -40,8 +39,8 @@
 }
 
 .logo-img {
-  height: 32px;
-  width: auto;
+  width: 220px;
+  height: auto;
   cursor: default;
 }
 
@@ -56,12 +55,14 @@
 .language-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 46px;
   border: 1px solid #e0e0e0;
-  border-radius: 20px;
+  border-radius: 23px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 15px;
   color: #333;
   background: #fff;
   transition: border-color 0.2s ease;
@@ -72,7 +73,7 @@
 }
 
 .language-flag {
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1;
 }
 
@@ -95,23 +96,24 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 0 15%;
-  max-width: 560px;
+  padding: 40px 56px;
+  max-width: 650px;
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
+  transform: translateY(-8px);
 }
 
 .form-title {
   font-weight: 700;
-  font-size: 28px;
+  font-size: 36px;
   color: #1a1a1a;
   margin: 0 0 8px 0;
 }
 
 .form-subtitle {
-  font-size: 14px;
-  color: #888;
+  font-size: 16px;
+  color: #666;
   margin: 0 0 28px 0;
 }
 
@@ -122,28 +124,29 @@
   justify-content: center;
   gap: 12px;
   width: 100%;
-  height: 48px;
-  background: #1a1a1a;
-  color: #fff;
-  border-radius: 12px;
-  font-size: 14px;
+  height: 56px;
+  background: #fff;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  border-radius: 28px;
+  font-size: 15px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: all 0.2s ease;
   user-select: none;
 
   &:hover {
-    background: #333;
+    background: #f9f9f9;
   }
 
   &:active {
-    background: #000;
+    background: #f0f0f0;
   }
 }
 
 .google-icon {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
 }
 
 /* ---------- Divider ---------- */
@@ -162,7 +165,7 @@
 
   span {
     padding: 0 16px;
-    font-size: 13px;
+    font-size: 14px;
     color: #999;
     white-space: nowrap;
   }
@@ -171,7 +174,7 @@
 /* ---------- Input fields ---------- */
 .input-label {
   display: block;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: #333;
   margin-bottom: 8px;
@@ -184,7 +187,7 @@
 
 .auth-input {
   width: 100%;
-  border-radius: 10px;
+  border-radius: 28px;
   border: 1px solid #e5e5e5;
   background: #f9f9f9;
   overflow: hidden;
@@ -209,10 +212,10 @@
 /* ---------- Form links ---------- */
 .form-links {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  margin-top: 16px;
-  font-size: 13px;
+  margin-top: 24px;
+  font-size: 14px;
   color: #666;
 }
 
@@ -235,13 +238,13 @@
 /* ---------- Auth button ---------- */
 .auth-btn {
   width: 100%;
-  height: 48px;
+  height: 56px;
   background: #1a1a1a;
   color: #fff;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 48px;
+  border-radius: 28px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 56px;
   text-align: center;
   cursor: pointer;
   margin-top: 24px;
@@ -274,43 +277,41 @@
 }
 
 /* ---------- Element UI overrides ---------- */
-::v-deep {
-  .el-input__inner {
-    border: none;
-    background-color: transparent;
-    height: 46px;
-    padding: 0 16px;
-    font-size: 14px;
-    color: #333;
+::v-deep .el-input__inner {
+  border: none;
+  background-color: transparent;
+  height: 54px;
+  padding: 0 20px;
+  font-size: 15px;
+  color: #333;
 
-    &::placeholder {
-      color: #bbb;
-    }
+  &::placeholder {
+    color: #bbb;
   }
+}
 
-  .el-input__suffix {
-    right: 12px;
-  }
+::v-deep .el-input__suffix {
+  right: 12px;
+}
 
-  /* Fix select inside auth-input */
-  .area-code-select .el-input__inner {
-    border-right: 1px solid #e5e5e5;
-    border-radius: 0;
-    background: transparent;
-  }
+/* Fix select inside auth-input */
+::v-deep .area-code-select .el-input__inner {
+  border-right: 1px solid #e5e5e5;
+  border-radius: 0;
+  background: transparent;
+}
 
-  .el-tabs__nav-wrap::after {
-    height: 1px;
-  }
+::v-deep .el-tabs__nav-wrap::after {
+  height: 1px;
+}
 
-  .el-tabs__item {
-    height: 65px;
-    line-height: 65px;
-    font-weight: 700;
-    color: #3d4566;
-  }
+::v-deep .el-tabs__item {
+  height: 65px;
+  line-height: 65px;
+  font-weight: 700;
+  color: #3d4566;
+}
 
-  .el-tabs__item.is-active {
-    color: #000000;
-  }
+::v-deep .el-tabs__item.is-active {
+  color: #000000;
 }

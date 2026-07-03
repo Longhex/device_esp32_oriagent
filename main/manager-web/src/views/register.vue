@@ -4,7 +4,7 @@
     <div class="split-right">
       <!-- Logo top-left -->
       <div class="logo-area">
-        <img src="@/assets/login-v2/logo.svg" alt="Oriagent" class="logo-img" @click="goToLogin" style="cursor: pointer" />
+        <img src="@/assets/auth/logo.svg" alt="Oriagent" class="logo-img" @click="goToLogin" style="cursor: pointer" />
       </div>
 
       <!-- Language pill top-right -->
@@ -28,26 +28,26 @@
 
       <!-- Form center -->
       <div class="form-center">
-        <h1 class="form-title">{{ $t("register.title") }}</h1>
-        <p class="form-subtitle">{{ $t("register.welcome") }}</p>
+        <h1 class="form-title">Quản lý thiết bị</h1>
+        <p class="form-subtitle">Kết nối thiết bị ESP32 vào hệ thống AI Agent</p>
 
         <!-- Google Register Button -->
         <div v-if="googleOAuthEnabled" class="google-btn" @click="handleGoogleLogin">
-          <img src="@/assets/login-v2/icon-google.svg" alt="Google" class="google-icon" />
-          <span>{{ $t("register.googleRegister") }}</span>
+          <img src="@/assets/auth/icon-google.svg" alt="Google" class="google-icon" />
+          <span>Đăng nhập hoặc đăng ký bằng Google</span>
         </div>
 
         <!-- Divider -->
         <div v-if="googleOAuthEnabled" class="divider">
-          <span>{{ $t("login.orDivider") }}</span>
+          <span>hoặc</span>
         </div>
 
         <form @submit.prevent="register">
           <!-- Username / Mobile input -->
           <div v-if="!enableMobileRegister">
-            <label class="input-label">{{ $t("login.emailLabel") }}</label>
+            <label class="input-label">Địa chỉ Email</label>
             <div class="auth-input">
-              <el-input v-model="form.username" :placeholder="$t('register.usernamePlaceholder')" />
+              <el-input v-model="form.username" placeholder="Email của bạn" />
             </div>
           </div>
 
@@ -83,23 +83,23 @@
           </template>
 
           <!-- Password -->
-          <label class="input-label">{{ $t("login.password") }}</label>
+          <label class="input-label">Mật khẩu</label>
           <div class="auth-input">
-            <el-input v-model="form.password" :placeholder="$t('register.passwordPlaceholder')" type="password" show-password />
+            <el-input v-model="form.password" placeholder="Mật khẩu của bạn" type="password" show-password />
           </div>
 
           <!-- Confirm Password -->
-          <label class="input-label">{{ $t("register.confirmPassword") }}</label>
+          <label class="input-label">Xác nhận mật khẩu</label>
           <div class="auth-input">
-            <el-input v-model="form.confirmPassword" :placeholder="$t('register.confirmPasswordPlaceholder')" type="password" show-password />
+            <el-input v-model="form.confirmPassword" placeholder="Nhập lại mật khẩu" type="password" show-password />
           </div>
 
           <!-- Graphic Captcha for Username Register -->
           <template v-if="!enableMobileRegister">
-            <label class="input-label">{{ $t("register.captcha") }}</label>
+            <label class="input-label">Mã xác nhận</label>
             <div style="display: flex; gap: 10px; align-items: stretch;">
               <div class="auth-input" style="flex: 1;">
-                <el-input v-model="form.captcha" :placeholder="$t('register.captchaPlaceholder')" />
+                <el-input v-model="form.captcha" placeholder="Nhập mã xác nhận" />
               </div>
               <img v-if="captchaUrl" :src="captchaUrl" alt="Captcha" class="captcha-img" @click="fetchCaptcha" />
             </div>
@@ -108,22 +108,16 @@
           <!-- Links -->
           <div class="form-links">
             <div class="register-link">
-              {{ $t("register.hasAccount") }}
-              <span class="link-action" @click="goToLogin">{{ $t("register.goToLogin") }}</span>
+              Đã có tài khoản?
+              <span class="link-action" @click="goToLogin">Đăng nhập</span>
             </div>
           </div>
         </form>
 
         <!-- Register button -->
-        <div class="auth-btn" @click="register">{{ $t("register.registerButton") }}</div>
+        <div class="auth-btn" @click="register">Đăng ký</div>
 
-        <!-- Agreement -->
-        <div class="agreement-text">
-          {{ $t("register.agreeTo") }}
-          <span class="link-action" @click="openPage('/user-agreement.html')">{{ $t("register.userAgreement") }}</span>
-          {{ $t("login.and") }}
-          <span class="link-action" @click="openPage('/privacy-policy.html')">{{ $t("register.privacyPolicy") }}</span>
-        </div>
+
       </div>
 
       <!-- Footer -->
