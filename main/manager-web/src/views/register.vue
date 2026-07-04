@@ -380,7 +380,7 @@ export default {
 .captcha-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
   
   .auth-input {
@@ -390,20 +390,20 @@ export default {
 }
 
 .captcha-img {
-  flex: 0 0 112px;
-  width: 112px;
-  height: 48px;
+  flex: 0 0 clamp(88px, 6vw, 100px);
+  width: clamp(88px, 6vw, 100px);
+  height: clamp(40px, 2.8vw, 50px);
   object-fit: contain;
   border-radius: 8px;
   cursor: pointer;
 }
 
 .send-captcha-btn {
-  flex: 0 0 112px;
-  width: 112px;
-  height: 48px;
+  flex: 0 0 clamp(88px, 6vw, 100px);
+  width: clamp(88px, 6vw, 100px);
+  height: clamp(40px, 2.8vw, 50px);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   background: #1a1a1a;
   color: #fff;
   border: none;
