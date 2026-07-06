@@ -1,7 +1,8 @@
 <template>
+  <StudioLayout active="agents" contextLabel="Agent Robot Builder">
   <div class="agent-config-view">
-    
-    <AgentConfigTabs 
+
+    <AgentConfigTabs
       v-model="activeTab" 
       :saving="saving" 
       :agent-name="agentForm.agentName"
@@ -91,10 +92,12 @@
 
     <VersionFooter />
   </div>
+  </StudioLayout>
 </template>
 
 <script>
 import Api from "@/apis/api";
+import StudioLayout from "@/components/StudioLayout.vue";
 import VersionFooter from "@/components/VersionFooter.vue";
 import RoleConfigSection from "@/components/RoleConfigSection.vue";
 import DeviceManagementSection from "@/components/DeviceManagementSection.vue";
@@ -107,8 +110,8 @@ import ManualAddDeviceDialog from "@/components/ManualAddDeviceDialog.vue";
 
 export default {
   name: "AgentConfig",
-  components: { 
-    VersionFooter, RoleConfigSection, DeviceManagementSection, 
+  components: {
+    StudioLayout, VersionFooter, RoleConfigSection, DeviceManagementSection,
     ChatHistorySection, FunctionDialog, ContextProviderDialog,
     AgentConfigTabs, AddDeviceDialog, ManualAddDeviceDialog
   },
@@ -300,10 +303,9 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.agent-config-view { 
-   background: #f8fafc; // Oriagent Gray Background
-   min-height: 100vh; 
-   display: flex; 
+.agent-config-view {
+   background: transparent; // nen xam do StudioLayout lo, tranh 2 lop nen
+   display: flex;
    flex-direction: column;
    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }

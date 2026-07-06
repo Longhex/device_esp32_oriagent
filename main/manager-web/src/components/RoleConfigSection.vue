@@ -1,20 +1,12 @@
 <template>
   <div class="role-config-section">
     <div class="dashboard-layout">
-      <!-- Left Column: Pure Setup -->
+      <!-- Column 1: Form cấu hình -->
       <div class="config-panel no-scrollbar card-style">
-        
-        <!-- Center Branding Section -->
-        <div class="branding-header">
-           <div class="branding-avatar-wrapper">
-              <div class="avatar-circle">
-                <img src="@/assets/dashboard/agent.svg" alt="Agent" />
-              </div>
-           </div>
-           <h2 class="branding-title">{{ form.agentName }}</h2>
-           <p class="branding-subtitle">
-             {{ $t("roleConfig.brandingSubtitle") }}
-           </p>
+
+        <div class="form-panel-header">
+          <h3 class="form-panel-title">{{ form.agentName }}</h3>
+          <i class="el-icon-edit-outline form-panel-edit-icon"></i>
         </div>
 
         <div class="config-flow">
@@ -22,7 +14,7 @@
           <div class="custom-field-group" v-if="!isOriagentLLM">
             <div class="prompt-toggle-row">
               <label class="field-label-premium">
-                <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> Tùy chỉnh System Prompt
+                <i class="el-icon-magic-stick label-icon"></i> Tùy chỉnh System Prompt
               </label>
               <el-switch v-model="showSystemPrompt" active-color="#08c45b" />
             </div>
@@ -31,25 +23,30 @@
           <!-- LLM Model Selector -->
           <div class="custom-field-group">
             <label class="field-label-premium">
-              <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> {{ $t("roleConfig.llm") }}
+              <i class="el-icon-cpu label-icon"></i> {{ $t("roleConfig.llm") }}
             </label>
-            <div class="premium-field-pill">
+            <div class="model-row-white">
+              <div class="model-row-icon"><i class="el-icon-cpu"></i></div>
               <el-select
                 v-model="form.model.llmModelId"
-                class="premium-select-field"
+                class="model-row-select"
                 @change="handleModelChange('LLM', $event)"
               >
                 <el-option v-for="item in modelOptions['LLM']" :key="item.value" :label="item.label" :value="item.value" />
               </el-select>
+              <span class="model-row-tag">Chat</span>
+              <i class="el-icon-view model-row-action"></i>
+              <i class="el-icon-set-up model-row-action"></i>
             </div>
           </div>
 
           <!-- Oriagent API Key riêng từng agent — chỉ hiện khi chọn Oriagent; để trống = dùng key chung của model -->
           <div class="custom-field-group" v-if="isOriagentLLM">
             <label class="field-label-premium">
-              <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> Oriagent API Key (riêng agent này)
+              <i class="el-icon-key label-icon"></i> Oriagent API Key (riêng agent này)
             </label>
-            <div class="premium-field-pill">
+            <div class="premium-field-pill soft-pill">
+              <i class="el-icon-key pill-badge-icon-inline"></i>
               <el-input
                 v-model="form.oriagentApiKey"
                 class="premium-input-field"
@@ -63,12 +60,13 @@
           <div class="selection-grid-vertical">
             <div class="custom-field-group">
               <label class="field-label-premium">
-                <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> {{ $t("roleConfig.voiceDetect") }}
+                <i class="el-icon-mic label-icon"></i> {{ $t("roleConfig.voiceDetect") }}
               </label>
-              <div class="premium-field-pill">
-                <el-select 
-                  v-model="form.model.vadModelId" 
-                  class="premium-select-field" 
+              <div class="premium-field-pill soft-pill">
+                <img src="@/assets/dashboard/agent.svg" class="pill-badge-icon" />
+                <el-select
+                  v-model="form.model.vadModelId"
+                  class="premium-select-field"
                   @change="handleModelChange('VAD', $event)"
                 >
                   <el-option v-for="item in modelOptions['VAD']" :key="item.value" :label="item.label" :value="item.value" />
@@ -78,12 +76,13 @@
 
             <div class="custom-field-group">
               <label class="field-label-premium">
-                <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> {{ $t("roleConfig.speechRecognition") }}
+                <i class="el-icon-microphone label-icon"></i> {{ $t("roleConfig.speechRecognition") }}
               </label>
-              <div class="premium-field-pill">
-                <el-select 
-                  v-model="form.model.asrModelId" 
-                  class="premium-select-field" 
+              <div class="premium-field-pill soft-pill">
+                <img src="@/assets/dashboard/agent.svg" class="pill-badge-icon" />
+                <el-select
+                  v-model="form.model.asrModelId"
+                  class="premium-select-field"
                   @change="handleModelChange('ASR', $event)"
                 >
                   <el-option v-for="item in modelOptions['ASR']" :key="item.value" :label="item.label" :value="item.value" />
@@ -95,16 +94,16 @@
           <!-- TTS Section Header -->
           <div class="custom-field-group">
             <label class="field-label-premium">
-              <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> Văn bản thành giọng nói
+              <i class="el-icon-data-line label-icon"></i> Văn bản thành giọng nói
             </label>
           </div>
 
           <!-- Text-to-Speech Sub-Selection Card -->
           <div class="tts-premium-card">
             <div class="brand-pill-row">
-              <el-select 
-                v-model="form.model.ttsModelId" 
-                class="brand-select-pill" 
+              <el-select
+                v-model="form.model.ttsModelId"
+                class="brand-select-pill"
                 @change="handleModelChange('TTS', $event)"
               >
                 <div slot="prefix" class="brand-logo-prefix" v-if="currentModelLabel">
@@ -138,7 +137,7 @@
           <div class="filler-premium-card">
             <div class="filler-header-row">
               <label class="field-label-premium">
-                <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> Câu đệm suy nghĩ
+                <i class="el-icon-magic-stick label-icon"></i> Câu đệm suy nghĩ
               </label>
               <el-switch
                 v-model="form.fillerEnabled"
@@ -151,7 +150,7 @@
 
             <template v-if="form.fillerEnabled === 1">
               <div class="filler-field">
-                <span class="filler-tag">Thời gian đợi trước khi đệm (ms)</span>
+                <span class="filler-tag">Thời gian chờ (ms)</span>
                 <div class="filler-input-pill">
                   <el-input-number
                     v-model="form.fillerDelayMs"
@@ -184,13 +183,74 @@
         </div>
       </div>
 
-      <!-- Middle Column: System Prompt (chỉ hiện khi bật toggle & model không phải Oriagent) -->
+      <!-- Column 2: Testing (Live Preview) -->
+      <div class="preview-panel card-style">
+        <div class="panel-header-row">
+          <span class="panel-header-title"><i class="el-icon-video-camera"></i> Testing</span>
+        </div>
+
+        <div class="mockup-screen">
+          <!-- Trạng thái đang gọi: waveform tĩnh + trạng thái + nút ngắt, chat thật nằm trong iframe -->
+          <template v-if="isLiveTesting">
+            <div class="live-test-wrapper">
+              <div class="live-status-bar">
+                <div class="live-waveform-static">
+                  <span class="wave-bar" v-for="n in 5" :key="n"></span>
+                </div>
+                <span class="live-status-text">Đang hoạt động</span>
+                <div class="call-btn end" @click="isLiveTesting = false">
+                  <img src="@/assets/dashboard/phone_stop.svg" class="btn-icon-svg" />
+                </div>
+              </div>
+              <iframe
+                :src="testLiveUrl"
+                frameborder="0"
+                class="live-iframe"
+                :title="$t('roleConfig.liveTestTitle')"
+              ></iframe>
+            </div>
+          </template>
+
+          <!-- Trạng thái chưa gọi: vòng tròn trắng + waveform tĩnh + nút gọi -->
+          <template v-else>
+            <div class="idle-test-wrapper">
+              <div class="idle-circle">
+                <svg class="idle-waveform" viewBox="0 0 100 40" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="6" y="15" width="4" height="10" rx="2" />
+                  <rect x="16" y="9" width="4" height="22" rx="2" />
+                  <rect x="26" y="4" width="4" height="32" rx="2" />
+                  <rect x="36" y="12" width="4" height="16" rx="2" />
+                  <rect x="46" y="1" width="4" height="38" rx="2" />
+                  <rect x="56" y="12" width="4" height="16" rx="2" />
+                  <rect x="66" y="4" width="4" height="32" rx="2" />
+                  <rect x="76" y="9" width="4" height="22" rx="2" />
+                  <rect x="86" y="15" width="4" height="10" rx="2" />
+                </svg>
+              </div>
+              <div class="call-btn start" @click="toggleLiveTest">
+                <img src="@/assets/dashboard/phone_calling.svg" class="btn-icon-svg" />
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Ô nhập tin nhắn tĩnh: chỉ hiện khi chưa gọi (khi đang gọi, ô nhập thật nằm trong live-iframe) -->
+        <div class="idle-input-bar" v-if="!isLiveTesting">
+          <i class="el-icon-chat-dot-round"></i>
+          <span class="idle-input-placeholder">Nhập tin nhắn...</span>
+          <span class="idle-input-count">0</span>
+          <div class="idle-send-btn"><i class="el-icon-top"></i></div>
+        </div>
+      </div>
+
+      <!-- Column 3: Instructions (System Prompt) — chỉ hiện khi bật toggle & model không phải Oriagent -->
       <div class="system-prompt-panel card-style" v-if="showSystemPrompt && !isOriagentLLM">
-        <div class="sp-header">
-          <label class="field-label-premium">
-            <img src="@/assets/dashboard/model_AI.svg" class="label-icon-svg" /> System Prompt
-          </label>
-          <p class="sp-hint">Hướng dẫn tác nhân cách giao tiếp và xử lý yêu cầu.</p>
+        <div class="panel-header-row">
+          <span class="panel-header-title"><i class="el-icon-video-camera"></i> Instructions</span>
+          <div class="panel-header-actions">
+            <i class="el-icon-setting sp-gear-icon"></i>
+            <span class="sp-auto-btn"><i class="el-icon-magic-stick"></i> Tạo tự động</span>
+          </div>
         </div>
         <el-input
           type="textarea"
@@ -198,41 +258,13 @@
           class="sp-textarea"
           :rows="16"
           maxlength="4000"
-          show-word-limit
           resize="none"
           placeholder="Ví dụ: Bạn là trợ lý thân thiện, trả lời ngắn gọn, dễ hiểu..."
         />
-      </div>
-
-      <!-- Right Column: Live Preview / Test -->
-      <div class="preview-panel card-style">
-         <div class="mockup-screen">
-            <!-- Live iframe -->
-            <template v-if="isLiveTesting">
-               <div class="live-test-wrapper">
-                  <iframe
-                    :src="testLiveUrl"
-                    frameborder="0"
-                    class="live-iframe"
-                    :title="$t('roleConfig.liveTestTitle')"
-                  ></iframe>
-               </div>
-            </template>
-            <!-- Show Blank/Empty when !isLiveTesting -->
-         </div>
-         
-         <div class="test-live-bar">
-            <div class="pill-bar">
-               <div class="call-btn start" @click="toggleLiveTest" :class="{ active: isLiveTesting }">
-                  <img src="@/assets/dashboard/phone_calling.svg" class="btn-icon-svg" v-if="!isLiveTesting" />
-                  <i class="el-icon-close" v-else></i>
-               </div>
-               <div class="status-label">{{ $t("roleConfig.testLive") }}</div>
-               <div class="call-btn end" @click="isLiveTesting = false">
-                  <img src="@/assets/dashboard/phone_stop.svg" class="btn-icon-svg" />
-               </div>
-            </div>
-         </div>
+        <div class="sp-footer">
+          <span class="sp-footer-item">Character: {{ (form.systemPrompt || '').length }}</span>
+          <span class="sp-footer-item">Token prompt: --</span>
+        </div>
       </div>
     </div>
   </div>
@@ -356,128 +388,167 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import "@/views/studio.scss";
+
 $ori-dark: #313133;
 $ori-slate: #64748b;
 $ori-green: #08c45b;
-$ori-light-green: #ecfccb;
 $ori-border: #f1f5f9;
 
-.role-config-section { 
-  padding: 0; 
+.role-config-section {
+  padding: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
 }
 
 .card-style {
-  background: white !important;
-  border: 1px solid $ori-border !important;
-  border-radius: 24px !important;
-  box-shadow: none !important;
+  @include studio-panel;
 }
 
-.dashboard-layout { 
-  display: flex; 
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
   flex: 1;
   min-height: 700px;
-  gap: 24px;
-  
-  @media (max-width: 1200px) { 
-    flex-direction: column; 
+  gap: $studio-gap;
+
+  @media (max-width: 1400px) {
+    grid-template-columns: 1fr;
     min-height: auto;
-    gap: 32px;
+    gap: 20px;
   }
 }
 
 .config-panel {
-  flex: 0 0 35%; 
-  min-width: 400px;
-  display: flex; 
-  flex-direction: column; 
-  gap: 40px;
-  padding: 40px;
+  order: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 32px;
   overflow-y: auto;
-  
-  @media (max-width: 1200px) { 
-    flex: none;
-    width: 100%;
-    min-width: 0;
-    max-height: none; // Allow it to grow on mobile
+}
+
+.preview-panel {
+  order: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 32px;
+  overflow: hidden;
+
+  @media (max-width: 1400px) {
+    min-height: 560px;
   }
 }
 
-/* Toggle row: Tùy chỉnh System Prompt */
-.prompt-toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-/* Middle Column: System Prompt */
 .system-prompt-panel {
-  flex: 1;
-  min-width: 320px;
+  order: 3;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 40px;
+  padding: 32px;
+}
 
-  @media (max-width: 1200px) {
-    flex: none;
-    width: 100%;
-    min-width: 0;
-  }
+/* Header dùng chung cho panel Testing / Instructions */
+.panel-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 
-  .sp-header { display: flex; flex-direction: column; gap: 6px; }
-  .sp-hint { margin: 0; font-size: 13px; color: $ori-slate; }
-  .sp-textarea { flex: 1; display: flex; }
-  ::v-deep .sp-textarea .el-textarea__inner {
-    height: 100%;
-    min-height: 360px;
-    border-radius: 16px;
-    border: 1px solid $ori-border;
-    background: #f8fafc;
-    font-size: 14px;
-    line-height: 1.6;
-    padding: 16px;
-  }
+.panel-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: $studio-text;
+
+  i { color: $studio-text-sub; font-size: 15px; }
+}
+
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sp-gear-icon {
+  font-size: 16px;
+  color: $studio-text-sub;
+  cursor: default;
+}
+
+.sp-auto-btn {
+  @include studio-black-pill;
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12px;
+  cursor: default; // Chưa có tính năng thật — hiển thị tĩnh
+}
+
+.sp-textarea {
+  flex: 1;
+  display: flex;
+}
+::v-deep .sp-textarea .el-textarea__inner {
+  height: 100%;
+  min-height: 340px;
+  border-radius: 16px;
+  border: 1px solid $studio-border;
+  background: $studio-soft-bg;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 16px;
+}
+
+.sp-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: $studio-text-sub;
 }
 
 /* Hide Scrollbar */
 .no-scrollbar {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
-  
+
   &::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Opera */
   }
 }
 
-/* Branding Header */
-.branding-header {
-  text-align: center;
-  margin-bottom: 10px;
-  
-  .avatar-circle {
-    width: 80px; height: 80px; 
-    background: #e2f9eb;
-    border-radius: 50%; 
-    display: inline-flex; align-items: center; justify-content: center;
-    margin-bottom: 16px;
-    border: 4px solid white;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.05);
-    img { width: 48px; height: 48px; }
-  }
-  
-  .branding-title {
-    font-size: 20px; font-weight: 800; color: #111827; margin: 0 0 8px;
-  }
-  
-  .branding-subtitle {
-    font-size: 13px; color: $ori-slate; line-height: 1.5; max-width: 320px; margin: 0 auto;
-  }
+/* Header panel Form: tên agent + icon edit tĩnh */
+.form-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.form-panel-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: $studio-text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.form-panel-edit-icon {
+  font-size: 16px;
+  color: $studio-text-sub;
+  cursor: default;
+  flex-shrink: 0;
 }
 
 .config-flow {
@@ -488,9 +559,9 @@ $ori-border: #f1f5f9;
   display: flex; flex-direction: column; gap: 20px;
 }
 
-/* Câu đệm suy nghĩ — card đồng bộ thiết kế với .tts-premium-card (xanh, bo tròn) */
+/* Câu đệm suy nghĩ — card xanh nhạt theo token */
 .filler-premium-card {
-  background: #DFF9C0;
+  background: $studio-accent-soft;
   border-radius: 20px;
   padding: 20px 24px;
   display: flex;
@@ -512,7 +583,7 @@ $ori-border: #f1f5f9;
   .filler-tag {
     font-size: 12px;
     font-weight: 700;
-    color: #3d4566;
+    color: $ori-dark;
     padding-left: 4px;
   }
 
@@ -574,57 +645,111 @@ $ori-border: #f1f5f9;
 /* Custom Fields */
 .custom-field-group {
   display: flex; flex-direction: column; gap: 8px;
-  
+
   .field-label-premium {
-    font-size: 13px; font-weight: 700; color: $ori-dark; display: flex; align-items: center; gap: 10px;
-    .label-icon-svg { width: 14px; height: 14px; opacity: 0.7; }
+    font-size: 13px; font-weight: 700; color: $ori-dark; display: flex; align-items: center; gap: 8px;
+    .label-icon { font-size: 14px; color: $studio-text-sub; }
     i { color: $ori-slate; opacity: 0.8; }
   }
 }
 
+/* Hàng model AI (LLM): pill trắng viền, icon + tên + tag Chat + icon mắt/chỉnh */
+.model-row-white {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid $studio-border;
+  border-radius: $studio-radius-pill;
+  padding: 6px 14px;
+
+  .model-row-icon {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: $studio-soft-bg;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    i { font-size: 13px; color: $studio-text-sub; }
+  }
+
+  .model-row-tag {
+    font-size: 11px; font-weight: 700; color: $studio-text-sub;
+    background: $studio-soft-bg; border-radius: $studio-radius-pill;
+    padding: 3px 10px; flex-shrink: 0; white-space: nowrap;
+  }
+
+  .model-row-action { font-size: 14px; color: $studio-text-sub; cursor: default; flex-shrink: 0; }
+
+  ::v-deep .el-input__inner {
+    border: none; background: transparent; padding: 0; height: 32px;
+    font-size: 13px; font-weight: 700; color: $studio-text;
+  }
+  ::v-deep .el-input__suffix { display: none; }
+}
+.model-row-select { flex: 1; min-width: 0; }
+
+/* Pill xanh nhạt: API key / VAD / STT */
 .premium-field-pill {
-  background: #EEEEEE;
+  background: $studio-soft-bg;
   border-radius: 999px;
   padding: 3px;
   transition: all 0.3s ease;
   border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &.soft-pill {
+    background: $studio-accent-soft;
+    padding: 6px 14px;
+  }
 
   &:focus-within {
-    background: white;
-    border-color: $ori-green;
-    box-shadow: 0 0 0 4px rgba(8, 196, 91, 0.1);
+    border-color: $studio-accent;
   }
+  &.soft-pill:focus-within {
+    background: $studio-accent-soft;
+    box-shadow: 0 0 0 3px rgba(8, 196, 91, 0.15);
+  }
+}
+
+.pill-badge-icon {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; padding: 4px; flex-shrink: 0;
+}
+.pill-badge-icon-inline {
+  font-size: 14px; color: $studio-text-sub; flex-shrink: 0;
 }
 
 ::v-deep {
   .premium-input-field .el-input__inner,
   .premium-select-field .el-input__inner {
-    height: 36px; border: none; background: transparent; padding: 0 16px;
+    height: 36px; border: none; background: transparent; padding: 0 4px;
     font-size: 12px; font-weight: 600; color: $ori-dark;
     &:focus { outline: none; }
   }
-  
-  .premium-select-field { width: 100%; }
+
+  .premium-select-field { width: 100%; flex: 1; }
+  .premium-input-field { flex: 1; }
 }
 
-/* TTS Card Premium */
+/* TTS Card: viền xanh, nền trắng */
 .tts-premium-card {
-  background: #DFF9C0; 
-  border-radius: 20px; 
+  background: #fff;
+  border: 1.5px solid $studio-accent;
+  border-radius: 20px;
   padding: 24px;
   display: flex; flex-direction: column; gap: 16px;
-  
+
   .brand-pill-row {
     .brand-select-pill {
       width: 100%;
       ::v-deep .el-input__inner {
-         height: 52px; border: none; border-radius: 999px; background: white;
+         height: 52px; border: none; border-radius: 999px; background: $studio-soft-bg;
          padding: 0 48px 0 64px; font-size: 14px; font-weight: 700; color: #111827;
-         box-shadow: 0 4px 10px rgba(0,0,0,0.05);
       }
       ::v-deep .el-input__prefix { left: 16px; display: flex; align-items: center; }
       ::v-deep .el-input__suffix { display: none !important; }
-      
+
       .brand-logo-prefix {
          .brand-icon { width: 32px; height: 32px; }
       }
@@ -634,19 +759,19 @@ $ori-border: #f1f5f9;
   .sub-selectors-row {
      display: flex; justify-content: space-between; gap: 20px;
   }
-  
+
   .mini-selector-premium {
      display: flex; flex-direction: column; gap: 8px; width: 48%; // Ensure split
-     
+
      .selector-tag-premium { font-size: 12px; font-weight: 700; color: #3d4566; padding-left: 4px; text-align: left; }
-     
+
      .white-pill-selector {
-        background: white; border-radius: 999px; padding: 4px; 
+        background: $studio-soft-bg; border-radius: 999px; padding: 4px;
         .ghost-select-premium {
            width: 100%;
-           ::v-deep .el-input__inner { 
-              background: transparent; border: none; text-align: left; 
-              padding: 0 20px; font-weight: 600; color: #111827; height: 36px; font-size: 13px; 
+           ::v-deep .el-input__inner {
+              background: transparent; border: none; text-align: left;
+              padding: 0 20px; font-weight: 600; color: #111827; height: 36px; font-size: 13px;
            }
            ::v-deep .el-input__suffix { display: none; }
         }
@@ -654,76 +779,141 @@ $ori-border: #f1f5f9;
   }
 }
 
-/* Preview Panel */
-.preview-panel {
-  flex: 1; // Takes the remaining 65%
-  display: flex; 
-  flex-direction: column; 
-  gap: 24px;
-  padding: 40px;
-  overflow: hidden;
-  
-  @media (max-width: 1200px) { 
-    width: 100%; 
-    height: 600px; 
-  }
-}
-
+/* Mockup / test area */
 .mockup-screen {
-  flex: 1; 
-  background: transparent; 
-  border-radius: 24px; 
-  border: none; 
+  flex: 1;
+  background: transparent;
+  border-radius: 24px;
+  border: none;
   overflow: hidden;
-  position: relative; 
+  position: relative;
   box-shadow: none;
-}
-
-.chat-preview-mock {
-   padding: 24px; 
-   .mock-header { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: $ori-slate; margin-bottom: 20px; }
-   .mock-msg .msg-bubble { background: #f1f5f9; padding: 12px 18px; border-radius: 18px; border-bottom-left-radius: 4px; font-size: 14px; color: $ori-dark; line-height: 1.5; }
-}
-
-.live-test-wrapper { width: 100%; height: 100%; }
-.live-iframe { width: 100%; height: 100%; border: none; }
-
-.test-live-bar {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+}
 
-  .pill-bar {
-    background: #EEEEEE; 
-    border-radius: 50px; 
-    padding: 8px 12px;
-    display: flex; 
-    align-items: center; 
-    justify-content: space-between;
-    width: fit-content;
-    min-width: 320px;
-    border: 1px solid transparent;
-    transition: all 0.3s ease;
+.live-test-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.live-iframe { width: 100%; height: 100%; border: none; flex: 1; border-radius: 16px; }
+
+/* Thanh trạng thái khi đang gọi: waveform tĩnh + "Đang hoạt động" + nút ngắt */
+.live-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid $studio-border;
+  border-radius: 999px;
+  padding: 8px 10px 8px 16px;
+  flex-shrink: 0;
+}
+
+.live-waveform-static {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+
+  .wave-bar {
+    width: 3px;
+    background: $studio-accent;
+    border-radius: 2px;
+    height: 14px;
+    &:nth-child(2) { height: 20px; }
+    &:nth-child(3) { height: 10px; }
+    &:nth-child(4) { height: 22px; }
+    &:nth-child(5) { height: 14px; }
   }
-  
-  .status-label { font-size: 14px; font-weight: 700; color: #111827; }
-  
-  .call-btn {
-    width: 48px; height: 48px; border-radius: 50%; 
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; transition: all 0.3s; font-size: 18px;
-    
-    &.start { 
-      background: $ori-green; color: white; 
-      &.active { background: #ef4444; transform: rotate(180deg); }
-    }
-    &.end { background: #ef4444; color: white; }
-    
-    &:hover { transform: scale(1.05); }
+}
 
-    .btn-icon-svg {
-       width: 20px; height: 20px;
-       filter: brightness(0) invert(1); // Make SVG white
-    }
+.live-status-text {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: $studio-text;
+}
+
+/* Trạng thái chưa gọi: vòng tròn trắng lớn + waveform tĩnh + nút gọi */
+.idle-test-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+}
+
+.idle-circle {
+  width: 240px;
+  height: 240px;
+  max-width: 80%;
+  max-height: 80%;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.idle-waveform {
+  width: 55%;
+  height: auto;
+  fill: #c7c9cf;
+}
+
+.call-btn {
+  width: 56px; height: 56px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.3s; flex-shrink: 0;
+
+  &.start { background: $studio-accent; }
+  &.end { background: #ef4444; width: 40px; height: 40px; }
+
+  &:hover { transform: scale(1.05); }
+
+  .btn-icon-svg {
+     width: 22px; height: 22px;
+     filter: brightness(0) invert(1); // Make SVG white
+  }
+  &.end .btn-icon-svg { width: 16px; height: 16px; }
+}
+
+/* Ô nhập tin nhắn tĩnh — chỉ hiển thị khi chưa gọi (trang trí, không có logic gửi) */
+.idle-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: $studio-soft-bg;
+  border-radius: 999px;
+  padding: 8px 8px 8px 16px;
+  flex-shrink: 0;
+
+  i { color: $studio-text-sub; font-size: 15px; }
+
+  .idle-input-placeholder {
+    flex: 1;
+    font-size: 13px;
+    color: $studio-text-sub;
+    text-align: left;
+  }
+
+  .idle-input-count {
+    font-size: 12px;
+    color: $studio-text-sub;
+  }
+
+  .idle-send-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: $studio-black;
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
   }
 }
 </style>

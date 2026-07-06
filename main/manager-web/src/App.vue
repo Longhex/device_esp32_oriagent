@@ -119,7 +119,7 @@ export default {
     isStudioPage() {
       // Mở dần theo từng đợt redesign: thêm 'ModelConfig' (Đợt 2), 'AgentConfig' (Đợt 3)
       // khi màn tương ứng chuyển sang StudioLayout
-      const studioPages = ['home', 'ModelConfig'];
+      const studioPages = ['home', 'ModelConfig', 'AgentConfig'];
       return studioPages.includes(this.$route.name);
     }
   },

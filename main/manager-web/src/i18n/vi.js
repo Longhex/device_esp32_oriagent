@@ -842,7 +842,7 @@ export default {
   'roleConfig.title': 'Agent',
   'roleConfig.addTag': 'Thêm mới nhãn',
   'roleConfig.restartNotice': 'Sau khi lưu cấu hình, bạn cần khởi động lại thiết bị để cấu hình mới có hiệu lực.',
-  'roleConfig.saveConfig': 'Lưu cấu hình',
+  'roleConfig.saveConfig': 'Xuất bản',
   'roleConfig.reset': 'Đặt lại',
   'roleConfig.tabSetup': 'Cấu hình',
   'roleConfig.tabOverview': 'Tổng quan',
