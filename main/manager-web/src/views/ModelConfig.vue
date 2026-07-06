@@ -1,263 +1,312 @@
 <template>
-  <div class="welcome">
-
-    <div class="operation-bar">
-      <h2 class="page-title">{{ $t("modelConfig." + activeTab) }}</h2>
-      <div class="action-group">
-        <div class="search-group">
-          <el-input
-            :placeholder="$t('modelConfig.searchPlaceholder')"
-            v-model="search"
-            class="search-input"
-            clearable
-            @keyup.enter.native="handleSearch"
-            style="width: 240px"
-          />
-          <el-button class="btn-search" @click="handleSearch">
-            {{ $t("modelConfig.search") }}
-          </el-button>
+  <StudioLayout active="models" contextLabel="Agent Builder">
+    <div class="studio-model-wrap">
+      <!-- Panel trái: menu nhóm model (restyle của nav/activeTab cũ) -->
+      <div class="studio-cat-panel">
+        <div
+          v-for="cat in catList"
+          :key="cat.key"
+          class="studio-cat-item"
+          :class="{ active: activeTab === cat.key }"
+          @click="$router.push({ query: { tab: cat.key } })"
+        >
+          <i :class="cat.icon"></i>
+          <span>{{ $t(cat.labelKey) }}</span>
+          <i v-if="activeTab === cat.key" class="el-icon-right studio-cat-arrow"></i>
         </div>
       </div>
-    </div>
 
-    <!-- 主体内容 -->
-    <div class="main-wrapper">
-      <div class="content-panel">
-        <!-- 内容区域 -->
-        <div class="content-area">
-          <el-card class="model-card" shadow="never">
-            <el-table
-              ref="modelTable"
-              style="width: 100%"
-              v-loading="loading"
-              :element-loading-text="$t('modelConfig.loading')"
-              element-loading-spinner="el-icon-loading"
-              element-loading-background="rgba(255, 255, 255, 0.7)"
-              :header-cell-style="{ background: 'transparent' }"
-              :data="modelList"
-              class="transparent-table"
-              header-row-class-name="table-header"
-              :header-cell-class-name="headerCellClassName"
-              @selection-change="handleSelectionChange"
+      <!-- Panel phải: danh sách model -->
+      <div class="studio-model-panel">
+        <div class="studio-model-toolbar">
+          <h2 class="studio-model-title">{{ $t("modelConfig." + activeTab) }}</h2>
+          <div class="studio-search-group">
+            <el-input
+              :placeholder="$t('modelConfig.searchPlaceholder')"
+              v-model="search"
+              class="search-input"
+              clearable
+              @keyup.enter.native="handleSearch"
+            />
+            <el-button class="btn-search" @click="handleSearch">
+              {{ $t("modelConfig.search") }}
+            </el-button>
+          </div>
+        </div>
+
+        <el-card class="model-card" shadow="never">
+          <el-table
+            ref="modelTable"
+            style="width: 100%"
+            v-loading="loading"
+            :element-loading-text="$t('modelConfig.loading')"
+            element-loading-spinner="el-icon-loading"
+            element-loading-background="rgba(255, 255, 255, 0.7)"
+            :header-cell-style="{ background: 'transparent' }"
+            :data="displayModelList"
+            :span-method="providerSpanMethod"
+            :row-class-name="modelRowClassName"
+            class="transparent-table"
+            header-row-class-name="table-header"
+            :header-cell-class-name="headerCellClassName"
+            @selection-change="handleSelectionChange"
+          >
+            <el-table-column
+              type="selection"
+              width="55"
+              align="center"
+              :selectable="isModelRowSelectable"
+              :cell-class-name="selectionCellClassName"
+            ></el-table-column>
+            <el-table-column
+              :label="$t('modelConfig.modelId')"
+              prop="id"
+              align="center"
             >
-              <el-table-column
-                type="selection"
-                width="55"
-                align="center"
-                :cell-class-name="selectionCellClassName"
-              ></el-table-column>
-              <el-table-column
-                :label="$t('modelConfig.modelId')"
-                prop="id"
-                align="center"
-              ></el-table-column>
-              <el-table-column
-                :label="$t('modelConfig.modelName')"
-                prop="modelName"
-                align="center"
-              ></el-table-column>
-              <el-table-column :label="$t('modelConfig.provider')" align="center">
-                <template slot-scope="scope">
-                  {{ scope.row.configJson.type || $t("modelConfig.unknown") }}
-                </template>
-              </el-table-column>
-              <el-table-column :label="$t('modelConfig.isEnabled')" align="center">
-                <template slot-scope="scope">
-                  <el-tooltip
-                    v-if="scope.row.isDefault === 1 && scope.row.isEnabled === 1"
-                    :content="$t('modelConfig.defaultModelCannotDisable')"
-                    placement="top"
-                    effect="light"
-                  > 
-                    <el-switch
-                      v-model="scope.row.isEnabled"
-                      class="custom-switch"
-                      :active-value="1"
-                      :inactive-value="0"
-                      disabled
-                      @change="handleStatusChange(scope.row)"
-                    />
-                  </el-tooltip>
+              <template slot-scope="scope">
+                <div v-if="scope.row.__groupHeader" class="provider-group-header">
+                  <i class="el-icon-cpu provider-group-icon"></i>
+                  <span class="provider-group-name">{{ scope.row.__provider }}</span>
+                </div>
+                <span v-else>{{ scope.row.id }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column
+              :label="$t('modelConfig.modelName')"
+              prop="modelName"
+              align="center"
+            >
+              <template slot-scope="scope">
+                <span class="model-name-cell">
+                  <i class="el-icon-cpu model-name-icon"></i>{{ scope.row.modelName }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column :label="$t('modelConfig.provider')" align="center">
+              <template slot-scope="scope">
+                <span v-if="!scope.row.__groupHeader" class="provider-tag">{{
+                  (scope.row.configJson && scope.row.configJson.type) || $t("modelConfig.unknown")
+                }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column :label="$t('modelConfig.isEnabled')" align="center">
+              <template slot-scope="scope">
+                <el-tooltip
+                  v-if="scope.row.isDefault === 1 && scope.row.isEnabled === 1"
+                  :content="$t('modelConfig.defaultModelCannotDisable')"
+                  placement="top"
+                  effect="light"
+                >
                   <el-switch
-                    v-else
                     v-model="scope.row.isEnabled"
                     class="custom-switch"
+                    active-color="#08c45b"
                     :active-value="1"
                     :inactive-value="0"
+                    disabled
                     @change="handleStatusChange(scope.row)"
                   />
-                </template>
-              </el-table-column>
-              <el-table-column :label="$t('modelConfig.isDefault')" align="center">
-                <template slot-scope="scope">
-                  <el-switch
-                    v-model="scope.row.isDefault"
-                    class="custom-switch"
-                    :active-value="1"
-                    :inactive-value="0"
-                    @change="handleDefaultChange(scope.row)"
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column
-                v-if="activeTab === 'tts'"
-                :label="$t('modelConfig.voiceManagement')"
-                align="center"
-              >
-                <template slot-scope="scope">
-                  <el-button
-                    type="text"
-                    size="mini"
-                    @click="openTtsDialog(scope.row)"
-                    class="voice-management-btn"
-                  >
-                    {{ $t("modelConfig.voiceManagement") }}
-                  </el-button>
-                </template>
-              </el-table-column>
-              <el-table-column
-                :label="$t('modelConfig.action')"
-                align="center"
-                width="210px"
-              >
-                <template slot-scope="scope">
-                  <el-button
-                    type="text"
-                    size="mini"
-                    @click="editModel(scope.row)"
-                    class="edit-btn"
-                  >
-                    {{ $t("modelConfig.edit") }}
-                  </el-button>
-                  <el-button
-                    type="text"
-                    size="mini"
-                    @click="duplicateModel(scope.row)"
-                    class="edit-btn"
-                  >
-                    {{ $t("modelConfig.duplicate") }}
-                  </el-button>
-                  <el-button
-                    type="text"
-                    size="mini"
-                    @click="deleteModel(scope.row)"
-                    class="delete-btn"
-                  >
-                    {{ $t("modelConfig.delete") }}
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
-            <div class="table-footer">
-              <div class="batch-actions">
-                <el-button size="mini" type="primary" @click="selectAll">
-                  {{
-                    isAllSelected
-                      ? $t("modelConfig.deselectAll")
-                      : $t("modelConfig.selectAll")
-                  }}
-                </el-button>
-                <el-button type="success" size="mini" @click="addModel" class="add-btn">
-                  {{ $t("modelConfig.add") }}
-                </el-button>
+                </el-tooltip>
+                <el-switch
+                  v-else
+                  v-model="scope.row.isEnabled"
+                  class="custom-switch"
+                  active-color="#08c45b"
+                  :active-value="1"
+                  :inactive-value="0"
+                  @change="handleStatusChange(scope.row)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column :label="$t('modelConfig.isDefault')" align="center">
+              <template slot-scope="scope">
+                <el-switch
+                  v-model="scope.row.isDefault"
+                  class="custom-switch"
+                  active-color="#08c45b"
+                  :active-value="1"
+                  :inactive-value="0"
+                  @change="handleDefaultChange(scope.row)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column
+              v-if="activeTab === 'tts'"
+              :label="$t('modelConfig.voiceManagement')"
+              align="center"
+            >
+              <template slot-scope="scope">
                 <el-button
+                  type="text"
                   size="mini"
-                  type="danger"
-                  icon="el-icon-delete"
-                  @click="batchDelete"
+                  @click="openTtsDialog(scope.row)"
+                  class="voice-management-btn"
                 >
-                  {{ $t("modelConfig.delete") }}
+                  {{ $t("modelConfig.voiceManagement") }}
                 </el-button>
-              </div>
-              <div class="custom-pagination">
-                <el-select
-                  v-model="pageSize"
-                  @change="handlePageSizeChange"
-                  class="page-size-select"
-                >
-                  <el-option
-                    v-for="item in pageSizeOptions"
-                    :key="item"
-                    :label="$t('modelConfig.itemsPerPage', { items: item })"
-                    :value="item"
-                  >
-                  </el-option>
-                </el-select>
-
-                <button
-                  class="pagination-btn"
-                  :disabled="currentPage === 1"
-                  @click="goFirst"
-                >
-                  {{ $t("modelConfig.firstPage") }}
-                </button>
-                <button
-                  class="pagination-btn"
-                  :disabled="currentPage === 1"
-                  @click="goPrev"
-                >
-                  {{ $t("modelConfig.prevPage") }}
-                </button>
-
-                <button
-                  v-for="page in visiblePages"
-                  :key="page"
-                  class="pagination-btn"
-                  :class="{ active: page === currentPage }"
-                  @click="goToPage(page)"
-                >
-                  {{ page }}
-                </button>
-
-                <button
-                  class="pagination-btn"
-                  :disabled="currentPage === pageCount"
-                  @click="goNext"
-                >
-                  {{ $t("modelConfig.nextPage") }}
-                </button>
-                <span class="total-text">{{
-                  $t("modelConfig.totalRecords", { total })
-                }}</span>
-              </div>
+              </template>
+            </el-table-column>
+            <el-table-column
+              :label="$t('modelConfig.action')"
+              align="center"
+              width="140px"
+            >
+              <template slot-scope="scope">
+                <el-tooltip :content="$t('modelConfig.edit')" placement="top" effect="light">
+                  <el-button
+                    type="text"
+                    circle
+                    size="mini"
+                    icon="el-icon-edit"
+                    @click="editModel(scope.row)"
+                    class="action-icon-btn"
+                  ></el-button>
+                </el-tooltip>
+                <el-tooltip :content="$t('modelConfig.duplicate')" placement="top" effect="light">
+                  <el-button
+                    type="text"
+                    circle
+                    size="mini"
+                    icon="el-icon-copy-document"
+                    @click="duplicateModel(scope.row)"
+                    class="action-icon-btn"
+                  ></el-button>
+                </el-tooltip>
+                <el-tooltip :content="$t('modelConfig.delete')" placement="top" effect="light">
+                  <el-button
+                    type="text"
+                    circle
+                    size="mini"
+                    icon="el-icon-delete"
+                    @click="deleteModel(scope.row)"
+                    class="action-icon-btn action-icon-btn--danger"
+                  ></el-button>
+                </el-tooltip>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div class="table-footer">
+            <div class="batch-actions">
+              <el-button size="mini" type="primary" @click="selectAll">
+                {{
+                  isAllSelected
+                    ? $t("modelConfig.deselectAll")
+                    : $t("modelConfig.selectAll")
+                }}
+              </el-button>
+              <el-button type="success" size="mini" @click="addModel" class="add-btn">
+                {{ $t("modelConfig.add") }}
+              </el-button>
+              <el-button
+                size="mini"
+                type="danger"
+                icon="el-icon-delete"
+                @click="batchDelete"
+              >
+                {{ $t("modelConfig.delete") }}
+              </el-button>
             </div>
-          </el-card>
-        </div>
-      </div>
+            <div class="custom-pagination">
+              <el-select
+                v-model="pageSize"
+                @change="handlePageSizeChange"
+                class="page-size-select"
+              >
+                <el-option
+                  v-for="item in pageSizeOptions"
+                  :key="item"
+                  :label="$t('modelConfig.itemsPerPage', { items: item })"
+                  :value="item"
+                >
+                </el-option>
+              </el-select>
 
-      <ModelEditDialog
-        :modelType="activeTab"
-        :visible.sync="editDialogVisible"
-        :modelData="editModelData"
-        @save="handleModelSave"
-      />
-      <TtsModel
-        :visible.sync="ttsDialogVisible"
-        :ttsModelId="selectedTtsModelId"
-        :modelConfig="selectedModelConfig"
-      />
-      <AddModelDialog
-        :modelType="activeTab"
-        :visible.sync="addDialogVisible"
-        @confirm="handleAddConfirm"
-      />
+              <button
+                class="pagination-btn"
+                :disabled="currentPage === 1"
+                @click="goFirst"
+              >
+                {{ $t("modelConfig.firstPage") }}
+              </button>
+              <button
+                class="pagination-btn"
+                :disabled="currentPage === 1"
+                @click="goPrev"
+              >
+                {{ $t("modelConfig.prevPage") }}
+              </button>
+
+              <button
+                v-for="page in visiblePages"
+                :key="page"
+                class="pagination-btn"
+                :class="{ active: page === currentPage }"
+                @click="goToPage(page)"
+              >
+                {{ page }}
+              </button>
+
+              <button
+                class="pagination-btn"
+                :disabled="currentPage === pageCount"
+                @click="goNext"
+              >
+                {{ $t("modelConfig.nextPage") }}
+              </button>
+              <span class="total-text">{{
+                $t("modelConfig.totalRecords", { total })
+              }}</span>
+            </div>
+          </div>
+        </el-card>
+      </div>
     </div>
+
+    <ModelEditDialog
+      :modelType="activeTab"
+      :visible.sync="editDialogVisible"
+      :modelData="editModelData"
+      @save="handleModelSave"
+    />
+    <TtsModel
+      :visible.sync="ttsDialogVisible"
+      :ttsModelId="selectedTtsModelId"
+      :modelConfig="selectedModelConfig"
+    />
+    <AddModelDialog
+      :modelType="activeTab"
+      :visible.sync="addDialogVisible"
+      @confirm="handleAddConfirm"
+    />
+
     <el-footer>
       <version-footer />
     </el-footer>
-  </div>
+  </StudioLayout>
 </template>
 
 <script>
 import Api from "@/apis/api";
 import AddModelDialog from "@/components/AddModelDialog.vue";
 import ModelEditDialog from "@/components/ModelEditDialog.vue";
+import StudioLayout from "@/components/StudioLayout.vue";
 import TtsModel from "@/components/TtsModel.vue";
 import VersionFooter from "@/components/VersionFooter.vue";
 export default {
-  components: { ModelEditDialog, TtsModel, AddModelDialog, VersionFooter },
+  components: { ModelEditDialog, TtsModel, AddModelDialog, VersionFooter, StudioLayout },
   data() {
     return {
+      // Menu nhóm model (panel trái) - bê nguyên danh sách model-type từ SideBar.vue
+      catList: [
+        { key: "vad", icon: "el-icon-microphone", labelKey: "modelConfig.vad" },
+        { key: "asr", icon: "el-icon-chat-dot-round", labelKey: "modelConfig.asr" },
+        { key: "llm", icon: "el-icon-cpu", labelKey: "modelConfig.llm" },
+        { key: "vllm", icon: "el-icon-picture-outline", labelKey: "modelConfig.vllm" },
+        { key: "intent", icon: "el-icon-aim", labelKey: "modelConfig.intent" },
+        { key: "tts", icon: "el-icon-headset", labelKey: "modelConfig.tts" },
+        { key: "memory", icon: "el-icon-collection", labelKey: "modelConfig.memory" },
+        { key: "rag", icon: "el-icon-notebook-2", labelKey: "modelConfig.rag" },
+      ],
       addDialogVisible: false,
       activeTab: "llm",
       search: "",
@@ -307,6 +356,28 @@ export default {
   },
 
   computed: {
+    // Gộp modelList thành các khối theo nhà cung cấp (configJson.type):
+    // chèn 1 hàng header (__groupHeader) trước mỗi nhóm. Chỉ đổi HIỂN THỊ,
+    // không đụng modelList gốc nên chọn-nhiều/phân trang/CRUD giữ nguyên.
+    displayModelList() {
+      const groups = [];
+      const idxByProvider = {};
+      for (const m of this.modelList) {
+        const p =
+          (m.configJson && m.configJson.type) || this.$t("modelConfig.unknown");
+        if (!(p in idxByProvider)) {
+          idxByProvider[p] = groups.length;
+          groups.push({ provider: p, items: [] });
+        }
+        groups[idxByProvider[p]].items.push(m);
+      }
+      const rows = [];
+      for (const g of groups) {
+        rows.push({ __groupHeader: true, __provider: g.provider });
+        for (const m of g.items) rows.push(m);
+      }
+      return rows;
+    },
     modelTypeText() {
       return (
         this.$t("modelConfig." + this.activeTab) || this.$t("modelConfig.modelConfig")
@@ -333,6 +404,23 @@ export default {
   },
 
   methods: {
+    // Hàng header nhóm provider không cho chọn (checkbox ẩn)
+    isModelRowSelectable(row) {
+      return !row.__groupHeader;
+    },
+    modelRowClassName({ row }) {
+      return row && row.__groupHeader ? "provider-group-row" : "";
+    },
+    // Hàng header nhóm: gộp 1 ô trải hết bảng; hàng model: bình thường
+    providerSpanMethod({ row, columnIndex }) {
+      if (row && row.__groupHeader) {
+        const colCount = this.activeTab === "tts" ? 8 : 7;
+        if (columnIndex === 0) return [0, 0];
+        if (columnIndex === 1) return [1, colCount];
+        return [0, 0];
+      }
+      return [1, 1];
+    },
     // 更新选择列表头翻译文本
     updateSelectionHeaderText() {
       const thElement = document.querySelector(`.el-table__header th:nth-child(1) .cell`);
@@ -610,6 +698,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import "./studio.scss";
+
 .el-switch {
   height: 23px;
 }
@@ -618,81 +708,104 @@ export default {
   background: transparent;
 }
 
-.welcome {
-  min-width: 900px;
-  min-height: 506px;
-  height: 100vh;
+/* ---------- Layout 2 panel (menu trái + danh sách model) ---------- */
+.studio-model-wrap {
   display: flex;
-  position: relative;
-  flex-direction: column;
-  background-size: cover;
-  background: linear-gradient(to bottom right, #dce8ff, #e4eeff, #e6cbfd) center;
-  -webkit-background-size: cover;
-  -o-background-size: cover;
-}
-
-.main-wrapper {
-  // 顶部 63px 底部 35px 查询72px
-  height: calc(100vh - 63px - 35px - 72px);
-  margin: 0 22px;
-  border-radius: 15px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  position: relative;
-  background: rgba(237, 242, 255, 0.5);
-}
-
-.operation-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 24px;
-}
-
-.page-title {
-  font-size: 24px;
-  margin: 0;
-}
-
-.content-panel {
+  gap: $studio-gap;
+  align-items: flex-start;
   flex: 1;
-  display: flex;
-  overflow: hidden;
-  height: 100%;
-  border-radius: 15px;
-  background: transparent;
+  min-height: 0;
 }
 
-.content-area {
-  flex: 1;
-  padding: 24px 24px 0;
-  height: 100%;
-  min-width: 600px;
-  overflow: hidden;
-  background-color: transparent;
-  display: flex;
-  flex-direction: column;
+.studio-cat-panel {
+  @include studio-panel;
+  width: 260px;
+  flex-shrink: 0;
+  padding: 14px 10px;
   box-sizing: border-box;
 }
 
-.action-group {
+.studio-cat-item {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: $studio-text;
+  cursor: pointer;
+  transition: background 0.2s ease;
+
+  i {
+    font-size: 15px;
+  }
+
+  span {
+    flex: 1;
+    text-align: left;
+  }
+
+  .studio-cat-arrow {
+    flex: none;
+    font-size: 14px;
+  }
+
+  &:hover:not(.active) {
+    background: $studio-soft-bg;
+  }
+
+  &.active {
+    background: $studio-accent-soft;
+    color: #069d49;
+    font-weight: 600;
+  }
+
+  & + .studio-cat-item {
+    margin-top: 4px;
+  }
 }
 
-.search-group {
+.studio-model-panel {
+  @include studio-panel;
+  flex: 1;
+  min-width: 0;
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  padding: 18px 20px;
+  box-sizing: border-box;
+  height: 100%;
+}
+
+.studio-model-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+.studio-model-title {
+  @include studio-title;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.studio-search-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .search-input {
-  width: 240px;
+  width: 220px;
 }
 
 .btn-search {
   background: linear-gradient(135deg, #555555, #a966ff);
   border: none;
   color: white;
+  border-radius: $studio-radius-pill;
 }
 
 .btn-search:hover {
@@ -701,9 +814,9 @@ export default {
 }
 
 ::v-deep .search-input .el-input__inner {
-  border-radius: 4px;
-  border: 1px solid #dcdfe6;
-  background-color: white;
+  border-radius: $studio-radius-pill;
+  border: 1px solid $studio-border;
+  background-color: $studio-soft-bg;
   transition: border-color 0.2s;
 }
 
@@ -756,16 +869,6 @@ export default {
   outline: none;
 }
 
-// .data-table {
-//   border-radius: 6px;
-//   overflow: hidden;
-//   background-color: transparent !important;
-// }
-
-// .data-table ::v-deep .el-table__row {
-//   background-color: transparent !important;
-// }
-
 .table-header th {
   background-color: transparent !important;
   color: #606266;
@@ -776,7 +879,6 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  // padding: 16px 0;
   width: 100%;
   flex-shrink: 0;
   min-height: 60px;
@@ -793,7 +895,7 @@ export default {
   height: 32px;
   padding: 7px 12px 7px 10px;
   font-size: 12px;
-  border-radius: 4px;
+  border-radius: $studio-radius-pill;
   line-height: 1;
   font-weight: 500;
   border: none;
@@ -811,24 +913,15 @@ export default {
   color: white;
 }
 
-.batch-actions .el-button--success {
-  background: #5bc98c;
+/* Nút "Thêm mới model" - pill accent xanh giống mẫu */
+.batch-actions .add-btn {
+  background: $studio-accent !important;
   color: white;
 }
 
 .batch-actions .el-button--danger {
   background: #fd5b63;
   color: white;
-}
-
-.batch-actions .el-button:first-child {
-  background: linear-gradient(135deg, #000000, #555555);
-  border: none;
-  color: white;
-}
-
-.batch-actions .el-button:first-child:hover {
-  background: linear-gradient(135deg, #3a8ee6, #5a7cff);
 }
 
 .el-table th ::v-deep .el-table__cell {
@@ -864,8 +957,6 @@ export default {
   position: relative;
 }
 
-/* 已移除可能影响文本显示的空伪元素 */
-
 ::v-deep .el-table__body .el-checkbox__inner {
   display: inline-block !important;
   background: #e6edfa;
@@ -878,7 +969,6 @@ export default {
 ::v-deep .nav-panel .el-menu-item.is-active .menu-text {
   color: #fff !important;
 }
-
 
 .el-button img {
   height: 1em;
@@ -921,10 +1011,70 @@ export default {
   padding-right: 15px !important;
 }
 
-.edit-btn,
-.delete-btn {
-  margin: 0 8px;
-  color: #7079aa !important;
+/* Cụm action icon tròn (sửa/nhân bản/xóa) */
+.action-icon-btn {
+  margin: 0 3px;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  color: $studio-text-sub !important;
+  border: 1px solid $studio-border !important;
+  background: $studio-soft-bg !important;
+
+  &:hover {
+    color: $studio-text !important;
+    background: darken(#f7f7f7, 4%) !important;
+  }
+
+  &.action-icon-btn--danger:hover {
+    color: #fd5b63 !important;
+    border-color: #fd5b63 !important;
+  }
+}
+
+/* Cột tên model kèm icon */
+.model-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.model-name-icon {
+  color: $studio-text-sub;
+}
+
+/* Tag loại provider */
+.provider-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: $studio-radius-pill;
+  background: $studio-soft-bg;
+  color: $studio-text-sub;
+  font-size: 12px;
+}
+
+/* Hàng header nhóm theo nhà cung cấp (như mẫu: khối "OpenAI" ...) */
+.provider-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 4px 2px;
+}
+.provider-group-icon {
+  font-size: 18px;
+  color: $studio-text;
+}
+.provider-group-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: $studio-text;
+}
+::v-deep .transparent-table .provider-group-row > td {
+  background: $studio-soft-bg;
+}
+::v-deep .transparent-table .provider-group-row:hover > td {
+  background: $studio-soft-bg; /* không đổi màu khi hover header */
 }
 
 ::v-deep .el-table .cell {
@@ -1007,6 +1157,7 @@ export default {
   border: none;
   box-shadow: none;
   overflow: hidden;
+  min-height: 0;
 }
 
 .model-card ::v-deep .el-card__body {
@@ -1016,6 +1167,7 @@ export default {
   flex: 1;
   overflow: hidden;
 }
+
 :deep(.transparent-table) {
     background: white;
     flex: 1;
@@ -1033,31 +1185,36 @@ export default {
         flex-shrink: 0;
     }
 
-    .el-table__header th {
-        background: white !important;
-        color: black;
-        font-weight: 600;
-        height: 40px;
-        padding: 8px 0;
-        font-size: 14px;
-        border-bottom: 1px solid #e4e7ed;
+    /* Bỏ kẻ ô, header nền phụ chữ chính theo token studio */
+    td, th {
+        border: none !important;
     }
 
+    .el-table__header th {
+        background: $studio-soft-bg !important;
+        color: $studio-text;
+        font-weight: 600;
+        height: 44px;
+        padding: 8px 0;
+        font-size: 14px;
+        border-bottom: none;
+    }
+
+    /* Hàng cao thoáng, bo góc nhẹ */
     .el-table__body tr {
         background-color: white;
 
         td {
-            border-top: 1px solid rgba(0, 0, 0, 0.04);
-            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
-            padding: 8px 0;
-            height: 40px;
+            border: none;
+            padding: 14px 0;
+            height: 52px;
             color: #606266;
             font-size: 14px;
         }
     }
 
     .el-table__row:hover>td {
-        background-color: #f5f7fa !important;
+        background-color: $studio-soft-bg !important;
     }
 
     &::before {
