@@ -76,15 +76,27 @@ Script giữ nguyên: `showAddDialog`, search/history, delete, click card → Ag
 
 ## [S5] Đợt 2 — Màn Model AI (artboard 31) → `ModelConfig.vue`
 
-Quyết định đã duyệt: **giữ bảng, không chuyển card** (bảng đang gánh switch enable,
-đặt mặc định, sửa/nhân bản/xóa, batch delete, phân trang — chuyển card sẽ rủi ro sót).
+Bố cục theo ảnh mẫu — 2 khối cạnh nhau trong khu nội dung:
 
-- Bọc `StudioLayout` (Model AI active).
-- Bảng restyle: panel trắng bo góc lớn, header bảng `#f7f7f7`, chữ Roboto 15px `#313133`,
-  switch/nút accent `#08c45b`, hàng cao thoáng.
-- Thanh chọn nhóm model style pill/menu như mẫu — giữ đủ **6 nhóm thật**
-  (LLM/VAD/STT/TTS/Memory/Intent; mẫu chỉ vẽ 4).
-- Nút "Thêm mới model" đúng vị trí/kiểu mẫu.
+1. **Panel trái — menu nhóm model** (panel trắng bo góc): danh sách dọc các nhóm, mỗi dòng
+   icon + tên (*Mô hình ngôn ngữ (LLM)*, *Phát hiện giọng nói (VAD)*, *Giọng nói thành văn
+   bản (STT)*, *Văn bản thành giọng nói (TTS)*), nhóm active có mũi tên → và nền nhấn.
+   Giữ đủ **6 nhóm thật** (thêm Memory/Intent; mẫu chỉ vẽ 4). Đây chính là restyle của
+   nav-panel/`activeTab` hiện có — logic chuyển tab giữ nguyên.
+2. **Panel phải — danh sách model** (panel trắng bo góc): mẫu vẽ header provider
+   (logo + tên "OpenAI", góc phải API-KEY + Setup + chấm trạng thái) và các hàng model
+   (tên `gpt-4o-mini`, tag loại `Chat`, icon xem, icon cấu hình, **toggle xanh** bật/tắt),
+   link "Thêm mới model" cuối danh sách.
+
+Quyết định đã duyệt (giữ nguyên): **giữ bảng `el-table`, không viết lại thành list mới** —
+vì bảng đang gánh switch enable, đặt mặc định, sửa/nhân bản/xóa, batch delete, phân trang.
+Cách dung hòa: **restyle bảng cho giống hàng model trong mẫu** — bỏ kẻ ô, hàng cao thoáng
+bo góc, cột tên kèm icon provider, tag loại, switch accent xanh `#08c45b`, cụm nút
+sửa/nhân bản/xóa thu thành icon như mẫu. Header provider gộp nhóm trong mẫu **không làm**
+(cần đổi script để group data — vi phạm nguyên tắc S2); thay bằng cột/nhãn provider
+trên từng hàng như hiện tại, style theo tông mẫu.
+
+- Nút "Thêm mới model" đúng vị trí/kiểu mẫu (cuối panel phải).
 - Dialog thêm/sửa model + dialog giọng TTS: giữ cấu trúc, tút màu/bo góc.
 - Route + query `?tab=` giữ nguyên (nơi khác đang link tới).
 
@@ -105,6 +117,13 @@ Chủ yếu restyle + sắp bố cục:
   waveform + nút gọi xanh + ô "Nhập tin nhắn…"); (3) panel **Instructions** (system
   prompt, nút "Tạo tự động", đếm Character/Token). Màn hẹp thì các cột xếp dọc.
 - Tab còn lại (Lịch sử/Tổng quan/Thiết bị): giữ component, tút card/màu/bo góc theo token.
+- **Panel Testing có 2 trạng thái** (đã xác nhận từ ảnh render 29 vs 30):
+  - *Chưa gọi* (artboard 30): vòng tròn trắng lớn có waveform tĩnh + nút gọi tròn xanh.
+  - *Đang gọi* (artboard 29): thanh waveform "Đang hoạt động" + nút ngắt máy đỏ trên đầu
+    panel, bong bóng chat hai chiều bên dưới.
+  - Cả 2 trạng thái: ô "Nhập tin nhắn…" + đếm ký tự + nút gửi tròn đen ở đáy.
+  - Map vào tính năng test chat live WebSocket hiện có; trạng thái nào tính năng thật
+    chưa có (vd waveform động) thì thể hiện tĩnh, không chế thêm logic.
 - Giữ đủ ngoài mẫu: FunctionDialog (plugins), ContextProviderDialog, 2 dialog Add Device,
   Memory/Intent, voiceprint...
 - Trước khi code: diff kỹ artboard 29 vs 30 để lấy đủ trạng thái.
