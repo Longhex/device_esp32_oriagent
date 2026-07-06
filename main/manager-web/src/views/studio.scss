@@ -1,0 +1,69 @@
+/* ============================================
+   Studio design tokens & shared shell styles
+   Reference: docs/compose/specs/assets/ui-studio/*.png
+   Import bằng @import "./studio.scss" trong <style lang="scss" scoped>
+   ============================================ */
+
+/* ---------- Tokens ---------- */
+$studio-accent: #08c45b;          /* xanh Oriagent */
+$studio-accent-soft: #dff5e8;     /* nền xanh nhạt cho item active / pill chọn model */
+$studio-text: #313133;            /* chữ chính */
+$studio-text-sub: #707070;        /* chữ phụ */
+$studio-black: #1a1a1c;           /* pill đen (nút chính) */
+$studio-page-bg: #e9e9e9;         /* nền ngoài cùng (xám) */
+$studio-panel-bg: #ffffff;        /* panel nổi */
+$studio-soft-bg: #f7f7f7;         /* nền phụ trong panel */
+$studio-border: #eeeeee;
+$studio-radius-panel: 18px;       /* bo góc panel nổi */
+$studio-radius-pill: 999px;
+$studio-gap: 12px;                /* khe giữa các panel nổi */
+$studio-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+/* ---------- Type scale (Roboto đã set global) ---------- */
+$studio-fs-title: 20px;   /* tiêu đề — dùng với weight 700 */
+$studio-fs-label: 20px;   /* nhãn — dùng với weight 500 */
+$studio-fs-body: 15px;    /* phụ — weight 400 */
+
+@mixin studio-title { font-size: $studio-fs-title; font-weight: 700; color: $studio-text; }
+@mixin studio-label { font-size: $studio-fs-label; font-weight: 500; color: $studio-text; }
+@mixin studio-body  { font-size: $studio-fs-body;  font-weight: 400; color: $studio-text-sub; }
+
+/* ---------- Panel nổi ---------- */
+@mixin studio-panel {
+  background: $studio-panel-bg;
+  border-radius: $studio-radius-panel;
+  box-shadow: $studio-shadow;
+  box-sizing: border-box;
+}
+
+/* ---------- Pill đen (nút hành động chính) ---------- */
+@mixin studio-black-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 18px;
+  border: none;
+  border-radius: $studio-radius-pill;
+  background: linear-gradient(180deg, #333335 0%, $studio-black 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  &:hover { background: linear-gradient(180deg, #3a3a3c 0%, #202022 100%); }
+  &:active { background: #111112; }
+}
+
+/* ---------- Pill xanh nhạt (giá trị được chọn) ---------- */
+@mixin studio-soft-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: $studio-radius-pill;
+  background: $studio-accent-soft;
+  color: $studio-text;
+  padding: 0 14px;
+  height: 40px;
+}
