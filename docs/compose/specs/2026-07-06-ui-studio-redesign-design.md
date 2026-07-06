@@ -105,13 +105,15 @@ Bố cục theo ảnh mẫu — 2 khối cạnh nhau trong khu nội dung:
    (tên `gpt-4o-mini`, tag loại `Chat`, icon xem, icon cấu hình, **toggle xanh** bật/tắt),
    link "Thêm mới model" cuối danh sách.
 
-Quyết định đã duyệt (giữ nguyên): **giữ bảng `el-table`, không viết lại thành list mới** —
-vì bảng đang gánh switch enable, đặt mặc định, sửa/nhân bản/xóa, batch delete, phân trang.
-Cách dung hòa: **restyle bảng cho giống hàng model trong mẫu** — bỏ kẻ ô, hàng cao thoáng
-bo góc, cột tên kèm icon provider, tag loại, switch accent xanh `#08c45b`, cụm nút
-sửa/nhân bản/xóa thu thành icon như mẫu. Header provider gộp nhóm trong mẫu **không làm**
-(cần đổi script để group data — vi phạm nguyên tắc S2); thay bằng cột/nhãn provider
-trên từng hàng như hiện tại, style theo tông mẫu.
+Quyết định đã duyệt: **giữ bảng `el-table`** (đang gánh switch enable, đặt mặc định,
+sửa/nhân bản/xóa, batch delete, phân trang) và **restyle cho giống hàng model trong mẫu** —
+bỏ kẻ ô, hàng cao thoáng bo góc, cột tên kèm icon provider, tag loại, switch accent xanh
+`#08c45b`, cụm nút sửa/nhân bản/xóa thu thành icon như mẫu.
+
+**Gộp nhóm theo provider (đã duyệt ngoại lệ S2):** được phép **THÊM 1 computed** trong
+script gộp danh sách model hiện có theo provider để render header khối provider như mẫu
+(logo + tên, góc phải API-KEY + Setup). Chỉ thêm mới, không sửa logic hiện hữu; mọi thao
+tác CRUD/switch/batch/phân trang phải test lại đủ sau thay đổi này.
 
 - Nút "Thêm mới model" đúng vị trí/kiểu mẫu (cuối panel phải).
 - Dialog thêm/sửa model + dialog giọng TTS: giữ cấu trúc, tút màu/bo góc.
