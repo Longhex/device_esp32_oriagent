@@ -1,41 +1,35 @@
 <template>
-  <div class="device-item card-clickable" @click="handleCardClick">
-    <div style="display: flex;justify-content: space-between;">
-    <el-tooltip :content="device.agentName" placement="top" effect="light">
-      <div class="device-item-title">
-        {{ device.agentName }}
+  <div class="studio-agent-card" @click="handleCardClick">
+    <div class="card-head">
+      <div class="card-avatar"><img src="@/assets/home/robot-avatar.png" class="card-avatar-img" alt="" /></div>
+      <div class="card-title-block">
+        <el-tooltip :content="device.agentName" placement="top" effect="light">
+          <div class="card-name">{{ device.agentName }}</div>
+        </el-tooltip>
+        <div class="card-sub">Agent</div>
       </div>
-    </el-tooltip>
-      <div>
-        <img src="@/assets/home/delete.png" alt="" style="width: 18px;height: 18px;margin-right: 10px;"
-          @click.stop="handleDelete" />
-        <el-tooltip class="item" effect="light" :content="device.systemPrompt" placement="top"
-          popper-class="custom-tooltip">
-          <img src="@/assets/home/info.png" alt="" style="width: 18px;height: 18px;" />
+      <div class="card-actions">
+        <img src="@/assets/home/delete.png" class="card-icon" @click.stop="handleDelete" />
+        <el-tooltip effect="light" :content="device.systemPrompt" placement="top" popper-class="custom-tooltip">
+          <img src="@/assets/home/info.png" class="card-icon" />
         </el-tooltip>
       </div>
     </div>
-    <div class="device-name">
-      {{ $t('home.languageModel') }}：{{ device.llmModelName }}
-    </div>
-    <div class="device-name">
-      {{ $t('home.voiceModel') }}：{{ device.ttsModelName }} ({{ device.ttsVoiceName }})
-    </div>
-    
-    <!-- Redesigned Mini Stats -->
-    <div class="device-stats-mini">
-        <span class="stat-tag"><i class="el-icon-monitor"></i> {{ device.deviceCount || 0 }} {{ $t('roleConfig.tabDevice') }}</span>
-        <span v-if="device.memModelId !== 'Memory_nomem'" class="stat-tag"><i class="el-icon-chat-dot-round"></i> History</span>
+
+    <div class="card-chips">
+      <div class="chip"><span class="chip-label"><i class="el-icon-microphone"></i> TTS</span><span class="chip-value">{{ device.ttsModelName }}</span></div>
+      <div class="chip"><span class="chip-label"><i class="el-icon-cpu"></i> LLM</span><span class="chip-value">{{ device.llmModelName }}</span></div>
+      <div class="chip"><span class="chip-label"><i class="el-icon-headset"></i> Voice</span><span class="chip-value">{{ device.ttsVoiceName }}</span></div>
     </div>
 
-    <div class="version-info">
-      <div>{{ $t('home.lastConversation') }}：{{ formattedLastConnectedTime }}</div>
-      <el-tooltip :content="tags.join()" placement="top" effect="light">
-        <div class="version-info-scroll">
-          {{ tags.join() }}
-        </div>
-      </el-tooltip>
+    <div class="card-foot">
+      <span class="foot-badge"><i class="el-icon-monitor"></i> {{ device.deviceCount || 0 }} {{ $t('roleConfig.tabDevice') }}</span>
+      <span v-if="device.memModelId !== 'Memory_nomem'" class="foot-badge"><i class="el-icon-chat-dot-round"></i> History</span>
+      <span class="foot-time">{{ formattedLastConnectedTime }}</span>
     </div>
+    <el-tooltip v-if="tags.length" :content="tags.join()" placement="top" effect="light">
+      <div class="card-tags">{{ tags.join() }}</div>
+    </el-tooltip>
   </div>
 </template>
 
@@ -44,8 +38,8 @@ export default {
   name: 'DeviceItem',
   props: {
     device: { type: Object, required: true },
-    featureStatus: { 
-      type: Object, 
+    featureStatus: {
+      type: Object,
       default: () => ({
         voiceprintRecognition: false,
         voiceClone: false,
@@ -92,82 +86,110 @@ export default {
 }
 </script>
 <style lang="scss" scoped>
-.device-item {
-  width: 100%;
-  border-radius: 20px;
-  background: white;
-  padding: 24px;
-  box-sizing: border-box;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  border: 1px solid #f0f2f5;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
-  
-  &-title {
-    flex: 1;
-    font-weight: bold;
-    font-size: 18px;
-    color: #313133;
-    text-align: left;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    overflow: hidden;
-  }
+@import "@/views/studio.scss";
 
-  &.card-clickable {
-    cursor: pointer;
-    &:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 24px rgba(0,0,0,0.08);
-      border-color: #08c45b;
-    }
-  }
+.studio-agent-card {
+  @include studio-panel;
+  border: 1px solid $studio-border;
+  padding: 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  &:hover { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); }
 }
 
-.device-name {
-  margin: 10px 0;
-  font-weight: 400;
-  font-size: 12px;
-  color: #64748b;
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-avatar {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.card-title-block {
+  min-width: 0;
+  flex: 1;
+}
+
+.card-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: $studio-text;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-align: left;
 }
 
-.device-stats-mini {
-    display: flex;
-    gap: 8px;
-    margin: 15px 0;
-    
-    .stat-tag {
-        font-size: 11px;
-        background: #f1f5f9;
-        color: #475569;
-        padding: 4px 10px;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        i { font-size: 12px; color: #94a3b8; }
-    }
+.card-sub {
+  font-size: 12px;
+  color: $studio-text-sub;
+  text-align: left;
 }
 
-.version-info {
+.card-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 15px;
-  font-size: 11px;
-  color: #979db1;
-  font-weight: 400;
-  padding-top: 15px;
-  border-top: 1px solid #f8fafc;
-  
-  &-scroll {
-    margin-left: 20px;
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: right;
+  gap: 8px;
+
+  .card-icon {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
   }
+}
+
+.card-chips {
+  display: flex;
+  gap: 8px;
+
+  .chip {
+    flex: 1;
+    background: $studio-soft-bg;
+    border-radius: 10px;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+
+    .chip-label { font-size: 11px; color: $studio-text-sub; }
+    .chip-label i { margin-right: 3px; font-size: 11px; }
+    .chip-value { font-size: 12px; font-weight: 600; color: $studio-text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  }
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+
+  .foot-badge { background: $studio-soft-bg; border-radius: 999px; padding: 3px 10px; font-size: 12px; color: $studio-text-sub; }
+  .foot-time { margin-left: auto; font-size: 11px; color: $studio-text-sub; }
+}
+
+.card-tags {
+  font-size: 11px;
+  color: $studio-text-sub;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
 }
 </style>
 

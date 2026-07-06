@@ -1,10 +1,13 @@
 <template>
   <div id="app">
-    <div v-if="isLoggedIn && !isAuthPage" class="app-layout">
+    <div v-if="isLoggedIn && !isAuthPage && !isStudioPage" class="app-layout">
       <SideBar />
       <div class="main-content">
         <router-view />
       </div>
+    </div>
+    <div v-else-if="isLoggedIn && isStudioPage" class="studio-page-layout">
+      <router-view />
     </div>
     <div v-else class="auth-layout">
       <router-view />
@@ -112,6 +115,12 @@ export default {
     isAuthPage() {
       const authPages = ['login', 'Register', 'RetrievePassword', 'welcome'];
       return authPages.includes(this.$route.name);
+    },
+    isStudioPage() {
+      // Mở dần theo từng đợt redesign: thêm 'ModelConfig' (Đợt 2), 'AgentConfig' (Đợt 3)
+      // khi màn tương ứng chuyển sang StudioLayout
+      const studioPages = ['home'];
+      return studioPages.includes(this.$route.name);
     }
   },
   created() {

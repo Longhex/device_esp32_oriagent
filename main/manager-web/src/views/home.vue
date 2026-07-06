@@ -1,86 +1,67 @@
 <template>
-  <div class="welcome">
-    <!-- 公共头部 -->
-    <el-main class="home-main">
-      <div class="home-content">
-        <!-- Hero Section -->
-        <div class="add-device">
-          <div class="add-device-bg">
-            <div class="hero-text-area">
-               <div class="greeting">{{ $t('home.greeting') }}</div>
-               <div class="wish">{{ $t('home.wish') }}</div>
-               <div class="hi-hint">Ready to manage your intelligent agents?</div>
-               
-               <div class="add-device-btn" @click="showAddDialog">
-                 <div class="left-add">{{ $t('home.addAgent') }}</div>
-               </div>
-            </div>
-          </div>
-        </div>
+  <StudioLayout active="agents" contextLabel="Agent Builder">
+    <div class="studio-topbar">
+      <div class="studio-search-wrap">
+        <el-input
+          v-model="search"
+          placeholder="Tìm kiếm Robot Agent"
+          class="studio-search-input"
+          @keyup.enter.native="handleSearch"
+          @focus="showHistory = true"
+          @blur="hideSearchHistory"
+          clearable
+          ref="searchInput">
+          <i slot="prefix" class="el-icon-search search-icon"></i>
+        </el-input>
 
-        <!-- Search & Filter Section -->
-        <div class="search-section">
-          <div class="search-wrapper">
-            <el-input 
-              v-model="search" 
-              :placeholder="$t('header.searchPlaceholder')" 
-              class="modern-search-input"
-              @keyup.enter.native="handleSearch"
-              @focus="showHistory = true"
-              @blur="hideSearchHistory"
-              clearable
-              ref="searchInput">
-              <i slot="prefix" class="el-icon-search search-icon"></i>
-            </el-input>
-            
-            <!-- Search History Dropdown -->
-            <div v-if="showHistory && searchHistory.length > 0" class="search-history-dropdown">
-               <div class="history-header">
-                  <span>{{ $t("header.searchHistory") }}</span>
-                  <el-button type="text" size="mini" @click="clearSearchHistory">{{ $t("header.clearHistory") }}</el-button>
-               </div>
-               <div class="history-list">
-                  <div v-for="(item, idx) in searchHistory" :key="idx" class="history-item" @mousedown="selectSearchHistory(item)">
-                     <span>{{ item }}</span>
-                     <i class="el-icon-close" @mousedown.stop="removeSearchHistory(idx)"></i>
-                  </div>
-               </div>
-            </div>
-          </div>
-          
-          <div v-if="isSearching" class="search-status">
-             <span class="status-badge">Searching: "{{ search }}"</span>
-             <el-button type="text" icon="el-icon-close" @click="handleSearchReset">Clear Results</el-button>
-          </div>
-        </div>
-
-        <!-- Agent Grid -->
-        <div class="device-list-container">
-          <template v-if="isLoading">
-            <div v-for="i in skeletonCount" :key="'skeleton-' + i" class="skeleton-item">
-              <div class="skeleton-image"></div>
-              <div class="skeleton-content">
-                <div class="skeleton-line"></div>
-                <div class="skeleton-line-short"></div>
+        <!-- Search History Dropdown -->
+        <div v-if="showHistory && searchHistory.length > 0" class="search-history-dropdown">
+           <div class="history-header">
+              <span>{{ $t("header.searchHistory") }}</span>
+              <el-button type="text" size="mini" @click="clearSearchHistory">{{ $t("header.clearHistory") }}</el-button>
+           </div>
+           <div class="history-list">
+              <div v-for="(item, idx) in searchHistory" :key="idx" class="history-item" @mousedown="selectSearchHistory(item)">
+                 <span>{{ item }}</span>
+                 <i class="el-icon-close" @mousedown.stop="removeSearchHistory(idx)"></i>
               </div>
-            </div>
-          </template>
-
-          <template v-else>
-            <DeviceItem v-for="(item, index) in devices" :key="index" :device="item" :feature-status="featureStatus" 
-              @configure="goToRoleConfig" @deviceManage="handleDeviceManage" @delete="handleDeleteAgent" 
-              @chat-history="handleShowChatHistory" />
-          </template>
+           </div>
         </div>
       </div>
-      <AddWisdomBodyDialog :visible.sync="addDeviceDialogVisible" @confirm="handleWisdomBodyAdded" />
-    </el-main>
+
+      <div class="studio-create-btn" @click="showAddDialog">Create Robot Agent</div>
+    </div>
+
+    <div class="studio-board">
+      <div v-if="isSearching" class="search-status">
+         <span class="status-badge">Searching: "{{ search }}"</span>
+         <el-button type="text" icon="el-icon-close" @click="handleSearchReset">Clear Results</el-button>
+      </div>
+
+      <template v-if="isLoading">
+        <div v-for="i in skeletonCount" :key="'skeleton-' + i" class="skeleton-item">
+          <div class="skeleton-image"></div>
+          <div class="skeleton-content">
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line-short"></div>
+          </div>
+        </div>
+      </template>
+
+      <template v-else>
+        <DeviceItem v-for="(item, index) in devices" :key="index" :device="item" :feature-status="featureStatus"
+          @configure="goToRoleConfig" @deviceManage="handleDeviceManage" @delete="handleDeleteAgent"
+          @chat-history="handleShowChatHistory" />
+      </template>
+    </div>
+
+    <AddWisdomBodyDialog :visible.sync="addDeviceDialogVisible" @confirm="handleWisdomBodyAdded" />
+    <chat-history-dialog :visible.sync="showChatHistory" :agent-id="currentAgentId" :agent-name="currentAgentName" />
+
     <el-footer>
       <version-footer />
     </el-footer>
-    <chat-history-dialog :visible.sync="showChatHistory" :agent-id="currentAgentId" :agent-name="currentAgentName" />
-  </div>
-
+  </StudioLayout>
 </template>
 
 <script>
@@ -88,12 +69,13 @@ import Api from '@/apis/api';
 import AddWisdomBodyDialog from '@/components/AddWisdomBodyDialog.vue';
 import ChatHistoryDialog from '@/components/ChatHistoryDialog.vue';
 import DeviceItem from '@/components/DeviceItem.vue';
+import StudioLayout from '@/components/StudioLayout.vue';
 import VersionFooter from '@/components/VersionFooter.vue';
 import featureManager from '@/utils/featureManager';
 
 export default {
   name: 'HomePage',
-  components: { DeviceItem, AddWisdomBodyDialog, VersionFooter, ChatHistoryDialog },
+  components: { DeviceItem, AddWisdomBodyDialog, VersionFooter, ChatHistoryDialog, StudioLayout },
   data() {
     return {
       addDeviceDialogVisible: false,
@@ -154,7 +136,7 @@ export default {
         knowledgeBase: config.knowledgeBase
       };
     },
-    
+
     showAddDialog() {
       this.addDeviceDialogVisible = true
     },
@@ -223,124 +205,70 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-.welcome {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  width: 100%;
-  background: #f8fafc;
-}
+@import "./studio.scss";
 
-.home-main {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.home-content {
-  max-width: 1440px;
-  width: 96%;
-  margin: 0 auto;
-  padding: 40px 0;
-}
-
-.add-device {
-  height: 240px;
-  border-radius: 24px;
-  overflow: hidden;
-  margin-bottom: 40px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
-}
-
-.add-device-bg {
-  width: 100%;
-  height: 100%;
-  background-image: url("@/assets/home/banner.jpeg");
-  background-size: cover;
-  background-position: center;
+.studio-topbar {
+  @include studio-panel;
   display: flex;
   align-items: center;
-  padding: 0 60px;
-  
-  .hero-text-area {
-     text-align: left;
-     .greeting { font-size: 36px; font-weight: 800; color: #313133; }
-     .wish { font-size: 18px; font-weight: 500; color: #64748b; margin-bottom: 8px; }
-     .hi-hint { font-size: 14px; color: #94a3b8; margin-bottom: 24px; font-style: italic; }
-  }
+  justify-content: flex-end;
+  gap: 20px;
+  padding: 12px 16px;
 }
 
-.add-device-btn {
-  display: inline-flex;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  
-  &:hover { 
-    transform: translateY(-1px);
-    .left-add {
-      background: #22c55e; // Modern green highlight on hover
-      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
-    }
-  }
-  
-  &:active { transform: translateY(0); }
+.studio-search-wrap {
+  position: relative;
+  width: 360px;
+}
 
-  .left-add {
-    padding: 6px 20px;
-    height: 34px;
-    border-radius: 17px;
-    background: #000;
-    color: #fff;
+.studio-search-input ::v-deep .el-input__inner {
+  height: 42px;
+  line-height: 42px;
+  border-radius: 999px;
+  background: $studio-soft-bg;
+  border: 1px solid $studio-border;
+  padding-left: 38px;   /* chừa chỗ icon */
+}
+
+.studio-search-input ::v-deep .el-input__prefix {
+  display: flex;
+  align-items: center;
+  left: 12px;
+}
+
+.studio-search-input ::v-deep .el-input__icon {
+  line-height: 42px;
+}
+
+.studio-create-btn {
+  @include studio-black-pill;
+}
+
+.studio-board {
+  @include studio-panel;
+  background: $studio-soft-bg;
+  flex: 1;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  align-content: start;
+}
+
+.search-status {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  .status-badge {
+    background: $studio-soft-bg;
+    padding: 4px 12px;
+    border-radius: 20px;
     font-size: 13px;
     font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
+    color: $studio-text-sub;
   }
-}
-
-.search-section {
-  margin-bottom: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  
-  .search-wrapper {
-    position: relative;
-    max-width: 600px;
-  }
-  
-  .search-status {
-     display: flex;
-     align-items: center;
-     gap: 12px;
-     .status-badge {
-        background: #f1f5f9;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 13px;
-        font-weight: 600;
-        color: #475569;
-     }
-  }
-}
-
-::v-deep .modern-search-input {
-  .el-input__inner {
-    height: 48px;
-    border-radius: 16px;
-    background: white;
-    border: 1px solid #f1f5f9;
-    padding-left: 45px;
-    font-size: 15px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    transition: all 0.2s;
-    
-    &:focus { border-color: #08c45b; box-shadow: 0 10px 15px -3px rgba(8, 196, 91, 0.1); }
-  }
-  
-  .search-icon { position: absolute; left: 15px; top: 14px; font-size: 18px; color: #94a3b8; }
 }
 
 .search-history-dropdown {
@@ -348,27 +276,27 @@ export default {
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  background: white;
-  border: 1px solid #f1f5f9;
+  background: $studio-panel-bg;
+  border: 1px solid $studio-border;
   border-radius: 16px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   z-index: 1000;
   overflow: hidden;
-  
+
   .history-header {
     padding: 12px 16px;
-    background: #f8fafc;
+    background: $studio-soft-bg;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    span { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+    span { font-size: 11px; font-weight: 700; color: $studio-text-sub; text-transform: uppercase; letter-spacing: 0.05em; }
   }
-  
+
   .history-list {
     max-height: 240px;
     overflow-y: auto;
   }
-  
+
   .history-item {
     padding: 12px 16px;
     display: flex;
@@ -376,32 +304,26 @@ export default {
     align-items: center;
     cursor: pointer;
     transition: background 0.2s;
-    
-    &:hover { background: #f1f5f9; }
-    span { font-size: 14px; color: #334155; }
-    i { color: #94a3b8; font-size: 14px; padding: 4px; &:hover { color: #ef4444; } }
+
+    &:hover { background: $studio-soft-bg; }
+    span { font-size: 14px; color: $studio-text; }
+    i { color: $studio-text-sub; font-size: 14px; padding: 4px; &:hover { color: #ef4444; } }
   }
 }
 
-.device-list-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 24px;
-}
-
 .skeleton-item {
-  background: #fff;
-  border-radius: 20px;
+  background: $studio-soft-bg;
+  border-radius: 14px;
   padding: 24px;
   height: 140px;
-  border: 1px solid #f1f5f9;
+  border: 1px solid $studio-border;
   position: relative;
   overflow: hidden;
 }
 
 .skeleton-line-short {
   height: 12px;
-  background: #f0f2f5;
+  background: #eaeaea;
   border-radius: 4px;
   width: 50%;
 }
@@ -415,7 +337,7 @@ export default {
   height: 100%;
   background: linear-gradient(90deg,
       rgba(255, 255, 255, 0),
-      rgba(255, 255, 255, 0.3),
+      rgba(255, 255, 255, 0.5),
       rgba(255, 255, 255, 0));
   animation: shimmer 1.5s infinite;
 }

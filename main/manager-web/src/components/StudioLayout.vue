@@ -109,12 +109,19 @@ export default {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   padding: 18px 14px;
   position: sticky;
   top: $studio-gap;
   height: calc(100vh - #{$studio-gap * 2});
+  overflow: hidden; /* phần cuộn nằm ở .studio-sidebar-top */
+}
+
+/* Nhóm nav cuộn khi màn thấp; đáy (Guide/My Account) luôn ghim, không bị che */
+.studio-sidebar-top {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden; /* chặn thanh cuộn ngang vắt qua đáy nav (che Guide Document) */
 
   &::-webkit-scrollbar {
     width: 4px;
@@ -170,9 +177,11 @@ export default {
 }
 
 .studio-sidebar-bottom {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding-top: 12px;
 }
 
 .studio-guide-btn {

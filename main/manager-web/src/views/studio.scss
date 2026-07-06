@@ -44,6 +44,7 @@ $studio-fs-body: 15px;    /* phụ — weight 400 */
   gap: 8px;
   height: 36px;
   padding: 0 18px;
+  box-sizing: border-box; /* để width:100% không tràn ngang (nút Guide Document) */
   border: none;
   border-radius: $studio-radius-pill;
   background: linear-gradient(180deg, #333335 0%, $studio-black 100%);
