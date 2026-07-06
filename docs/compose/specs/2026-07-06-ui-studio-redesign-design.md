@@ -68,8 +68,11 @@ xanh nhạt + chữ/icon xanh; nút hành động chính là pill **đen** chữ
     Mục trỏ tới trang chưa redesign điều hướng về route cũ (giao diện cũ) — chấp nhận được.
   - Slot nội dung cho từng màn.
 - `src/views/studio.scss` — design tokens lấy từ XD, 3 màn cùng import (mô hình như `auth.scss`):
-  - Accent xanh `#08c45b`; chữ chính `#313133`, phụ `#707070`, đen `#000`;
-    nền panel `#fefefe`/`#ffffff`, nền trang `#fbfbfb`, nền phụ `#f7f7f7`, viền `#eeeeee`.
+  - Accent xanh `#08c45b`; chữ chính `#313133`, phụ `#707070`; pill đen = gradient
+    `#333335 → #1a1a1c` (đồng bộ nút login đã duyệt); nền panel `#ffffff`, nền trang
+    xám `#e9e9e9` (theo ảnh render — panel trắng phải "nổi" được), nền phụ `#f7f7f7`,
+    viền `#eeeeee`. *(Sửa 2026-07-06: bản đầu ghi đen `#000`/nền trang `#fbfbfb` theo
+    fill XD thô — ảnh render cho thấy không đúng.)*
   - Font: Roboto — tiêu đề Bold 20px, nhãn Medium 20px, phụ Regular 15px
     (HelveticaNeue-Medium 15px trong mẫu thay bằng Roboto Medium 15px, đồng bộ với login).
   - Mọi class mới prefix `studio-` / scoped trong view, **không sửa `global.scss`**.
