@@ -54,13 +54,17 @@ xanh nhạt + chữ/icon xanh; nút hành động chính là pill **đen** chữ
     2. Pill ngữ cảnh nền xám nhạt, icon robot: nhãn "Agent Builder" (mẫu ghi "Agent
        Buider"/"Agent Robot Buider" — lỗi chính tả trong mẫu, ta dùng "Agent Builder").
     3. Nhóm **AgentOS**: Robot Agent (active nền xanh nhạt + chữ xanh khi ở Home/AgentConfig).
-    4. Nhóm **AgentCore**: Model AI, Knowledge. (Integration trong mẫu — app chưa có → bỏ.)
+    4. Nhóm **AgentCore**: Model AI, Knowledge, Integration — hiển thị đủ 3 mục như mẫu,
+       nhưng **Knowledge và Integration tạm để trống** (quyết định 2026-07-06): chỉ hiển
+       thị, không điều hướng đi đâu (disabled, không đổi con trỏ/không active). Khi nào
+       có trang mới cho 2 mục này thì gắn route sau. Trang Knowledge cũ vẫn truy cập được
+       qua route cũ `/knowledge-base-management`, chỉ là không link từ sidebar mới.
     5. Nhãn nhóm **AgentSetting**: Thiết lập.
     6. Đáy sidebar: nút **Guide Document** (pill đen) + **My Account** (menu tài khoản
        hiện có — đổi chỗ từ header cũ xuống đây).
   - **Không có topbar** — Guide Document/My Account nằm đáy sidebar theo mẫu.
   - Mapping route: Robot Agent → `/home`; Model AI → `/model-config`;
-    Knowledge → `/knowledge-base-management`; Thiết lập → `/params-management`.
+    Knowledge → *(để trống)*; Integration → *(để trống)*; Thiết lập → `/params-management`.
     Mục trỏ tới trang chưa redesign điều hướng về route cũ (giao diện cũ) — chấp nhận được.
   - Slot nội dung cho từng màn.
 - `src/views/studio.scss` — design tokens lấy từ XD, 3 màn cùng import (mô hình như `auth.scss`):
