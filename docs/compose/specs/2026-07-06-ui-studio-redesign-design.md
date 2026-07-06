@@ -32,15 +32,19 @@ trong sidebar mẫu (app chưa có tính năng này).
 
 Thành phần **mới** (không sửa cái cũ):
 
-- `src/components/StudioLayout.vue` — shell dùng chung:
-  - Sidebar trái ~280px: logo Oriagent trên cùng; nhóm **AgentOS** (Robot Agent, Knowledge,
-    Thiết lập), nhóm **AgentCore** (AgentSetting, Model AI). Mục active màu accent.
+- `src/components/StudioLayout.vue` — shell dùng chung (cấu trúc theo ảnh mẫu):
+  - Sidebar trái ~280px, từ trên xuống:
+    1. Logo Oriagent — dùng lại `@/assets/auth/logo.svg` (logo màn login, không thêm asset).
+    2. Pill "Agent Builder" (nhãn tiêu đề khu vực, nền xám nhạt).
+    3. Nhóm **AgentOS**: Robot Agent (active nền xanh nhạt + chữ xanh khi ở Home/AgentConfig).
+    4. Nhóm **AgentCore**: Model AI, Knowledge. (Integration trong mẫu — app chưa có → bỏ.)
+    5. Nhãn nhóm **AgentSetting**: Thiết lập.
+    6. Đáy sidebar: nút **Guide Document** (pill đen) + **My Account** (menu tài khoản
+       hiện có — đổi chỗ từ header cũ xuống đây).
+  - **Không có topbar** — Guide Document/My Account nằm đáy sidebar theo mẫu.
+  - Mapping route: Robot Agent → `/home`; Model AI → `/model-config`;
+    Knowledge → `/knowledge-base-management`; Thiết lập → `/params-management`.
     Mục trỏ tới trang chưa redesign điều hướng về route cũ (giao diện cũ) — chấp nhận được.
-  - Mapping sidebar → route: Robot Agent → `/home`; Knowledge → `/knowledge-base-management`;
-    Model AI → `/model-config`; Thiết lập → `/params-management`; AgentSetting →
-    `/agent-template-management`. Mục không có route tương ứng rõ ràng → bỏ khỏi sidebar
-    (cùng quy tắc với Integration).
-  - Topbar: Guide Document + My Account (menu tài khoản hiện có).
   - Slot nội dung cho từng màn.
 - `src/views/studio.scss` — design tokens lấy từ XD, 3 màn cùng import (mô hình như `auth.scss`):
   - Accent xanh `#08c45b`; chữ chính `#313133`, phụ `#707070`, đen `#000`;
@@ -54,15 +58,16 @@ Nhánh git: commit phần login đang dở trên `fix/live-test-websocket` trư�
 
 ## [S4] Đợt 1 — Màn Home (artboard 28) → `home.vue`
 
-Bố cục: bọc `StudioLayout` (Robot Agent active). Hàng tiêu đề: chữ "Robot Agent" +
-ô "Tìm kiếm Robot Agent" (bo tròn, nền `#f7f7f7`) + nút "Create Robot Agent". Lưới card
-trên nền `#fbfbfb`, card trắng bo góc lớn, bóng nhẹ. Banner hero cũ gọn lại thành hàng
-tiêu đề; lời chào thành dòng phụ nhỏ.
+Bố cục theo ảnh mẫu: bọc `StudioLayout` (Robot Agent active). Hàng trên cùng khu nội dung:
+ô "Tìm kiếm Robot Agent" (bo tròn trắng, icon kính lúp) + nút **"Create Robot Agent"**
+(pill đen, chữ trắng) sát mép phải. Lưới card trên nền xám nhạt, card trắng bo góc lớn,
+bóng nhẹ. Banner hero cũ bỏ, thay bằng hàng search + Create như mẫu.
 
-Card agent (restyle `DeviceItem.vue`) theo mẫu: tên agent, mô tả từ `systemPrompt`,
-chip LLM / TTS / STT, badge "N Thiết bị". **Giữ đủ ngoài mẫu:** nút xóa, tooltip info,
-tên model + giọng TTS cụ thể, tag History (khi có memory), thời gian hội thoại gần nhất,
-tags firmware, skeleton loading, search-history dropdown.
+Card agent (restyle `DeviceItem.vue`) theo ảnh mẫu: avatar robot tròn (nền xanh) góc trái,
+tên agent đậm + dòng phụ "Agent", hàng chip **TTS / LLM / STT** (mỗi chip: nhãn loại +
+tên provider kèm icon), badge **"N Thiết bị"** ở chân card. **Giữ đủ ngoài mẫu:** nút xóa,
+tooltip info systemPrompt, giọng TTS cụ thể, tag History (khi có memory), thời gian hội
+thoại gần nhất, tags firmware, skeleton loading, search-history dropdown.
 
 Chip STT: chỉ hiển thị nếu payload agent sẵn có trường model STT; thiếu thì ẩn chip —
 không sửa backend.
@@ -90,10 +95,16 @@ Cấu trúc thật đã gần mẫu: `AgentConfigTabs` có đúng tab (Setup/T�
 Chủ yếu restyle + sắp bố cục:
 
 - Bọc `StudioLayout` (Robot Agent active — màn con).
-- Thanh tab restyle (pill/underline accent), giữ logic tab + nút Lưu + Back.
-- Tab Setup: 2 cột như mẫu — trái form (`RoleConfigSection`), phải panel Testing;
-  màn hẹp thì cột phải xuống dưới.
-- Tab còn lại: giữ component, tút card/màu/bo góc theo token.
+- Header khu nội dung theo ảnh mẫu: nút **back** (mũi tên tròn) + dãy **tab pill**
+  (Thiết lập Robot / Lịch sử & Nhật ký / Tổng quan / Thiết bị — tab active pill đen) +
+  nút **"Xuất bản"** (pill đen) sát phải — map vào nút Lưu hiện có (giữ logic
+  `handleSaveAll`, chỉ đổi nhãn/kiểu theo mẫu).
+- Tab "Thiết lập Robot": **3 cột như ảnh mẫu** — (1) form cấu hình (`RoleConfigSection`:
+  tên agent, Model AI (LLM), API Key, VAD, STT, TTS + Language/Voice Type, Câu đệm suy
+  nghĩ với thời gian chờ ms); (2) panel **Testing** (test chat live WebSocket: vòng
+  waveform + nút gọi xanh + ô "Nhập tin nhắn…"); (3) panel **Instructions** (system
+  prompt, nút "Tạo tự động", đếm Character/Token). Màn hẹp thì các cột xếp dọc.
+- Tab còn lại (Lịch sử/Tổng quan/Thiết bị): giữ component, tút card/màu/bo góc theo token.
 - Giữ đủ ngoài mẫu: FunctionDialog (plugins), ContextProviderDialog, 2 dialog Add Device,
   Memory/Intent, voiceprint...
 - Trước khi code: diff kỹ artboard 29 vs 30 để lấy đủ trạng thái.
