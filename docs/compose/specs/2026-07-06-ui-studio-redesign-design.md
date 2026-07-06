@@ -18,6 +18,16 @@ Nguồn mẫu: file Adobe XD đã giải nén tại
 (UserManagement, OTA, Dict, VoiceClone, ...), mọi thay đổi backend/API, mục "Integration"
 trong sidebar mẫu (app chưa có tính năng này).
 
+**Ảnh tham chiếu chuẩn** (đối chiếu khi code, tại `docs/compose/specs/assets/ui-studio/`):
+
+| File | Màn |
+|---|---|
+| `login-1.png` | Login (đã làm) |
+| `home-28.png` | Home — danh sách Robot Agent |
+| `model-ai-31.png` | Model AI |
+| `agent-config-30-idle.png` (+`-alt`) | Thiết lập Robot — trạng thái chưa gọi |
+| `agent-config-29-incall.png` | Thiết lập Robot — trạng thái đang gọi (có chat) |
+
 ## [S2] Nguyên tắc bất di bất dịch
 
 1. **Chức năng là chuẩn, mẫu là skin.** Giữ 100% chức năng hiện có. Chức năng mẫu không vẽ
@@ -32,10 +42,17 @@ trong sidebar mẫu (app chưa có tính năng này).
 
 Thành phần **mới** (không sửa cái cũ):
 
+**Ngôn ngữ thị giác chung (từ ảnh mẫu):** toàn trang là các **panel trắng bo góc lớn
+"nổi"** trên nền xám nhạt, có khe hở đều giữa sidebar và các panel nội dung (không phải
+layout dính liền như hiện tại). Mọi control dạng pill bo tròn; active/selected dùng nền
+xanh nhạt + chữ/icon xanh; nút hành động chính là pill **đen** chữ trắng.
+
 - `src/components/StudioLayout.vue` — shell dùng chung (cấu trúc theo ảnh mẫu):
-  - Sidebar trái ~280px, từ trên xuống:
+  - Sidebar trái ~280px (panel trắng bo góc, có icon thu gọn cạnh logo — icon hiển thị
+    tĩnh, chức năng thu gọn chỉ làm nếu không đụng logic), từ trên xuống:
     1. Logo Oriagent — dùng lại `@/assets/auth/logo.svg` (logo màn login, không thêm asset).
-    2. Pill "Agent Builder" (nhãn tiêu đề khu vực, nền xám nhạt).
+    2. Pill ngữ cảnh nền xám nhạt, icon robot: nhãn "Agent Builder" (mẫu ghi "Agent
+       Buider"/"Agent Robot Buider" — lỗi chính tả trong mẫu, ta dùng "Agent Builder").
     3. Nhóm **AgentOS**: Robot Agent (active nền xanh nhạt + chữ xanh khi ở Home/AgentConfig).
     4. Nhóm **AgentCore**: Model AI, Knowledge. (Integration trong mẫu — app chưa có → bỏ.)
     5. Nhãn nhóm **AgentSetting**: Thiết lập.
@@ -111,11 +128,17 @@ Chủ yếu restyle + sắp bố cục:
   (Thiết lập Robot / Lịch sử & Nhật ký / Tổng quan / Thiết bị — tab active pill đen) +
   nút **"Xuất bản"** (pill đen) sát phải — map vào nút Lưu hiện có (giữ logic
   `handleSaveAll`, chỉ đổi nhãn/kiểu theo mẫu).
-- Tab "Thiết lập Robot": **3 cột như ảnh mẫu** — (1) form cấu hình (`RoleConfigSection`:
-  tên agent, Model AI (LLM), API Key, VAD, STT, TTS + Language/Voice Type, Câu đệm suy
-  nghĩ với thời gian chờ ms); (2) panel **Testing** (test chat live WebSocket: vòng
-  waveform + nút gọi xanh + ô "Nhập tin nhắn…"); (3) panel **Instructions** (system
-  prompt, nút "Tạo tự động", đếm Character/Token). Màn hẹp thì các cột xếp dọc.
+- Tab "Thiết lập Robot": **3 cột như ảnh mẫu** — mỗi cột 1 panel trắng bo góc:
+  1. **Form cấu hình** (`RoleConfigSection` restyle): tiêu đề tên agent; các mục có icon +
+     nhãn đậm: *Model AI (LLM)* (hàng model trắng: icon + tên + tag Chat + icon mắt/chỉnh),
+     *API Key* (pill nền xanh nhạt chứa key), *Phát hiện giọng nói* và *Nhận diện giọng
+     nói (STT)* (pill chọn model nền xanh nhạt), *Văn bản thành giọng nói* (card viền xanh:
+     pill model + 2 select **Language / Voice Type**), *Câu đệm suy nghĩ* (card xanh nhạt:
+     pill "Thời gian chờ (ms)" + textarea câu đệm).
+  2. **Panel Testing** (test chat live WebSocket) — 2 trạng thái ở mục dưới.
+  3. **Panel Instructions**: header + nút gear + pill đen "Tạo tự động"; vùng soạn system
+     prompt lớn; chân panel: `Character: N` (trái) + `Token prompt: N` (phải).
+  Màn hẹp thì các cột xếp dọc.
 - Tab còn lại (Lịch sử/Tổng quan/Thiết bị): giữ component, tút card/màu/bo góc theo token.
 - **Panel Testing có 2 trạng thái** (đã xác nhận từ ảnh render 29 vs 30):
   - *Chưa gọi* (artboard 30): vòng tròn trắng lớn có waveform tĩnh + nút gọi tròn xanh.
