@@ -40,6 +40,12 @@ Knowledge/Integration hiển thị như mẫu nhưng tạm để trống — xem
 
 ## [S3] Kiến trúc: shell dùng chung (Hướng A đã chọn)
 
+**Ngoại lệ S2 #2 (anh duyệt 2026-07-06):** `App.vue` đang render sidebar cũ toàn cục
+(`<SideBar/>` + `margin-left: 240px`) cho mọi route sau đăng nhập → route studio sẽ bị
+2 sidebar chồng nhau. Được phép THÊM vào `App.vue`: 1 computed `isStudioPage` (danh sách
+tên route studio) + 1 nhánh template render `<router-view/>` trần cho các route đó.
+Không sửa logic hiện hữu; màn cũ giữ nguyên shell cũ.
+
 Thành phần **mới** (không sửa cái cũ):
 
 **Ngôn ngữ thị giác chung (từ ảnh mẫu):** toàn trang là các **panel trắng bo góc lớn
