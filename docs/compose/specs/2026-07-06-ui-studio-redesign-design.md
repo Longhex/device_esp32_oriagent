@@ -15,8 +15,8 @@ Nguồn mẫu: file Adobe XD đã giải nén tại
 | Home - Studio – 29, 30 | Thiết lập Robot (2 biến thể trạng thái) | `AgentConfig.vue` | Đợt 3 |
 
 **Ngoài phạm vi:** màn Quên mật khẩu (`retrievePassword.vue`), ~17 màn admin không có mẫu
-(UserManagement, OTA, Dict, VoiceClone, ...), mọi thay đổi backend/API, mục "Integration"
-trong sidebar mẫu (app chưa có tính năng này).
+(UserManagement, OTA, Dict, VoiceClone, ...), mọi thay đổi backend/API. Mục sidebar
+Knowledge/Integration hiển thị như mẫu nhưng tạm để trống — xem [S3].
 
 **Ảnh tham chiếu chuẩn** (đối chiếu khi code, tại `docs/compose/specs/assets/ui-studio/`):
 
