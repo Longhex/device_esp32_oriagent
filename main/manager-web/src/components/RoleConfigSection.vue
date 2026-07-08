@@ -138,6 +138,12 @@
             <div class="filler-header-row">
               <label class="field-label-premium">
                 <span class="studio-ic studio-ic--voice label-icon"></span> Câu đệm suy nghĩ
+                <i
+                  :class="fillerPlaying ? 'el-icon-loading' : 'el-icon-video-play'"
+                  class="filler-play-btn"
+                  title="Nghe thử câu đệm bằng giọng agent"
+                  @click.stop.prevent="playFiller"
+                ></i>
               </label>
               <el-switch
                 v-model="form.fillerEnabled"
@@ -288,7 +294,8 @@ export default {
       isLiveTesting: false,
       testLoading: false,
       internalLanguage: this.selectedLanguage,
-      showSystemPrompt: false
+      showSystemPrompt: false,
+      fillerPlaying: false
     };
   },
   computed: {
@@ -338,6 +345,30 @@ export default {
     onFillerToggle(val) {
       if (val === 1 && (this.form.fillerDelayMs == null || this.form.fillerDelayMs === '')) {
         this.$set(this.form, 'fillerDelayMs', 700);
+      }
+    },
+    // Nghe thử câu đệm bằng ĐÚNG giọng agent (render server-side qua /mcp/filler/preview).
+    // QUAN TRỌNG: gọi play() ĐỒNG BỘ ngay trong click (cho <audio> tự tải URL) để
+    // KHÔNG mất user-gesture → tránh Chrome chặn autoplay. Đừng await fetch trước play().
+    playFiller() {
+      if (this.fillerPlaying) return;
+      const first = (this.form.fillerPhrases || '')
+        .split('\n').map(s => s.trim()).filter(Boolean)[0] || 'Ừm, để mình nghĩ xíu nha';
+      const url = `/mcp/filler/preview?mac=${encodeURIComponent(this.testDeviceMac)}`
+        + `&text=${encodeURIComponent(first)}&t=${Date.now()}`;
+      this.fillerPlaying = true;
+      const audio = new Audio(url);
+      audio.onended = () => { this.fillerPlaying = false; };
+      audio.onerror = () => {
+        this.fillerPlaying = false;
+        this.$message.warning('Nghe thử thất bại — mở "Testing" một lần để khởi tạo thiết bị rồi thử lại.');
+      };
+      const p = audio.play();
+      if (p && p.catch) {
+        p.catch((err) => {
+          this.fillerPlaying = false;
+          this.$message.error('Không phát được: ' + (err && err.message ? err.message : err));
+        });
       }
     },
     // Bật/tắt test trực tiếp. Khi bật: đảm bảo MAC test riêng của agent đã được bind, RỒI mới mở iframe.
@@ -587,6 +618,15 @@ $ori-border: #f1f5f9;
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  .filler-play-btn {
+    margin-left: 8px;
+    font-size: 18px;
+    color: $ori-green;
+    cursor: pointer;
+    transition: transform 0.15s;
+    &:hover { transform: scale(1.15); }
   }
 
   .filler-field {

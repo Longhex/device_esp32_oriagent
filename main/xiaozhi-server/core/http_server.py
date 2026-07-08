@@ -3,6 +3,7 @@ from aiohttp import web
 from config.logger import setup_logging
 from core.api.ota_handler import OTAHandler
 from core.api.vision_handler import VisionHandler
+from core.api.filler_preview_handler import FillerPreviewHandler
 
 TAG = __name__
 
@@ -13,6 +14,7 @@ class SimpleHttpServer:
         self.logger = setup_logging()
         self.ota_handler = OTAHandler(config)
         self.vision_handler = VisionHandler(config)
+        self.filler_preview_handler = FillerPreviewHandler(config)
 
     def _get_websocket_url(self, local_ip: str, port: int, request: web.Request = None) -> str:
         """获取websocket地址
@@ -77,6 +79,13 @@ class SimpleHttpServer:
                         ),
                         web.options(
                             "/mcp/vision/explain", self.vision_handler.handle_options
+                        ),
+                        # Nghe thử câu đệm (filler) — chỉ để test trên manager-web
+                        web.get(
+                            "/mcp/filler/preview", self.filler_preview_handler.handle_get
+                        ),
+                        web.post(
+                            "/mcp/filler/preview", self.filler_preview_handler.handle_post
                         ),
                     ]
                 )
