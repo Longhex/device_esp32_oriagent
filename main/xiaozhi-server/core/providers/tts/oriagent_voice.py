@@ -209,11 +209,11 @@ class TTSProvider(TTSProviderBase):
                     self.playback_queue.task_done()
                     continue
 
-                if not (isinstance(item, tuple) and len(item) == 4):
+                if not (isinstance(item, tuple) and len(item) == 5):
                     self.playback_queue.task_done()
                     continue
 
-                idx, is_first, segment_text, session_id = item
+                idx, is_first, segment_text, session_id, seg_end_offset = item
                 task_id = f"{session_id}_{idx}"
 
                 if self.current_session_id != session_id:
@@ -235,6 +235,11 @@ class TTSProvider(TTSProviderBase):
                     if not seg_text_sent and segment_text and segment_text.strip():
                         await send_tts_message(self.conn, "sentence_start", segment_text)
                         seg_text_sent = True
+                        # Show ảnh gắn với vị trí <= cuối segment này -> đồng bộ audio.
+                        try:
+                            self.conn.fire_pending_images_up_to(seg_end_offset)
+                        except Exception as _e:
+                            logger.bind(tag=TAG).warning(f"fire_pending_images lỗi: {_e}")
 
                 seg_queue = self.segment_queues.get(task_id)
                 if not seg_queue:
@@ -619,6 +624,9 @@ class TTSProvider(TTSProviderBase):
                         segment = self._get_smart_segment()
                         if not segment:
                             break
+                        # offset cuối segment trong text-vào-TTS (cùng hệ đếm với
+                        # connection._tts_emitted_chars) -> để show ảnh đúng lúc segment phát.
+                        seg_end_offset = self.processed_chars
                         segment = MarkdownCleaner.clean_markdown(segment)
                         if not segment:
                             continue
@@ -627,7 +635,7 @@ class TTSProvider(TTSProviderBase):
                         task_id = f"{self.current_session_id}_{idx}"
                         self.segment_queues[task_id] = asyncio.Queue()
                         asyncio.run_coroutine_threadsafe(
-                            self.playback_queue.put((idx, idx == 0, segment, self.current_session_id)),
+                            self.playback_queue.put((idx, idx == 0, segment, self.current_session_id, seg_end_offset)),
                             self.conn.loop,
                         )
                         # segment0: thêm 2 khoảng trắng đầu câu cho TTS (warm-up, tránh clip âm
@@ -645,7 +653,7 @@ class TTSProvider(TTSProviderBase):
                         task_id = f"{self.current_session_id}_{idx}"
                         self.segment_queues[task_id] = asyncio.Queue()
                         asyncio.run_coroutine_threadsafe(
-                            self.playback_queue.put((idx, idx == 0, remaining, self.current_session_id)),
+                            self.playback_queue.put((idx, idx == 0, remaining, self.current_session_id, len(full_text))),
                             self.conn.loop,
                         )
                         fetch_text = "  " + remaining if idx == 0 else remaining

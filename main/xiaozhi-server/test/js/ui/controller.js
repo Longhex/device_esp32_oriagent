@@ -1,8 +1,8 @@
 // UI controller module
-import { loadConfig, saveConfig } from '../config/manager.js?v=0205';
-import { getAudioPlayer } from '../core/audio/player.js?v=0205';
-import { getAudioRecorder } from '../core/audio/recorder.js?v=0205';
-import { getWebSocketHandler } from '../core/network/websocket.js?v=0205';
+import { loadConfig, saveConfig } from '../config/manager.js?v=0209';
+import { getAudioPlayer } from '../core/audio/player.js?v=0209';
+import { getAudioRecorder } from '../core/audio/recorder.js?v=0209';
+import { getWebSocketHandler } from '../core/network/websocket.js?v=0209';
 
 // UI controller class
 class UIController {
@@ -20,6 +20,7 @@ class UIController {
         this.initEventListeners = this.initEventListeners.bind(this);
         this.updateDialButton = this.updateDialButton.bind(this);
         this.addChatMessage = this.addChatMessage.bind(this);
+        this.addChatImage = this.addChatImage.bind(this);
         this.switchBackground = this.switchBackground.bind(this);
         this.switchLive2DModel = this.switchLive2DModel.bind(this);
         this.showModal = this.showModal.bind(this);
@@ -445,6 +446,31 @@ class UIController {
         chatStream.scrollTop = chatStream.scrollHeight;
     }
 
+    // Hiển thị ảnh do server gửi (cmd:show_image). Dựng DOM bằng createElement,
+    // KHÔNG innerHTML — url do LLM sinh, tránh XSS. Ảnh hỏng thì gỡ bubble.
+    addChatImage(url) {
+        const chatStream = document.getElementById('chatStream');
+        if (!chatStream) return;
+        if (!url || !/^https?:\/\//i.test(url)) return;
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'chat-message ai';
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = '';
+        img.style.maxWidth = '100%';
+        img.style.borderRadius = '8px';
+        img.style.display = 'block';
+        img.onerror = () => { messageDiv.remove(); };
+        bubble.appendChild(img);
+        messageDiv.appendChild(bubble);
+        chatStream.appendChild(messageDiv);
+
+        chatStream.scrollTop = chatStream.scrollHeight;
+    }
+
     // Switch background
     switchBackground() {
         this.currentBackgroundIndex = (this.currentBackgroundIndex + 1) % this.backgroundImages.length;
@@ -627,7 +653,7 @@ class UIController {
 
             if (isConnected) {
                 // Check microphone availability (check again after connection)
-                const { checkMicrophoneAvailability } = await import('../core/audio/recorder.js?v=0205');
+                const { checkMicrophoneAvailability } = await import('../core/audio/recorder.js?v=0209');
                 const micAvailable = await checkMicrophoneAvailability();
 
                 if (!micAvailable) {

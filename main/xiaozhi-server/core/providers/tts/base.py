@@ -429,6 +429,13 @@ class TTSProviderBase(ABC):
 
                 # 收到下一个文本开始或会话结束时进行上报
                 if sentence_type is not SentenceType.MIDDLE:
+                    if sentence_type == SentenceType.LAST:
+                        # Flush ảnh còn chờ (đuôi câu, hoặc provider không đồng bộ theo
+                        # segment) đúng lúc audio kết thúc turn.
+                        try:
+                            self.conn.fire_pending_images_up_to(float("inf"))
+                        except Exception:
+                            pass
                     if self.report_on_last:
                         # 累积模式：适用于全程只有一个语音流的TTS（如seed-tts-2.0）
                         # FIRST时只记录文本，音频持续累积，仅在LAST时统一上报

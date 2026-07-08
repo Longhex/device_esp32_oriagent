@@ -1,10 +1,10 @@
 // 主应用入口
-import { checkOpusLoaded, initOpusEncoder } from './core/audio/opus-codec.js?v=0205';
-import { getAudioPlayer } from './core/audio/player.js?v=0205';
-import { checkMicrophoneAvailability, isHttpNonLocalhost } from './core/audio/recorder.js?v=0205';
-import { initMcpTools } from './core/mcp/tools.js?v=0205';
-import { uiController } from './ui/controller.js?v=0205';
-import { log } from './utils/logger.js?v=0205';
+import { checkOpusLoaded, initOpusEncoder } from './core/audio/opus-codec.js?v=0208';
+import { getAudioPlayer } from './core/audio/player.js?v=0208';
+import { checkMicrophoneAvailability, isHttpNonLocalhost } from './core/audio/recorder.js?v=0208';
+import { initMcpTools } from './core/mcp/tools.js?v=0208';
+import { uiController } from './ui/controller.js?v=0208';
+import { log } from './utils/logger.js?v=0208';
 
 // 辅助函数：将Base64数据转换为Blob
 function dataURItoBlob(dataURI) {

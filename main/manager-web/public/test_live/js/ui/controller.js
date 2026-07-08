@@ -1,8 +1,8 @@
 // UI controller module
-import { loadConfig, saveConfig } from '../config/manager.js?v=0205';
-import { getAudioPlayer } from '../core/audio/player.js?v=0205';
-import { getAudioRecorder } from '../core/audio/recorder.js?v=0205';
-import { getWebSocketHandler } from '../core/network/websocket.js?v=0205';
+import { loadConfig, saveConfig } from '../config/manager.js?v=0208';
+import { getAudioPlayer } from '../core/audio/player.js?v=0208';
+import { getAudioRecorder } from '../core/audio/recorder.js?v=0208';
+import { getWebSocketHandler } from '../core/network/websocket.js?v=0208';
 
 // UI controller class
 class UIController {
@@ -20,6 +20,7 @@ class UIController {
         this.initEventListeners = this.initEventListeners.bind(this);
         this.updateDialButton = this.updateDialButton.bind(this);
         this.addChatMessage = this.addChatMessage.bind(this);
+        this.addChatImage = this.addChatImage.bind(this);
         this.switchBackground = this.switchBackground.bind(this);
         this.switchLive2DModel = this.switchLive2DModel.bind(this);
         this.showModal = this.showModal.bind(this);
@@ -431,6 +432,30 @@ class UIController {
         }
     }
 
+    // Add chat image (từ lệnh show_image của server) — dùng DOM API, không innerHTML
+    // để URL từ LLM không thể chèn markup (chống XSS).
+    addChatImage(url) {
+        const chatStream = document.getElementById('chatStream');
+        if (!chatStream) return;
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'chat-message ai';
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = '';
+        img.loading = 'lazy';
+        img.style.maxWidth = '100%';
+        img.style.borderRadius = '8px';
+        img.onerror = () => { messageDiv.remove(); };
+        bubble.appendChild(img);
+        messageDiv.appendChild(bubble);
+        chatStream.appendChild(messageDiv);
+
+        chatStream.scrollTop = chatStream.scrollHeight;
+    }
+
     // Add chat message
     addChatMessage(content, isUser = false) {
         const chatStream = document.getElementById('chatStream');
@@ -627,7 +652,7 @@ class UIController {
 
             if (isConnected) {
                 // Check microphone availability (check again after connection)
-                const { checkMicrophoneAvailability } = await import('../core/audio/recorder.js?v=0205');
+                const { checkMicrophoneAvailability } = await import('../core/audio/recorder.js?v=0208');
                 const micAvailable = await checkMicrophoneAvailability();
 
                 if (!micAvailable) {

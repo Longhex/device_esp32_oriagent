@@ -40,6 +40,7 @@ from config.logger import setup_logging, build_module_string, create_connection_
 from config.manage_api_client import DeviceNotFoundException, DeviceBindException
 from core.utils.prompt_manager import PromptManager
 from core.utils.voiceprint_provider import VoiceprintProvider
+from core.utils.image_extractor import StreamingImageExtractor
 from core.utils.util import get_system_error_response
 from core.utils import textUtils
 from core.utils.device_conversation_store import (
@@ -191,6 +192,13 @@ class ConnectionHandler:
         self.sentence_id = None
         # 处理TTS响应没有文本返回
         self.tts_MessageText = ""
+        # Trích ảnh markdown ![alt](url) khỏi stream LLM (tạo mới mỗi turn ở chat())
+        self._image_extractor = None
+        # Ảnh chờ show, gắn với offset ký tự trong text-đưa-vào-TTS. Bắn khi audio
+        # phát tới offset đó (đồng bộ theo segment). single-producer(chat, append)
+        # / single-consumer(playback+LAST, pop front) -> an toàn dưới GIL, không cần lock.
+        self._pending_image_signals = []
+        self._tts_emitted_chars = 0
 
         # iot相关变量
         self.iot_descriptors = {}
@@ -906,6 +914,11 @@ class ConnectionHandler:
             ):
                 time.sleep(0.05)
             self.sentence_id = str(uuid.uuid4().hex)
+            # Extractor mới cho turn này: tách ![alt](url) khỏi text vào TTS,
+            # url được gửi xuống device (show_image) + web caller.
+            self._image_extractor = StreamingImageExtractor()
+            self._pending_image_signals = []
+            self._tts_emitted_chars = 0
             self.dialogue.put(Message(role="user", content=query))
             self.tts.tts_text_queue.put(
                 TTSMessageDTO(
@@ -1250,16 +1263,31 @@ class ConnectionHandler:
                                 self.logger.bind(tag=TAG).error(f"System Interceptor failure: {e}")
 
                         from core.utils.util import strip_language_tags
-                        tts_content = strip_language_tags(content)
-                        response_message.append(tts_content)
-                        self.tts.tts_text_queue.put(
-                            TTSMessageDTO(
-                                sentence_id=self.sentence_id,
-                                sentence_type=SentenceType.MIDDLE,
-                                content_type=ContentType.TEXT,
-                                content_detail=tts_content,
+                        display_content = strip_language_tags(content)
+                        # Lịch sử hội thoại giữ nguyên form ảnh (LLM biết mình đã gửi ảnh gì)
+                        response_message.append(display_content)
+                        # Tách ![alt](url) khỏi text TRƯỚC khi vào TTS — TTS không đọc
+                        # link/tên ảnh; url gửi xuống device (show_image) + web caller.
+                        tts_content = display_content
+                        if self._image_extractor is not None:
+                            tts_content, extracted_images = self._image_extractor.feed(
+                                display_content
                             )
-                        )
+                            # Không bắn ngay: gắn ảnh với offset = cuối đoạn text vừa
+                            # đẩy vào TTS, để show đúng lúc audio phát tới đó (đồng bộ).
+                            _img_offset = self._tts_emitted_chars + len(tts_content)
+                            for _alt, _img_url in extracted_images:
+                                self._pending_image_signals.append((_img_offset, _img_url))
+                            self._tts_emitted_chars += len(tts_content)
+                        if tts_content:
+                            self.tts.tts_text_queue.put(
+                                TTSMessageDTO(
+                                    sentence_id=self.sentence_id,
+                                    sentence_type=SentenceType.MIDDLE,
+                                    content_type=ContentType.TEXT,
+                                    content_detail=tts_content,
+                                )
+                            )
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"LLM stream processing error: {e}")
             self.tts.tts_text_queue.put(
@@ -1383,6 +1411,24 @@ class ConnectionHandler:
                 self.tool_call_stats['consecutive_no_call'] += 1
 
         if depth == 0:
+            # Nhả nốt text extractor còn giữ (đuôi nghi là form ảnh nhưng stream đã hết)
+            if self._image_extractor is not None:
+                _tail, _tail_images = self._image_extractor.flush()
+                # Ảnh ở đuôi: gắn offset cuối cùng, sẽ được flush khi audio kết thúc
+                # (LAST) — xem fire_pending_images_up_to gọi từ _audio_play_priority_thread.
+                _tail_offset = self._tts_emitted_chars + len(_tail)
+                for _alt, _img_url in _tail_images:
+                    self._pending_image_signals.append((_tail_offset, _img_url))
+                self._tts_emitted_chars += len(_tail)
+                if _tail and _tail.strip() and not self.client_abort:
+                    self.tts.tts_text_queue.put(
+                        TTSMessageDTO(
+                            sentence_id=self.sentence_id,
+                            sentence_type=SentenceType.MIDDLE,
+                            content_type=ContentType.TEXT,
+                            content_detail=_tail,
+                        )
+                    )
             self.tts.tts_text_queue.put(
                 TTSMessageDTO(
                     sentence_id=self.sentence_id,
@@ -1408,6 +1454,38 @@ class ConnectionHandler:
                     self.logger.bind(tag=TAG).debug("已清理临时的工具调用提醒消息")
 
         return True
+
+    def _send_show_image(self, url):
+        """Gửi lệnh hiển thị ảnh xuống thiết bị + web caller.
+
+        Contract đã chốt với đội device: {"cmd": "show_image", "url": "http..."}.
+        Gọi được từ thread pool (chat chạy trong executor) — đẩy về event loop.
+        """
+        if not url or not url.lower().startswith(("http://", "https://")):
+            return
+        message = json.dumps({"cmd": "show_image", "url": url}, ensure_ascii=False)
+
+        async def _send():
+            try:
+                if self.websocket:
+                    await self.websocket.send(message)
+            except Exception as e:
+                self.logger.bind(tag=TAG).warning(f"Gửi show_image thất bại: {e}")
+
+        asyncio.run_coroutine_threadsafe(_send(), self.loop)
+        self.logger.bind(tag=TAG).info(f"show_image -> {url}")
+
+    def fire_pending_images_up_to(self, offset):
+        """Bắn show_image cho các ảnh có offset <= offset (đã phát audio tới đó).
+
+        Gọi từ playback (đồng bộ theo segment) và từ _audio_play_priority_thread
+        lúc LAST (flush phần còn lại). Dùng float('inf') để flush tất cả.
+        Consumer duy nhất pop từ đầu list; chat() chỉ append cuối -> an toàn GIL.
+        """
+        q = self._pending_image_signals
+        while q and q[0][0] <= offset:
+            _pos, url = q.pop(0)
+            self._send_show_image(url)
 
     def _get_tool_summary(self, functions: list) -> str:
         """

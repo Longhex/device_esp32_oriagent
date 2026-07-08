@@ -1,11 +1,11 @@
 // WebSocket消息处理模块
-import { getConfig, saveConnectionUrls } from '../../config/manager.js?v=0205';
-import { uiController } from '../../ui/controller.js?v=0205';
-import { log } from '../../utils/logger.js?v=0205';
-import { getAudioPlayer } from '../audio/player.js?v=0205';
-import { getAudioRecorder } from '../audio/recorder.js?v=0205';
-import { executeMcpTool, getMcpTools, setWebSocket as setMcpWebSocket } from '../mcp/tools.js?v=0205';
-import { webSocketConnect } from './ota-connector.js?v=0205';
+import { getConfig, saveConnectionUrls } from '../../config/manager.js?v=0209';
+import { uiController } from '../../ui/controller.js?v=0209';
+import { log } from '../../utils/logger.js?v=0209';
+import { getAudioPlayer } from '../audio/player.js?v=0209';
+import { getAudioRecorder } from '../audio/recorder.js?v=0209';
+import { executeMcpTool, getMcpTools, setWebSocket as setMcpWebSocket } from '../mcp/tools.js?v=0209';
+import { webSocketConnect } from './ota-connector.js?v=0209';
 
 // WebSocket处理器类
 export class WebSocketHandler {
@@ -72,6 +72,15 @@ export class WebSocketHandler {
 
     // 处理文本消息
     handleTextMessage(message) {
+        // Lệnh hiển thị ảnh (cùng contract với device): {"cmd":"show_image","url":...}
+        // Bắt TRƯỚC mọi nhánh type — KHÔNG được để lọt xuống fallback (lộ JSON thô).
+        if (message.cmd === 'show_image') {
+            if (message.url && /^https?:\/\//i.test(message.url)) {
+                log(`Hiển thị ảnh: ${message.url}`, 'info');
+                uiController.addChatImage(message.url);
+            }
+            return;
+        }
         if (message.type === 'hello') {
             log(`Phản hồi server：${JSON.stringify(message, null, 2)}`, 'success');
             window.cameraAvailable = true;

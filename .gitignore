@@ -187,6 +187,7 @@ deploy/mysql/
 deploy/data/.config.yaml
 deploy/uploadfile/
 deploy/.env
+deploy/data/*
  
 !package.json
 !**/package.json
