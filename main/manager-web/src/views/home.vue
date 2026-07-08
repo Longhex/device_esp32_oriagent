@@ -1,6 +1,7 @@
 <template>
   <StudioLayout active="agents" contextLabel="Agent Builder">
-    <div class="studio-topbar">
+    <div class="studio-content-panel">
+      <div class="studio-topbar-row">
       <div class="studio-search-wrap">
         <el-input
           v-model="search"
@@ -11,7 +12,7 @@
           @blur="hideSearchHistory"
           clearable
           ref="searchInput">
-          <i slot="prefix" class="el-icon-search search-icon"></i>
+          <span slot="prefix" class="studio-ic studio-ic--search search-icon"></span>
         </el-input>
 
         <!-- Search History Dropdown -->
@@ -29,10 +30,10 @@
         </div>
       </div>
 
-      <div class="studio-create-btn" @click="showAddDialog">Create Robot Agent</div>
-    </div>
+      <div class="studio-create-btn" @click="showAddDialog"><span class="studio-ic studio-ic--create"></span>Create Robot Agent</div>
+      </div>
 
-    <div class="studio-board">
+      <div class="studio-board-grid">
       <div v-if="isSearching" class="search-status">
          <span class="status-badge">Searching: "{{ search }}"</span>
          <el-button type="text" icon="el-icon-close" @click="handleSearchReset">Clear Results</el-button>
@@ -53,14 +54,11 @@
           @configure="goToRoleConfig" @deviceManage="handleDeviceManage" @delete="handleDeleteAgent"
           @chat-history="handleShowChatHistory" />
       </template>
+      </div>
     </div>
 
     <AddWisdomBodyDialog :visible.sync="addDeviceDialogVisible" @confirm="handleWisdomBodyAdded" />
     <chat-history-dialog :visible.sync="showChatHistory" :agent-id="currentAgentId" :agent-name="currentAgentName" />
-
-    <el-footer>
-      <version-footer />
-    </el-footer>
   </StudioLayout>
 </template>
 
@@ -70,12 +68,11 @@ import AddWisdomBodyDialog from '@/components/AddWisdomBodyDialog.vue';
 import ChatHistoryDialog from '@/components/ChatHistoryDialog.vue';
 import DeviceItem from '@/components/DeviceItem.vue';
 import StudioLayout from '@/components/StudioLayout.vue';
-import VersionFooter from '@/components/VersionFooter.vue';
 import featureManager from '@/utils/featureManager';
 
 export default {
   name: 'HomePage',
-  components: { DeviceItem, AddWisdomBodyDialog, VersionFooter, ChatHistoryDialog, StudioLayout },
+  components: { DeviceItem, AddWisdomBodyDialog, ChatHistoryDialog, StudioLayout },
   data() {
     return {
       addDeviceDialogVisible: false,
@@ -207,13 +204,23 @@ export default {
 <style lang="scss" scoped>
 @import "./studio.scss";
 
-.studio-topbar {
+/* 1 panel nội dung lớn: chứa hàng search+Create + lưới card (như Figma) */
+.studio-content-panel {
   @include studio-panel;
+  background: $studio-soft-bg;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 22px;
+}
+
+.studio-topbar-row {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 20px;
-  padding: 12px 16px;
+  gap: 16px;
+  flex-shrink: 0;
 }
 
 .studio-search-wrap {
@@ -240,19 +247,23 @@ export default {
   line-height: 42px;
 }
 
+.search-icon {
+  width: 18px;
+  height: 18px;
+  color: #9a9a9a;
+}
+
 .studio-create-btn {
   @include studio-black-pill;
 }
 
-.studio-board {
-  @include studio-panel;
-  background: $studio-soft-bg;
+.studio-board-grid {
   flex: 1;
-  padding: 20px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 380px));
+  gap: 20px;
   align-content: start;
+  justify-content: start;
 }
 
 .search-status {

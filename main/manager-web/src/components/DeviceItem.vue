@@ -23,7 +23,7 @@
     </div>
 
     <div class="card-foot">
-      <span class="foot-badge"><i class="el-icon-monitor"></i> {{ device.deviceCount || 0 }} {{ $t('roleConfig.tabDevice') }}</span>
+      <span class="foot-badge"><span class="studio-ic studio-ic--device badge-ic"></span>{{ device.deviceCount || 0 }} {{ $t('roleConfig.tabDevice') }}</span>
       <span v-if="device.memModelId !== 'Memory_nomem'" class="foot-badge"><i class="el-icon-chat-dot-round"></i> History</span>
       <span class="foot-time">{{ formattedLastConnectedTime }}</span>
     </div>
@@ -179,7 +179,9 @@ export default {
   gap: 8px;
   flex-wrap: wrap;
 
-  .foot-badge { background: $studio-soft-bg; border-radius: 999px; padding: 3px 10px; font-size: 12px; color: $studio-text-sub; }
+  .foot-badge { display: inline-flex; align-items: center; gap: 4px; background: $studio-soft-bg; border-radius: 999px; padding: 3px 10px; font-size: 12px; color: $studio-text-sub;
+    .badge-ic { width: 13px; height: 13px; }
+  }
   .foot-time { margin-left: auto; font-size: 11px; color: $studio-text-sub; }
 }
 

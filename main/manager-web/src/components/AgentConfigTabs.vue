@@ -4,7 +4,7 @@
       <!-- Left: Back Button -->
       <div class="header-left">
         <div class="back-btn" @click="$emit('back')">
-          <i class="el-icon-arrow-left"></i>
+          <span class="studio-ic studio-ic--back"></span>
         </div>
       </div>
 
@@ -18,11 +18,10 @@
             :class="{ active: value === tab.id }" 
             @click="$emit('input', tab.id)"
           >
-            <img 
-              :src="getIconPath(tab.iconName)" 
-              class="tab-icon-img" 
-              :class="{ 'active-icon': value === tab.id }"
-            />
+            <span
+              class="studio-ic tab-icon-img"
+              :class="['studio-ic--' + tab.studioIc, { 'active-icon': value === tab.id }]"
+            ></span>
             <span class="tab-label">{{ $t(tab.labelKey) }}</span>
           </div>
         </div>
@@ -32,7 +31,7 @@
       <div class="header-actions">
         <slot name="extra-actions"></slot>
         <el-button type="primary" size="medium" class="main-save-btn" @click="$emit('save')" :loading="saving">
-            {{ $t('roleConfig.saveConfig') }}
+            <span class="studio-ic studio-ic--publish save-btn-ic"></span>{{ $t('roleConfig.saveConfig') }}
         </el-button>
       </div>
     </div>
@@ -50,10 +49,10 @@ export default {
   data() {
     return {
       tabs: [
-        { id: 'setup', labelKey: 'roleConfig.tabSetup', iconName: 'studio_agent.svg' },
-        { id: 'history', labelKey: 'roleConfig.tabHistory', iconName: 'history.svg' },
-        { id: 'overview', labelKey: 'roleConfig.tabOverview', iconName: 'overview.svg' },
-        { id: 'device', labelKey: 'roleConfig.tabDevice', iconName: 'api_access.svg' }
+        { id: 'setup', labelKey: 'roleConfig.tabSetup', studioIc: 'tab-setup' },
+        { id: 'history', labelKey: 'roleConfig.tabHistory', studioIc: 'tab-history' },
+        { id: 'overview', labelKey: 'roleConfig.tabOverview', studioIc: 'tab-overview' },
+        { id: 'device', labelKey: 'roleConfig.tabDevice', studioIc: 'tab-device' }
       ]
     };
   },
@@ -109,6 +108,8 @@ export default {
   cursor: pointer;
   transition: background 0.2s;
 
+  .studio-ic { width: 17px; height: 17px; }
+
   &:hover {
     background: $studio-soft-bg;
   }
@@ -143,13 +144,8 @@ export default {
   .tab-icon-img {
     width: 16px;
     height: 16px;
-    opacity: 0.6;
+    color: $studio-text-sub;
     transition: all 0.2s;
-
-    &.active-icon {
-      filter: brightness(0) invert(1);
-      opacity: 1;
-    }
   }
 
   .tab-label {
@@ -161,12 +157,13 @@ export default {
 
   &:hover:not(.active) {
     .tab-label { color: $studio-text; }
-    .tab-icon-img { opacity: 0.9; }
+    .tab-icon-img { color: $studio-text; }
   }
 
   &.active {
     background: linear-gradient(180deg, #333335 0%, $studio-black 100%);
     .tab-label { color: white; }
+    .tab-icon-img { color: white; }
   }
 
   @media (max-width: 1024px) {
@@ -190,6 +187,13 @@ export default {
   font-weight: 800;
   font-size: 13px;
   box-shadow: none;
+
+  .save-btn-ic {
+    width: 15px;
+    height: 15px;
+    margin-right: 7px;
+    vertical-align: -3px;
+  }
 
   &:hover {
     background: linear-gradient(180deg, #3a3a3c 0%, #202022 100%);

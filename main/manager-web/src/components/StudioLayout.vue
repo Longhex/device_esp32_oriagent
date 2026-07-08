@@ -8,30 +8,30 @@
           <i class="el-icon-copy-document studio-collapse-icon"></i>
         </div>
         <div class="studio-context-pill">
-          <i class="el-icon-cpu"></i>
+          <span class="studio-ic studio-ic--agent-builder"></span>
           <span>{{ contextLabel }}</span>
         </div>
 
         <div class="studio-nav-group">
           <div class="studio-group-label">AgentOS</div>
           <div class="studio-nav-item" :class="{ active: active === 'agents' }" @click="go('/home')">
-            <i class="el-icon-user"></i><span>Robot Agent</span>
+            <span class="studio-ic studio-ic--robot-agent"></span><span>Robot Agent</span>
           </div>
         </div>
 
         <div class="studio-nav-group">
           <div class="studio-group-label">AgentCore</div>
           <div class="studio-nav-item" :class="{ active: active === 'models' }" @click="go('/model-config')">
-            <i class="el-icon-refresh"></i><span>Model AI</span>
+            <span class="studio-ic studio-ic--model-ai"></span><span>Model AI</span>
           </div>
-          <div class="studio-nav-item disabled"><i class="el-icon-notebook-2"></i><span>Knowledge</span></div>
-          <div class="studio-nav-item disabled"><i class="el-icon-connection"></i><span>Integration</span></div>
+          <div class="studio-nav-item disabled"><span class="studio-ic studio-ic--knowledge"></span><span>Knowledge</span></div>
+          <div class="studio-nav-item disabled"><span class="studio-ic studio-ic--integration"></span><span>Integration</span></div>
         </div>
 
         <div class="studio-nav-group">
           <div class="studio-group-label">AgentSetting</div>
           <div class="studio-nav-item" :class="{ active: active === 'settings' }" @click="go('/params-management')">
-            <i class="el-icon-setting"></i><span>Thiết lập</span>
+            <span class="studio-ic studio-ic--settings"></span><span>Thiết lập</span>
           </div>
         </div>
       </div>
@@ -39,12 +39,12 @@
       <div class="studio-sidebar-bottom">
         <!-- TODO: gắn link Guide Document khi có URL chính thức -->
         <div class="studio-guide-btn">
-          <i class="el-icon-reading"></i><span>Guide Document</span>
+          <span class="studio-ic studio-ic--guide"></span><span>Guide Document</span>
         </div>
         <el-dropdown trigger="click" class="studio-account" @command="onAccount">
           <div class="studio-account-pill">
-            <i class="el-icon-user"></i><span>My Account</span>
-            <i class="el-icon-sort studio-account-caret"></i>
+            <span class="studio-ic studio-ic--account"></span><span>My Account</span>
+            <span class="studio-ic studio-ic--caret studio-account-caret"></span>
           </div>
           <el-dropdown-menu slot="dropdown">
             <el-dropdown-item command="logout">{{ $t('header.logout') }}</el-dropdown-item>
@@ -101,6 +101,7 @@ export default {
   padding: $studio-gap;
   background: $studio-page-bg;
   box-sizing: border-box;
+  text-align: left; /* ghi đè #app{text-align:center} — chữ studio canh trái như Figma */
 }
 
 .studio-sidebar {
@@ -109,7 +110,7 @@ export default {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 18px 14px;
+  padding: 10px 14px 18px; /* top 10 = khớp padding nav bar -> logo thẳng hàng tab */
   position: sticky;
   top: $studio-gap;
   height: calc(100vh - #{$studio-gap * 2});
@@ -144,16 +145,17 @@ export default {
 .studio-context-pill {
   @include studio-soft-pill;
   background: $studio-soft-bg;
-  height: 36px;
-  font-size: 13px;
-  font-weight: 600;
-  color: $studio-text;
+  height: 38px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #5b5c65;
   margin-bottom: 18px;
 }
 
 .studio-group-label {
-  font-size: 12px;
-  color: $studio-text-sub;
+  font-size: 16px;
+  font-weight: 400;
+  color: #5b5c65;
   margin: 14px 6px 6px;
 }
 
@@ -162,19 +164,48 @@ export default {
   align-items: center;
   gap: 10px;
   padding: 9px 12px;
+  border: 1px solid transparent; /* giữ box model đồng nhất khi active có viền */
   border-radius: 10px;
-  font-size: 14px;
-  color: $studio-text;
+  font-size: 16px;
+  font-weight: 500;
+  color: #5b5c65;
   cursor: pointer;
 
   &:hover:not(.disabled) { background: $studio-soft-bg; }
   &.active {
-    background: $studio-accent-soft;
+    /* Figma: gradient #DFF9C0->#D0EFD7 + viền #707070 + radius 14 */
+    background: linear-gradient(90deg, #dff9c0 0%, #d0efd7 100%);
+    border-color: #707070;
+    border-radius: 14px;
     color: #069d49; /* darken(#08c45b, 8%) */
     font-weight: 600;
   }
   &.disabled { color: #b5b5b5; cursor: default; }
 }
+
+/* Icon studio (SVG mẫu qua CSS mask -> to mau theo currentColor) */
+.studio-ic {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+.studio-ic--agent-builder { -webkit-mask-image: url("~@/assets/studio/icons/ic-agent-builder.svg"); mask-image: url("~@/assets/studio/icons/ic-agent-builder.svg"); }
+.studio-ic--robot-agent   { -webkit-mask-image: url("~@/assets/studio/icons/ic-robot-agent.svg");   mask-image: url("~@/assets/studio/icons/ic-robot-agent.svg"); }
+.studio-ic--model-ai      { -webkit-mask-image: url("~@/assets/studio/icons/ic-model-ai.svg");      mask-image: url("~@/assets/studio/icons/ic-model-ai.svg"); }
+.studio-ic--knowledge     { -webkit-mask-image: url("~@/assets/studio/icons/ic-knowledge.svg");     mask-image: url("~@/assets/studio/icons/ic-knowledge.svg"); }
+.studio-ic--integration   { -webkit-mask-image: url("~@/assets/studio/icons/ic-integration.svg");   mask-image: url("~@/assets/studio/icons/ic-integration.svg"); }
+.studio-ic--settings      { -webkit-mask-image: url("~@/assets/studio/icons/ic-settings.svg");      mask-image: url("~@/assets/studio/icons/ic-settings.svg"); }
+.studio-ic--guide         { -webkit-mask-image: url("~@/assets/studio/icons/ic-guide.svg");         mask-image: url("~@/assets/studio/icons/ic-guide.svg"); }
+.studio-ic--account       { -webkit-mask-image: url("~@/assets/studio/icons/ic-account.svg");       mask-image: url("~@/assets/studio/icons/ic-account.svg"); }
+.studio-ic--caret         { width: 14px; -webkit-mask-image: url("~@/assets/studio/icons/ic-caret.svg"); mask-image: url("~@/assets/studio/icons/ic-caret.svg"); }
 
 .studio-sidebar-bottom {
   flex-shrink: 0;
@@ -187,7 +218,10 @@ export default {
 .studio-guide-btn {
   @include studio-black-pill;
   width: 100%;
-  height: 38px;
+  height: 40px;
+  font-size: 13px;
+  justify-content: flex-start; /* icon + chữ canh trái như Figma (không canh giữa) */
+  padding-left: 16px;
   /* Nút tĩnh cho tới khi có URL Guide Document chính thức */
   cursor: default;
   &:hover { background: linear-gradient(180deg, #333335 0%, $studio-black 100%); }
@@ -200,12 +234,13 @@ export default {
   align-items: center;
   gap: 10px;
   width: 100%;
-  height: 38px;
+  height: 40px;
   padding: 0 14px;
   border: 1px solid $studio-border;
   border-radius: $studio-radius-pill;
   font-size: 13px;
-  color: $studio-text;
+  font-weight: 700;
+  color: #5b5c65;
   cursor: pointer;
   box-sizing: border-box;
   .studio-account-caret { margin-left: auto; }

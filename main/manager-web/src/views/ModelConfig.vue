@@ -10,9 +10,10 @@
           :class="{ active: activeTab === cat.key }"
           @click="$router.push({ query: { tab: cat.key } })"
         >
-          <i :class="cat.icon"></i>
+          <span v-if="cat.studioIc" class="studio-ic" :class="'studio-ic--' + cat.studioIc"></span>
+          <i v-else :class="cat.icon"></i>
           <span>{{ $t(cat.labelKey) }}</span>
-          <i v-if="activeTab === cat.key" class="el-icon-right studio-cat-arrow"></i>
+          <span v-if="activeTab === cat.key" class="studio-ic studio-ic--arrow studio-cat-arrow"></span>
         </div>
       </div>
 
@@ -279,9 +280,6 @@
       @confirm="handleAddConfirm"
     />
 
-    <el-footer>
-      <version-footer />
-    </el-footer>
   </StudioLayout>
 </template>
 
@@ -291,19 +289,18 @@ import AddModelDialog from "@/components/AddModelDialog.vue";
 import ModelEditDialog from "@/components/ModelEditDialog.vue";
 import StudioLayout from "@/components/StudioLayout.vue";
 import TtsModel from "@/components/TtsModel.vue";
-import VersionFooter from "@/components/VersionFooter.vue";
 export default {
-  components: { ModelEditDialog, TtsModel, AddModelDialog, VersionFooter, StudioLayout },
+  components: { ModelEditDialog, TtsModel, AddModelDialog, StudioLayout },
   data() {
     return {
       // Menu nhóm model (panel trái) - bê nguyên danh sách model-type từ SideBar.vue
       catList: [
-        { key: "vad", icon: "el-icon-microphone", labelKey: "modelConfig.vad" },
-        { key: "asr", icon: "el-icon-chat-dot-round", labelKey: "modelConfig.asr" },
-        { key: "llm", icon: "el-icon-cpu", labelKey: "modelConfig.llm" },
+        { key: "vad", icon: "el-icon-microphone", studioIc: "cat-vad", labelKey: "modelConfig.vad" },
+        { key: "asr", icon: "el-icon-chat-dot-round", studioIc: "cat-asr", labelKey: "modelConfig.asr" },
+        { key: "llm", icon: "el-icon-cpu", studioIc: "cat-llm", labelKey: "modelConfig.llm" },
         { key: "vllm", icon: "el-icon-picture-outline", labelKey: "modelConfig.vllm" },
         { key: "intent", icon: "el-icon-aim", labelKey: "modelConfig.intent" },
-        { key: "tts", icon: "el-icon-headset", labelKey: "modelConfig.tts" },
+        { key: "tts", icon: "el-icon-headset", studioIc: "cat-tts", labelKey: "modelConfig.tts" },
         { key: "memory", icon: "el-icon-collection", labelKey: "modelConfig.memory" },
         { key: "rag", icon: "el-icon-notebook-2", labelKey: "modelConfig.rag" },
       ],
@@ -712,7 +709,7 @@ export default {
 .studio-model-wrap {
   display: flex;
   gap: $studio-gap;
-  align-items: flex-start;
+  align-items: stretch;
   flex: 1;
   min-height: 0;
 }
@@ -740,7 +737,7 @@ export default {
     font-size: 15px;
   }
 
-  span {
+  span:not(.studio-ic) {
     flex: 1;
     text-align: left;
   }

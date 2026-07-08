@@ -14,9 +14,9 @@ $studio-page-bg: #e9e9e9;         /* nền ngoài cùng (xám) */
 $studio-panel-bg: #ffffff;        /* panel nổi */
 $studio-soft-bg: #f7f7f7;         /* nền phụ trong panel */
 $studio-border: #eeeeee;
-$studio-radius-panel: 18px;       /* bo góc panel nổi */
+$studio-radius-panel: 20px;       /* bo góc panel nổi (Figma) */
 $studio-radius-pill: 999px;
-$studio-gap: 12px;                /* khe giữa các panel nổi */
+$studio-gap: 16px;                /* khe giữa các panel nổi (Figma) */
 $studio-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 
 /* ---------- Type scale (Roboto đã set global) ---------- */
@@ -68,3 +68,49 @@ $studio-fs-body: 15px;    /* phụ — weight 400 */
   padding: 0 14px;
   height: 40px;
 }
+
+/* ---------- Icon studio (SVG mẫu Figma qua CSS mask -> tô màu theo currentColor) ---------- */
+.studio-ic {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+.studio-ic--agent-builder { -webkit-mask-image: url("~@/assets/studio/icons/ic-agent-builder.svg"); mask-image: url("~@/assets/studio/icons/ic-agent-builder.svg"); }
+.studio-ic--robot-agent   { -webkit-mask-image: url("~@/assets/studio/icons/ic-robot-agent.svg");   mask-image: url("~@/assets/studio/icons/ic-robot-agent.svg"); }
+.studio-ic--model-ai      { -webkit-mask-image: url("~@/assets/studio/icons/ic-model-ai.svg");      mask-image: url("~@/assets/studio/icons/ic-model-ai.svg"); }
+.studio-ic--knowledge     { -webkit-mask-image: url("~@/assets/studio/icons/ic-knowledge.svg");     mask-image: url("~@/assets/studio/icons/ic-knowledge.svg"); }
+.studio-ic--integration   { -webkit-mask-image: url("~@/assets/studio/icons/ic-integration.svg");   mask-image: url("~@/assets/studio/icons/ic-integration.svg"); }
+.studio-ic--settings      { -webkit-mask-image: url("~@/assets/studio/icons/ic-settings.svg");      mask-image: url("~@/assets/studio/icons/ic-settings.svg"); }
+.studio-ic--guide         { -webkit-mask-image: url("~@/assets/studio/icons/ic-guide.svg");         mask-image: url("~@/assets/studio/icons/ic-guide.svg"); }
+.studio-ic--account       { -webkit-mask-image: url("~@/assets/studio/icons/ic-account.svg");       mask-image: url("~@/assets/studio/icons/ic-account.svg"); }
+.studio-ic--caret         { width: 14px; -webkit-mask-image: url("~@/assets/studio/icons/ic-caret.svg"); mask-image: url("~@/assets/studio/icons/ic-caret.svg"); }
+.studio-ic--search        { -webkit-mask-image: url("~@/assets/studio/icons/ic-search.svg");        mask-image: url("~@/assets/studio/icons/ic-search.svg"); }
+.studio-ic--create        { -webkit-mask-image: url("~@/assets/studio/icons/ic-create.svg");        mask-image: url("~@/assets/studio/icons/ic-create.svg"); }
+.studio-ic--device        { -webkit-mask-image: url("~@/assets/studio/icons/ic-device.svg");        mask-image: url("~@/assets/studio/icons/ic-device.svg"); }
+.studio-ic--cat-llm { -webkit-mask-image: url("~@/assets/studio/icons/ic-cat-llm.svg"); mask-image: url("~@/assets/studio/icons/ic-cat-llm.svg"); }
+.studio-ic--cat-vad { -webkit-mask-image: url("~@/assets/studio/icons/ic-cat-vad.svg"); mask-image: url("~@/assets/studio/icons/ic-cat-vad.svg"); }
+.studio-ic--cat-asr { -webkit-mask-image: url("~@/assets/studio/icons/ic-cat-asr.svg"); mask-image: url("~@/assets/studio/icons/ic-cat-asr.svg"); }
+.studio-ic--cat-tts { -webkit-mask-image: url("~@/assets/studio/icons/ic-cat-tts.svg"); mask-image: url("~@/assets/studio/icons/ic-cat-tts.svg"); }
+.studio-ic--arrow   { width: 16px; -webkit-mask-image: url("~@/assets/studio/icons/ic-arrow.svg"); mask-image: url("~@/assets/studio/icons/ic-arrow.svg"); }
+.studio-ic--eye     { -webkit-mask-image: url("~@/assets/studio/icons/ic-eye.svg"); mask-image: url("~@/assets/studio/icons/ic-eye.svg"); }
+.studio-ic--tab-setup    { -webkit-mask-image: url("~@/assets/studio/icons/ic-tab-setup.svg"); mask-image: url("~@/assets/studio/icons/ic-tab-setup.svg"); }
+.studio-ic--tab-history  { -webkit-mask-image: url("~@/assets/studio/icons/ic-tab-history.svg"); mask-image: url("~@/assets/studio/icons/ic-tab-history.svg"); }
+.studio-ic--tab-overview { -webkit-mask-image: url("~@/assets/studio/icons/ic-tab-overview.svg"); mask-image: url("~@/assets/studio/icons/ic-tab-overview.svg"); }
+.studio-ic--tab-device   { -webkit-mask-image: url("~@/assets/studio/icons/ic-tab-device.svg"); mask-image: url("~@/assets/studio/icons/ic-tab-device.svg"); }
+.studio-ic--publish      { -webkit-mask-image: url("~@/assets/studio/icons/ic-publish.svg"); mask-image: url("~@/assets/studio/icons/ic-publish.svg"); }
+.studio-ic--back         { -webkit-mask-image: url("~@/assets/studio/icons/ic-back.svg"); mask-image: url("~@/assets/studio/icons/ic-back.svg"); }
+.studio-ic--apikey       { -webkit-mask-image: url("~@/assets/studio/icons/ic-apikey.svg"); mask-image: url("~@/assets/studio/icons/ic-apikey.svg"); }
+.studio-ic--filler       { -webkit-mask-image: url("~@/assets/studio/icons/ic-filler.svg"); mask-image: url("~@/assets/studio/icons/ic-filler.svg"); }
+.studio-ic--voice        { -webkit-mask-image: url("~@/assets/studio/icons/ic-voice.svg"); mask-image: url("~@/assets/studio/icons/ic-voice.svg"); }
+.studio-ic--instructions { -webkit-mask-image: url("~@/assets/studio/icons/ic-instructions.svg"); mask-image: url("~@/assets/studio/icons/ic-instructions.svg"); }
+.studio-ic--autogen      { -webkit-mask-image: url("~@/assets/studio/icons/ic-autogen.svg"); mask-image: url("~@/assets/studio/icons/ic-autogen.svg"); }
+.studio-ic--char         { -webkit-mask-image: url("~@/assets/studio/icons/ic-char.svg"); mask-image: url("~@/assets/studio/icons/ic-char.svg"); }
+.studio-ic--token        { -webkit-mask-image: url("~@/assets/studio/icons/ic-token.svg"); mask-image: url("~@/assets/studio/icons/ic-token.svg"); }

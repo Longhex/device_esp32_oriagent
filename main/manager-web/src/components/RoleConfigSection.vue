@@ -14,7 +14,7 @@
           <div class="custom-field-group" v-if="!isOriagentLLM">
             <div class="prompt-toggle-row">
               <label class="field-label-premium">
-                <i class="el-icon-magic-stick label-icon"></i> Tùy chỉnh System Prompt
+                <span class="studio-ic studio-ic--instructions label-icon"></span> Tùy chỉnh System Prompt
               </label>
               <el-switch v-model="showSystemPrompt" active-color="#08c45b" />
             </div>
@@ -23,7 +23,7 @@
           <!-- LLM Model Selector -->
           <div class="custom-field-group">
             <label class="field-label-premium">
-              <i class="el-icon-cpu label-icon"></i> {{ $t("roleConfig.llm") }}
+              <span class="studio-ic studio-ic--cat-llm label-icon"></span> {{ $t("roleConfig.llm") }}
             </label>
             <div class="model-row-white">
               <div class="model-row-icon"><i class="el-icon-cpu"></i></div>
@@ -43,7 +43,7 @@
           <!-- Oriagent API Key riêng từng agent — chỉ hiện khi chọn Oriagent; để trống = dùng key chung của model -->
           <div class="custom-field-group" v-if="isOriagentLLM">
             <label class="field-label-premium">
-              <i class="el-icon-key label-icon"></i> Oriagent API Key (riêng agent này)
+              <span class="studio-ic studio-ic--apikey label-icon"></span> Oriagent API Key (riêng agent này)
             </label>
             <div class="premium-field-pill soft-pill">
               <i class="el-icon-key pill-badge-icon-inline"></i>
@@ -60,7 +60,7 @@
           <div class="selection-grid-vertical">
             <div class="custom-field-group">
               <label class="field-label-premium">
-                <i class="el-icon-mic label-icon"></i> {{ $t("roleConfig.voiceDetect") }}
+                <span class="studio-ic studio-ic--cat-vad label-icon"></span> {{ $t("roleConfig.voiceDetect") }}
               </label>
               <div class="premium-field-pill soft-pill">
                 <img src="@/assets/dashboard/agent.svg" class="pill-badge-icon" />
@@ -76,7 +76,7 @@
 
             <div class="custom-field-group">
               <label class="field-label-premium">
-                <i class="el-icon-microphone label-icon"></i> {{ $t("roleConfig.speechRecognition") }}
+                <span class="studio-ic studio-ic--cat-asr label-icon"></span> {{ $t("roleConfig.speechRecognition") }}
               </label>
               <div class="premium-field-pill soft-pill">
                 <img src="@/assets/dashboard/agent.svg" class="pill-badge-icon" />
@@ -94,7 +94,7 @@
           <!-- TTS Section Header -->
           <div class="custom-field-group">
             <label class="field-label-premium">
-              <i class="el-icon-data-line label-icon"></i> Văn bản thành giọng nói
+              <span class="studio-ic studio-ic--cat-tts label-icon"></span> Văn bản thành giọng nói
             </label>
           </div>
 
@@ -137,7 +137,7 @@
           <div class="filler-premium-card">
             <div class="filler-header-row">
               <label class="field-label-premium">
-                <i class="el-icon-magic-stick label-icon"></i> Câu đệm suy nghĩ
+                <span class="studio-ic studio-ic--voice label-icon"></span> Câu đệm suy nghĩ
               </label>
               <el-switch
                 v-model="form.fillerEnabled"
@@ -186,7 +186,7 @@
       <!-- Column 2: Testing (Live Preview) -->
       <div class="preview-panel card-style">
         <div class="panel-header-row">
-          <span class="panel-header-title"><i class="el-icon-video-camera"></i> Testing</span>
+          <span class="panel-header-title"><span class="studio-ic studio-ic--filler panel-header-ic"></span> Testing</span>
         </div>
 
         <div class="mockup-screen">
@@ -238,7 +238,6 @@
         <div class="idle-input-bar" v-if="!isLiveTesting">
           <i class="el-icon-chat-dot-round"></i>
           <span class="idle-input-placeholder">Nhập tin nhắn...</span>
-          <span class="idle-input-count">0</span>
           <div class="idle-send-btn"><i class="el-icon-top"></i></div>
         </div>
       </div>
@@ -246,10 +245,10 @@
       <!-- Column 3: Instructions (System Prompt) — chỉ hiện khi bật toggle & model không phải Oriagent -->
       <div class="system-prompt-panel card-style" v-if="showSystemPrompt && !isOriagentLLM">
         <div class="panel-header-row">
-          <span class="panel-header-title"><i class="el-icon-video-camera"></i> Instructions</span>
+          <span class="panel-header-title"><span class="studio-ic studio-ic--instructions panel-header-ic"></span> Instructions</span>
           <div class="panel-header-actions">
-            <i class="el-icon-setting sp-gear-icon"></i>
-            <span class="sp-auto-btn"><i class="el-icon-magic-stick"></i> Tạo tự động</span>
+            <span class="studio-ic studio-ic--settings sp-gear-icon"></span>
+            <span class="sp-auto-btn"><span class="studio-ic studio-ic--autogen sp-auto-ic"></span> Tạo tự động</span>
           </div>
         </div>
         <el-input
@@ -262,8 +261,8 @@
           placeholder="Ví dụ: Bạn là trợ lý thân thiện, trả lời ngắn gọn, dễ hiểu..."
         />
         <div class="sp-footer">
-          <span class="sp-footer-item">Character: {{ (form.systemPrompt || '').length }}</span>
-          <span class="sp-footer-item">Token prompt: --</span>
+          <span class="sp-footer-item"><span class="studio-ic studio-ic--char sp-footer-ic"></span>Character: {{ (form.systemPrompt || '').length }}</span>
+          <span class="sp-footer-item"><span class="studio-ic studio-ic--token sp-footer-ic"></span>Token prompt: --</span>
         </div>
       </div>
     </div>
@@ -407,15 +406,16 @@ $ori-border: #f1f5f9;
 }
 
 .dashboard-layout {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
   align-items: stretch;
   flex: 1;
   min-height: 700px;
-  gap: $studio-gap;
+  gap: 24px; /* tách 3 box rõ ràng (design step 16->24), đồng đều */
+
+  /* flex thay grid: 2 panel -> 50/50, 3 panel -> chia đều 3, không để cột trống */
 
   @media (max-width: 1400px) {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     min-height: auto;
     gap: 20px;
   }
@@ -423,35 +423,43 @@ $ori-border: #f1f5f9;
 
 .config-panel {
   order: 1;
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 32px;
-  padding: 32px;
+  padding: 24px;
   overflow-y: auto;
+
+  @media (max-width: 1400px) { flex: 1 1 auto; }
 }
 
 .preview-panel {
   order: 2;
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 32px;
+  padding: 24px;
   overflow: hidden;
 
   @media (max-width: 1400px) {
+    flex: 1 1 auto;
     min-height: 560px;
   }
 }
 
 .system-prompt-panel {
   order: 3;
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 32px;
+  padding: 24px;
+
+  @media (max-width: 1400px) { flex: 1 1 auto; }
 }
 
 /* Header dùng chung cho panel Testing / Instructions */
@@ -470,6 +478,7 @@ $ori-border: #f1f5f9;
   color: $studio-text;
 
   i { color: $studio-text-sub; font-size: 15px; }
+  .panel-header-ic { width: 18px; height: 18px; }
 }
 
 .panel-header-actions {
@@ -479,7 +488,8 @@ $ori-border: #f1f5f9;
 }
 
 .sp-gear-icon {
-  font-size: 16px;
+  width: 18px;
+  height: 18px;
   color: $studio-text-sub;
   cursor: default;
 }
@@ -490,6 +500,8 @@ $ori-border: #f1f5f9;
   padding: 0 14px;
   font-size: 12px;
   cursor: default; // Chưa có tính năng thật — hiển thị tĩnh
+
+  .sp-auto-ic { width: 14px; height: 14px; }
 }
 
 .sp-textarea {
@@ -514,6 +526,9 @@ $ori-border: #f1f5f9;
   font-size: 12px;
   font-weight: 600;
   color: $studio-text-sub;
+
+  .sp-footer-item { display: inline-flex; align-items: center; gap: 5px; }
+  .sp-footer-ic { width: 13px; height: 13px; }
 }
 
 /* Hide Scrollbar */
@@ -642,6 +657,13 @@ $ori-border: #f1f5f9;
   }
 }
 
+/* Hàng toggle "Tùy chỉnh System Prompt": icon+label trái, công tắc phải (tách rõ) */
+.prompt-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 /* Custom Fields */
 .custom-field-group {
   display: flex; flex-direction: column; gap: 8px;
@@ -649,6 +671,7 @@ $ori-border: #f1f5f9;
   .field-label-premium {
     font-size: 13px; font-weight: 700; color: $ori-dark; display: flex; align-items: center; gap: 8px;
     .label-icon { font-size: 14px; color: $studio-text-sub; }
+    span.label-icon { width: 16px; height: 16px; }
     i { color: $ori-slate; opacity: 0.8; }
   }
 }
@@ -844,14 +867,13 @@ $ori-border: #f1f5f9;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 28px;
+  gap: 0;
 }
 
 .idle-circle {
-  width: 240px;
-  height: 240px;
-  max-width: 80%;
-  max-height: 80%;
+  width: min(440px, 90%); /* gần đầy cột -> dải trắng cột config↔Testing co lại, 2 bên vẫn cân đều */
+  aspect-ratio: 1 / 1;     /* giữ hình tròn khi width đổi */
+  max-width: 100%;
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
@@ -871,7 +893,7 @@ $ori-border: #f1f5f9;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; transition: all 0.3s; flex-shrink: 0;
 
-  &.start { background: $studio-accent; }
+  &.start { background: $studio-accent; margin-top: -22px; position: relative; z-index: 1; } /* tuck sát mép dưới vòng tròn như mẫu */
   &.end { background: #ef4444; width: 40px; height: 40px; }
 
   &:hover { transform: scale(1.05); }
@@ -900,11 +922,6 @@ $ori-border: #f1f5f9;
     font-size: 13px;
     color: $studio-text-sub;
     text-align: left;
-  }
-
-  .idle-input-count {
-    font-size: 12px;
-    color: $studio-text-sub;
   }
 
   .idle-send-btn {

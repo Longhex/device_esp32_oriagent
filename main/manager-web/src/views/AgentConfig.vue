@@ -89,8 +89,6 @@
         :visible.sync="showContextProviderDialog" 
         :providers="currentContextProviders" 
         @confirm="handleUpdateContext" />
-
-    <VersionFooter />
   </div>
   </StudioLayout>
 </template>
@@ -98,7 +96,6 @@
 <script>
 import Api from "@/apis/api";
 import StudioLayout from "@/components/StudioLayout.vue";
-import VersionFooter from "@/components/VersionFooter.vue";
 import RoleConfigSection from "@/components/RoleConfigSection.vue";
 import DeviceManagementSection from "@/components/DeviceManagementSection.vue";
 import ChatHistorySection from "@/components/ChatHistorySection.vue";
@@ -111,7 +108,7 @@ import ManualAddDeviceDialog from "@/components/ManualAddDeviceDialog.vue";
 export default {
   name: "AgentConfig",
   components: {
-    StudioLayout, VersionFooter, RoleConfigSection, DeviceManagementSection,
+    StudioLayout, RoleConfigSection, DeviceManagementSection,
     ChatHistorySection, FunctionDialog, ContextProviderDialog,
     AgentConfigTabs, AddDeviceDialog, ManualAddDeviceDialog
   },
@@ -305,16 +302,15 @@ export default {
 <style lang="scss" scoped>
 .agent-config-view {
    background: transparent; // nen xam do StudioLayout lo, tranh 2 lop nen
+   flex: 1;
    display: flex;
    flex-direction: column;
    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.sections-container { 
-  max-width: 1800px; // Further increased for even larger screens
-  width: 96%; 
-  margin: 0 auto; 
-  padding: 16px 0;
+.sections-container {
+  width: 100%; /* full-width khớp khung canh lề của top bar (nav header cùng nằm trong agent-config-view) */
+  padding: 24px 0 16px; /* khe thở dọc top bar -> cụm 3 box (24 = đồng bộ gap ngang giữa box) */
   flex: 1;
   display: flex;
   flex-direction: column;
