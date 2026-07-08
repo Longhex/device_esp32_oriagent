@@ -17,6 +17,7 @@ Thiết kế:
 
 import time
 import asyncio
+import hashlib
 import threading
 
 from config.logger import setup_logging
@@ -96,9 +97,24 @@ def build_filler_config(config, private_config=None):
 
 
 def _voice_key(conn):
+    """
+    Khóa cache filler = VÂN TAY của mọi thứ quyết định ra TIẾNG, không chỉ voiceID.
+    Gồm: provider + speaker_id/voice + reference_audio + reference_text (giọng clone).
+    → Đổi audio dưới cùng voiceID (re-clone, sửa reference) cũng đổi khóa → tự render lại
+    (vá Bug #2: buffer kẹt bản cũ khi audio đổi mà voiceID giữ nguyên).
+    """
     tts = getattr(conn, "tts", None)
-    voice = getattr(tts, "speaker_id", None) or getattr(tts, "voice", "")
-    return (type(tts).__name__, str(voice), int(getattr(conn, "sample_rate", 16000)))
+    parts = "|".join(
+        str(x or "")
+        for x in (
+            type(tts).__name__,
+            getattr(tts, "speaker_id", None) or getattr(tts, "voice", ""),
+            getattr(tts, "reference_audio", ""),
+            getattr(tts, "reference_text", ""),
+        )
+    )
+    fp = hashlib.md5(parts.encode("utf-8")).hexdigest()[:16]
+    return (type(tts).__name__, fp, int(getattr(conn, "sample_rate", 16000)))
 
 
 def get_cached(conn, phrase):
