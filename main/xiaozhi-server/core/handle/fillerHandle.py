@@ -104,11 +104,19 @@ def _voice_key(conn):
     (vá Bug #2: buffer kẹt bản cũ khi audio đổi mà voiceID giữ nguyên).
     """
     tts = getattr(conn, "tts", None)
+    # Gom MỌI thuộc tính định danh giọng của các provider khác nhau:
+    #  - speaker_id/voice/voice_id: blaze, cozecn, minimax, ttson…
+    #  - voice_name + api_key: oriagent_voice (mỗi giọng 1 api_key → phân biệt chắc chắn)
+    #  - reference_audio/reference_text: giọng clone (fishspeech)
     parts = "|".join(
         str(x or "")
         for x in (
             type(tts).__name__,
-            getattr(tts, "speaker_id", None) or getattr(tts, "voice", ""),
+            getattr(tts, "speaker_id", ""),
+            getattr(tts, "voice", ""),
+            getattr(tts, "voice_name", ""),
+            getattr(tts, "voice_id", ""),
+            getattr(tts, "api_key", ""),
             getattr(tts, "reference_audio", ""),
             getattr(tts, "reference_text", ""),
         )
