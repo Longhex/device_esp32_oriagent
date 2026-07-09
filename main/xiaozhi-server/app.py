@@ -1,8 +1,10 @@
+import os
+import signal
 import sys
 import uuid
-import signal
 import asyncio
 from aioconsole import ainput
+
 from config.settings import load_config
 from config.logger import setup_logging
 from core.utils.util import get_local_ip, validate_mcp_endpoint
@@ -13,6 +15,59 @@ from core.utils.gc_manager import get_gc_manager
 
 TAG = __name__
 logger = setup_logging()
+
+VALID_TRANSPORT_MODES = {
+    "websocket_legacy",
+    "mqtt_udp_hybrid",
+    "livekit_bridge",
+}
+
+
+def _is_truthy_env(value: str) -> bool:
+    return value.strip().lower() in ("1", "true", "yes", "on")
+
+
+def resolve_transport_mode() -> str:
+    transport_mode_env = os.environ.get("TRANSPORT_MODE")
+    if transport_mode_env is not None:
+        transport_mode = transport_mode_env.strip().lower()
+        if transport_mode not in VALID_TRANSPORT_MODES:
+            logger.bind(tag=TAG).warning(
+                f"Unsupported TRANSPORT_MODE={transport_mode_env}, fallback to websocket_legacy"
+            )
+            return "websocket_legacy"
+        if transport_mode == "livekit_bridge":
+            logger.bind(tag=TAG).warning(
+                "TRANSPORT_MODE=livekit_bridge is not implemented in Phase 1, fallback to websocket_legacy"
+            )
+            return "websocket_legacy"
+        return transport_mode
+
+    logger.bind(tag=TAG).info(
+        "TRANSPORT_MODE not set, using ENABLE_HYBRID_GATEWAY compatibility flag"
+    )
+    if _is_truthy_env(os.environ.get("ENABLE_HYBRID_GATEWAY", "false")):
+        return "mqtt_udp_hybrid"
+    return "websocket_legacy"
+
+
+def resolve_server_auth_key(config: dict) -> str:
+    """Resolve auth_key without forcing test defaults into production paths."""
+    auth_key = config["server"].get("auth_key", "")
+
+    if not auth_key or len(auth_key) == 0 or "你" in auth_key:
+        auth_key = config.get("manager-api", {}).get("secret", "")
+        if not auth_key or len(auth_key) == 0 or "你" in auth_key:
+            auth_key = str(uuid.uuid4().hex)
+
+    test_auth = os.environ.get("HYBRID_TEST_AUTH_KEY", "").strip()
+    if test_auth:
+        logger.bind(tag=TAG).warning(
+            "HYBRID_TEST_AUTH_KEY override enabled for this process"
+        )
+        auth_key = test_auth
+
+    return auth_key
 
 
 async def wait_for_exit() -> None:
@@ -46,20 +101,10 @@ async def monitor_stdin():
 async def main():
     check_ffmpeg_installed()
     config = load_config()
+    transport_mode = resolve_transport_mode()
+    logger.bind(tag=TAG).info(f"Transport mode resolved: {transport_mode}")
 
-    # auth_key优先级：配置文件server.auth_key > manager-api.secret > 自动生成
-    # auth_key用于jwt认证，比如视觉分析接口的jwt认证、ota接口的token生成与websocket认证
-    # 获取配置文件中的auth_key
-    auth_key = config["server"].get("auth_key", "")
-    
-    # 验证auth_key，无效则尝试使用manager-api.secret
-    if not auth_key or len(auth_key) == 0 or "你" in auth_key:
-        auth_key = config.get("manager-api", {}).get("secret", "")
-        # 验证secret，无效则生成随机密钥
-        if not auth_key or len(auth_key) == 0 or "你" in auth_key:
-            auth_key = str(uuid.uuid4().hex)
-    
-    config["server"]["auth_key"] = auth_key
+    config["server"]["auth_key"] = resolve_server_auth_key(config)
 
     # BẮT MẠCH: In cấu hình Auth thực tế mà Server đang dùng
     auth_info = config.get("server", {}).get("auth", {})
@@ -75,6 +120,22 @@ async def main():
     # 启动 WebSocket 服务器
     ws_server = WebSocketServer(config)
     ws_task = asyncio.create_task(ws_server.start())
+
+    udp_manager = None
+    udp_task = None
+    mqtt_server = None
+    mqtt_task = None
+    if transport_mode == "mqtt_udp_hybrid":
+        logger.bind(tag=TAG).info("Hybrid gateway enabled: starting MQTT signaling + UDP media services")
+        from core.udp_server import udp_manager
+        udp_task = asyncio.create_task(udp_manager.start_server(port=5000))
+
+        from core.mqtt_server import MqttServer
+        mqtt_server = MqttServer(config, ws_server)
+        mqtt_task = asyncio.create_task(mqtt_server.start())
+    else:
+        logger.bind(tag=TAG).info("Hybrid gateway disabled: WebSocket voice path remains active as the default transport")
+
     # 启动 Simple http 服务器
     ota_server = SimpleHttpServer(config)
     ota_task = asyncio.create_task(ota_server.start())
@@ -133,15 +194,38 @@ async def main():
         # 停止全局GC管理器
         await gc_manager.stop()
 
+        if mqtt_server:
+            try:
+                await mqtt_server.stop()
+            except Exception as mqtt_stop_error:
+                logger.bind(tag=TAG).warning(f"MQTT stop warning: {mqtt_stop_error}")
+
+        if udp_manager:
+            try:
+                await udp_manager.stop_server()
+            except Exception as udp_stop_error:
+                logger.bind(tag=TAG).warning(f"UDP stop warning: {udp_stop_error}")
+
         # 取消所有任务（关键修复点）
         stdin_task.cancel()
         ws_task.cancel()
+        if mqtt_task:
+            mqtt_task.cancel()
+        if udp_task:
+            udp_task.cancel()
         if ota_task:
             ota_task.cancel()
 
         # 等待任务终止（必须加超时）
+        wait_tasks = [stdin_task, ws_task]
+        if ota_task:
+            wait_tasks.append(ota_task)
+        if udp_task:
+            wait_tasks.append(udp_task)
+        if mqtt_task:
+            wait_tasks.append(mqtt_task)
         await asyncio.wait(
-            [stdin_task, ws_task, ota_task] if ota_task else [stdin_task, ws_task],
+            wait_tasks,
             timeout=3.0,
             return_when=asyncio.ALL_COMPLETED,
         )

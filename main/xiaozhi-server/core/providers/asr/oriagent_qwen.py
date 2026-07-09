@@ -1,9 +1,10 @@
 import os
 import time
 import asyncio
+import json
 import requests
 from config.logger import setup_logging
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 from core.providers.asr.dto.dto import InterfaceType
 from core.providers.asr.base import ASRProviderBase
 
@@ -20,6 +21,63 @@ def _normalize_language(value, default="auto"):
     if v.startswith("en") or v == "english":
         return "en"
     return default
+
+
+def _safe_preview(value: Any, limit: int = 120) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        text = value.strip()
+    else:
+        try:
+            text = json.dumps(value, ensure_ascii=False)
+        except Exception:
+            text = str(value)
+    text = text.replace("\r", " ").replace("\n", " ").strip()
+    return text[:limit]
+
+
+def _extract_text_from_payload(payload: Any) -> str:
+    if isinstance(payload, str):
+        return payload.strip()
+
+    if isinstance(payload, list):
+        parts = []
+        for item in payload:
+            item_text = _extract_text_from_payload(item)
+            if item_text:
+                parts.append(item_text)
+        return " ".join(parts).strip()
+
+    if not isinstance(payload, dict):
+        return ""
+
+    for key in ("text", "transcript", "content"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    for key in ("result", "data"):
+        nested_text = _extract_text_from_payload(payload.get(key))
+        if nested_text:
+            return nested_text
+
+    segments = payload.get("segments")
+    if isinstance(segments, list):
+        segment_text = _extract_text_from_payload(segments)
+        if segment_text:
+            return segment_text
+
+    return ""
+
+
+def _debug_enabled() -> bool:
+    return os.environ.get("DEBUG_QWEN_ASR", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
 
 
 class ASRProvider(ASRProviderBase):
@@ -89,6 +147,14 @@ class ASRProvider(ASRProviderBase):
             logger.bind(tag=TAG).info(
                 f"[QWEN_ASR_START] session={session_id} file={os.path.basename(file_path)}"
             )
+            if _debug_enabled():
+                logger.bind(tag=TAG).info(
+                    "[QWEN_ASR_REQUEST] session={} endpoint={} field=file mime=audio/wav language_mode={} provider={}",
+                    session_id,
+                    self.api_url,
+                    self.language_mode,
+                    self.provider,
+                )
 
             # Quan trọng: không gọi requests.post trực tiếp trong async function,
             # nếu không event loop sẽ bị block và nhiều thiết bị sẽ bị xử lý tuần tự.
@@ -98,12 +164,35 @@ class ASRProvider(ASRProviderBase):
             logger.bind(tag=TAG).info(
                 f"[QWEN_ASR_DONE] session={session_id} status={response.status_code} cost={elapsed:.3f}s"
             )
-            logger.bind(tag=TAG).debug(
-                f"Oriagent Qwen STT result: {response.text[:300]}"
-            )
+            if _debug_enabled():
+                logger.bind(tag=TAG).debug(
+                    f"Oriagent Qwen STT result: {response.text[:300]}"
+                )
 
             if response.status_code == 200:
-                text = (response.json().get("text") or "").strip()
+                try:
+                    payload = response.json()
+                except Exception:
+                    payload = response.text
+
+                keys = list(payload.keys())[:10] if isinstance(payload, dict) else []
+                text = _extract_text_from_payload(payload)
+                if _debug_enabled():
+                    logger.bind(tag=TAG).info(
+                        "[QWEN_ASR_RESPONSE] status={} type={} keys={} text_len={} preview={}",
+                        response.status_code,
+                        type(payload).__name__,
+                        keys,
+                        len(text),
+                        _safe_preview(text or payload),
+                    )
+                else:
+                    logger.bind(tag=TAG).info(
+                        "[QWEN_ASR_RESPONSE] status={} type={} text_len={}",
+                        response.status_code,
+                        type(payload).__name__,
+                        len(text),
+                    )
                 return text, file_path
             if response.status_code == 429:
                 raise Exception(

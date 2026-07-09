@@ -196,4 +196,5 @@ deploy/data/*
 !main/manager-mobile/**/env/
 !main/manager-mobile/**/.env*
 !main/manager-mobile/**/*.json
-!main/xiaozhi-server/**/*.json
+!main/xiaozhi-server/**/*.json.codex/  
+firmware/.pio/ 

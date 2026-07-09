@@ -3,6 +3,11 @@
 # The system prioritizes [data/.config.yaml]. If a configuration does not exist there, it will automatically fall back to [config.yaml].
 # This approach simplifies configuration and protects your secret keys.
 # If you use the control panel, the following configurations will not take effect; please modify configurations in the control panel instead.
+# Runtime transport selection is controlled by env in Phase 1:
+#   TRANSPORT_MODE=websocket_legacy
+#   TRANSPORT_MODE=mqtt_udp_hybrid
+#   TRANSPORT_MODE=livekit_bridge   # planned only, falls back to websocket_legacy
+# If TRANSPORT_MODE is unset, the server keeps backward compatibility with ENABLE_HYBRID_GATEWAY.
 
 # #####################################################################################
 # ############################# Basic Server Configuration ############################
@@ -460,8 +465,8 @@ LLM:
   # ── Oriagent WebSocket (so sánh A/B với OriagentHTTP) ─────────────────────
   OriagentWebSocket:
     type: oriagent_websocket
-    ws_url: "ws://localhost:5001/ws/chat"
-    api_key: "app-7yFCHtUo7GTputO2rlXhkqbe"
+    ws_url: "wss://api.oriagent.com/ws/chat"
+    api_key: "your_api_key"
     model_name: "oriagent-websocket"
 
 VLLM:

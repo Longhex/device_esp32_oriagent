@@ -35,6 +35,7 @@ from core.connection import ConnectionHandler
 from config.config_loader import get_config_from_api_async
 from core.auth import AuthManager, AuthenticationError
 from core.utils.modules_initialize import initialize_modules
+from core.utils.util import sanitize_headers
 from core.utils.util import check_vad_update, check_asr_update
 
 TAG = __name__
@@ -82,7 +83,7 @@ class WebSocketServer:
     async def _handle_connection(self, websocket: websockets.ServerConnection):
         """Handle new connections, creating a separate ConnectionHandler each time"""
         headers = dict(websocket.request.headers)
-        self.logger.bind(tag=TAG).debug(f"New connection. Headers: {headers}")
+        self.logger.bind(tag=TAG).debug(f"New connection. Headers: {sanitize_headers(headers)}")
 
         device_id = headers.get("device-id", None)
         if device_id is None:

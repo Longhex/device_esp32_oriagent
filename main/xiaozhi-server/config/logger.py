@@ -38,6 +38,10 @@ def build_module_string(selected_module):
 def formatter(record):
     """为没有 tag 的日志添加默认值，并处理动态模块字符串"""
     record["extra"].setdefault("tag", record["name"])
+    record["extra"].setdefault("transport", "SYS")
+    record["extra"].setdefault("phase", "-")
+    record["extra"].setdefault("device", "-")
+    record["extra"].setdefault("session", "-")
     # 如果没有设置 selected_module，使用默认值
     record["extra"].setdefault("selected_module", "00000000000000")
     # 将 selected_module 从 extra 提取到顶级，以支持 {selected_module} 格式
@@ -63,11 +67,11 @@ def setup_logging():
 
         log_format = log_config.get(
             "log_format",
-            "<green>{time:YYMMDD HH:mm:ss}</green>[{version}_{extra[selected_module]}][<light-blue>{extra[tag]}</light-blue>]-<level>{level}</level>-<light-green>{message}</light-green>",
+            "<green>{time:YYMMDD HH:mm:ss}</green>[{version}_{extra[selected_module]}][<cyan>{extra[transport]}</cyan>][<magenta>{extra[phase]}</magenta>][<yellow>{extra[device]}</yellow>][<blue>{extra[session]}</blue>][<light-blue>{extra[tag]}</light-blue>]-<level>{level}</level>-<light-green>{message}</light-green>",
         )
         log_format_file = log_config.get(
             "log_format_file",
-            "{time:YYYY-MM-DD HH:mm:ss} - {version}_{extra[selected_module]} - {name} - {level} - {extra[tag]} - {message}",
+            "{time:YYYY-MM-DD HH:mm:ss} - {version}_{extra[selected_module]} - {extra[transport]} - {extra[phase]} - {extra[device]} - {extra[session]} - {name} - {level} - {extra[tag]} - {message}",
         )
         log_format = log_format.replace("{version}", SERVER_VERSION)
         log_format_file = log_format_file.replace("{version}", SERVER_VERSION)
@@ -112,3 +116,25 @@ def setup_logging():
 def create_connection_logger(selected_module_str):
     """为连接创建独立的日志器，绑定特定的模块字符串"""
     return logger.bind(selected_module=selected_module_str)
+
+
+def _short_value(value, max_len=16):
+    if value is None:
+        return "-"
+    value = str(value)
+    if not value:
+        return "-"
+    return value if len(value) <= max_len else value[:max_len]
+
+
+def bind_log_context(base_logger, transport=None, phase=None, device_id=None, session_id=None):
+    extra = {}
+    if transport:
+        extra["transport"] = transport
+    if phase:
+        extra["phase"] = phase
+    if device_id is not None:
+        extra["device"] = _short_value(device_id, max_len=18)
+    if session_id is not None:
+        extra["session"] = _short_value(session_id, max_len=12)
+    return base_logger.bind(**extra)

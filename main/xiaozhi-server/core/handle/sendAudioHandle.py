@@ -90,28 +90,14 @@ async def _wait_for_audio_completion(conn: "ConnectionHandler"):
         conn.logger.bind(tag=TAG).debug("音频发送完成")
 
 
-async def _send_to_mqtt_gateway(
-    conn: "ConnectionHandler", opus_packet, timestamp, sequence
-):
+async def _send_to_mqtt_gateway(conn: "ConnectionHandler", opus_packet):
     """
-    发送带16字节头部的opus数据包给mqtt_gateway
-    Args:
-        conn: 连接对象
-        opus_packet: opus数据包
-        timestamp: 时间戳
-        sequence: 序列号
+    Hybrid MQTT+UDP path:
+    - signaling/control runs over MQTT
+    - media frames are wrapped into the 12-byte UDP header by VirtualWebsocket/UdpMediaSession
+    So this path must forward raw audio bytes only.
     """
-    # 为opus数据包添加16字节头部
-    header = bytearray(16)
-    header[0] = 1  # type
-    header[2:4] = len(opus_packet).to_bytes(2, "big")  # payload length
-    header[4:8] = sequence.to_bytes(4, "big")  # sequence
-    header[8:12] = timestamp.to_bytes(4, "big")  # 时间戳
-    header[12:16] = len(opus_packet).to_bytes(4, "big")  # opus长度
-
-    # 发送包含头部的完整数据包
-    complete_packet = bytes(header) + opus_packet
-    await conn.websocket.send(complete_packet)
+    await conn.websocket.send(opus_packet)
 
 
 async def sendAudio(
@@ -264,10 +250,7 @@ async def _do_send_audio(conn: "ConnectionHandler", opus_packet, flow_control):
     sequence = flow_control.get("sequence", 0)
 
     if conn.conn_from_mqtt_gateway:
-        # 计算时间戳（基于播放位置）
-        start_time = time.time()
-        timestamp = int(start_time * 1000) % (2**32)
-        await _send_to_mqtt_gateway(conn, opus_packet, timestamp, sequence)
+        await _send_to_mqtt_gateway(conn, opus_packet)
     else:
         # 直接发送opus数据包
         await conn.websocket.send(opus_packet)
@@ -281,6 +264,10 @@ async def send_tts_message(conn: "ConnectionHandler", state, text=None):
     """发送 TTS 状态消息"""
     if text is None and state == "sentence_start":
         return
+    preview_text = _strip_lang_tags(text)[:80] if text else None
+    conn.logger.bind(tag=TAG, phase="TTS").info(
+        f"TTS state={state}" + (f" text={preview_text}" if preview_text else "")
+    )
     message = {"type": "tts", "state": state, "session_id": conn.session_id}
     if text is not None:
         message["text"] = textUtils.check_emoji(_strip_lang_tags(text))
@@ -298,7 +285,11 @@ async def send_tts_message(conn: "ConnectionHandler", state, text=None):
         # 等待所有音频包发送完成
         await _wait_for_audio_completion(conn)
         # 停止音频发送循环
-        conn.audio_rate_controller.stop_sending()
+        controller = getattr(conn, "audio_rate_controller", None)
+        if controller is not None:
+            controller.stop_sending()
+        else:
+            conn.logger.bind(tag=TAG).warning("[TTS] audio_rate_controller missing on stop; skip stop_sending")
         # 清除服务端讲话状态
         conn.clearSpeakStatus()
 
@@ -329,6 +320,7 @@ async def send_stt_message(conn: "ConnectionHandler", text):
         # 如果不是JSON格式，直接使用原始文本
         display_text = text
     stt_text = textUtils.get_string_no_punctuation_or_emoji(display_text)
+    conn.logger.bind(tag=TAG, phase="STT").info(f"STT emit: {stt_text[:80]}")
     await conn.websocket.send(
         json.dumps({"type": "stt", "text": stt_text, "session_id": conn.session_id})
     )

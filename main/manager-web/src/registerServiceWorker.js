@@ -5,19 +5,19 @@ export const register = () => {
     window.addEventListener('load', () => {
       const swUrl = `${process.env.BASE_URL}service-worker.js`;
       
-      console.info(`[小智服务] 正在尝试注册Service Worker，URL: ${swUrl}`);
+      console.info(`[Dịch vụ Xiaozhi] Đang thử đăng ký Service Worker, URL: ${swUrl}`);
       
       // 先检查Service Worker是否已注册
       navigator.serviceWorker.getRegistrations().then(registrations => {
         if (registrations.length > 0) {
-          console.info('[小智服务] 发现已有Service Worker注册，正在检查更新');
+          console.info('[Dịch vụ Xiaozhi] Đã tìm thấy Service Worker đã được đăng ký, đang kiểm tra cập nhật');
         }
         
         // 继续注册Service Worker
         navigator.serviceWorker
           .register(swUrl)
           .then(registration => {
-            console.info('[小智服务] Service Worker注册成功');
+            console.info('[Dịch vụ Xiaozhi] Đăng ký Service Worker thành công');
             
             // 更新处理
             registration.onupdatefound = () => {
@@ -29,7 +29,7 @@ export const register = () => {
                 if (installingWorker.state === 'installed') {
                   if (navigator.serviceWorker.controller) {
                     // 内容已缓存更新，通知用户刷新
-                    console.log('[小智服务] 新内容可用，请刷新页面');
+                    console.log('[Dịch vụ Xiaozhi] Nội dung mới đã có sẵn, vui lòng làm mới trang');
                     // 可以在这里展示更新提示
                     const updateNotification = document.createElement('div');
                     updateNotification.style.cssText = `
@@ -45,8 +45,8 @@ export const register = () => {
                     `;
                     updateNotification.innerHTML = `
                       <div style="display: flex; align-items: center;">
-                        <span style="margin-right: 10px;">发现新版本，点击刷新应用</span>
-                        <button style="background: white; color: #000000; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">刷新</button>
+                        <span style="margin-right: 10px;">Đã tìm thấy phiên bản mới; hãy chạm để làm mới ứng dụng.</span>
+                        <button style="background: white; color: #000000; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Làm mới</button>
                       </div>
                     `;
                     document.body.appendChild(updateNotification);
@@ -55,7 +55,7 @@ export const register = () => {
                     });
                   } else {
                     // 一切正常，Service Worker已成功安装
-                    console.log('[小智服务] 内容已缓存供离线使用');
+                    console.log('[Dịch vụ Xiaozhi] Nội dung đã được lưu vào bộ nhớ đệm để sử dụng khi ngoại tuyến.');
                     
                     // 可以在这里初始化缓存
                     setTimeout(() => {
@@ -74,7 +74,7 @@ export const register = () => {
                       // 预热缓存
                       cdnUrls.forEach(url => {
                         fetch(url, { mode: 'no-cors' }).catch(err => {
-                          console.log(`预热缓存 ${url} 失败`, err);
+                          console.log(`Làm nóng bộ nhớ đệm ${url} thất bại`, err);
                         });
                       });
                     }, 2000);
@@ -84,13 +84,13 @@ export const register = () => {
             };
           })
           .catch(error => {
-            console.error('Service Worker 注册失败:', error);
+            console.error('Đăng ký Service Worker thất bại:', error);
             
             if (error.name === 'TypeError' && error.message.includes('Failed to register a ServiceWorker')) {
-              console.warn('[小智服务] 注册Service Worker时出现网络错误，CDN资源可能无法缓存');
+              console.warn('[Dịch vụ Xiaozhi] Lỗi mạng khi đăng ký Service Worker, tài nguyên CDN có thể không được lưu vào bộ nhớ đệm');
               if (process.env.NODE_ENV === 'production') {
                 console.info(
-                  '可能原因：1. 服务器未配置正确的MIME类型 2. 服务器SSL证书问题 3. 服务器未返回service-worker.js文件'
+                  'Nguyên nhân có thể: 1. Máy chủ chưa cấu hình đúng loại MIME 2. Lỗi chứng chỉ SSL của máy chủ 3. Máy chủ không trả về file service-worker.js'
                 );
               }
             }

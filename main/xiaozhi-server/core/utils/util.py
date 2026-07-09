@@ -519,6 +519,61 @@ def filter_sensitive_info(config: dict) -> dict:
     return _filter_dict(copy.deepcopy(config))
 
 
+def sanitize_headers(headers: dict) -> dict:
+    """Mask sensitive headers and trim noisy values before logging."""
+    if not isinstance(headers, dict):
+        return {}
+
+    masked_headers = {}
+    sensitive_header_keys = {
+        "authorization",
+        "cookie",
+        "set-cookie",
+        "sec-websocket-key",
+        "proxy-authorization",
+    }
+
+    for key, value in headers.items():
+        lower_key = str(key).lower()
+        if lower_key in sensitive_header_keys or "token" in lower_key:
+            masked_headers[key] = "***"
+        elif lower_key == "x-original-uri" and isinstance(value, str):
+            masked_headers[key] = value.split("?", 1)[0] + "?***"
+        else:
+            masked_headers[key] = value
+
+    return masked_headers
+
+
+def summarize_private_config_for_log(config: dict) -> dict:
+    """Keep config logs useful without dumping the full private payload."""
+    if not isinstance(config, dict):
+        return {}
+
+    tts_section = config.get("TTS", {})
+    selected_module = config.get("selected_module", {})
+    summary = {
+        "selected_module": selected_module,
+        "plugin_count": len(config.get("plugins", {})),
+        "plugin_names": sorted(list(config.get("plugins", {}).keys()))[:20],
+        "has_prompt": bool(config.get("prompt")),
+        "prompt_len": len(config.get("prompt", "")) if isinstance(config.get("prompt"), str) else 0,
+        "llm_modules": sorted(list(config.get("LLM", {}).keys()))[:10],
+        "asr_modules": sorted(list(config.get("ASR", {}).keys()))[:10],
+        "tts_modules": sorted(list(tts_section.keys()))[:10],
+        "delete_audio": bool(config.get("delete_audio", True)),
+        "chat_history_conf": config.get("chat_history_conf"),
+        "device_max_output_size": config.get("device_max_output_size"),
+    }
+
+    for tts_name, tts_cfg in tts_section.items():
+        if isinstance(tts_cfg, dict) and "voices" in tts_cfg and isinstance(tts_cfg["voices"], list):
+            summary["tts_voice_count"] = len(tts_cfg["voices"])
+            break
+
+    return summary
+
+
 def get_vision_url(config: dict) -> str:
     """获取 vision URL
 

@@ -14,9 +14,39 @@ from core.handle.sendAudioHandle import send_stt_message, SentenceType
 TAG = __name__
 
 
+def _should_log_hybrid_audio_event(conn: "ConnectionHandler", event_name: str, interval: int = 25) -> bool:
+    counters = getattr(conn, "_hybrid_audio_log_counters", None)
+    if counters is None:
+        counters = {}
+        setattr(conn, "_hybrid_audio_log_counters", counters)
+
+    count = counters.get(event_name, 0) + 1
+    counters[event_name] = count
+    return count == 1 or count % interval == 0
+
+
 async def handleAudioMessage(conn: "ConnectionHandler", audio):
+    if _should_log_hybrid_audio_event(conn, "handle_audio_message"):
+        conn.logger.bind(tag=TAG).info(
+            "[HYBRID-AUDIO] handle_audio_message device={} session={} chunk_len={} audio_format={}",
+            conn.device_id or "-",
+            conn.session_id or "-",
+            len(audio) if audio is not None else 0,
+            conn.audio_format,
+        )
+
     # 当前片段是否有人说话
     have_voice = conn.vad.is_vad(conn, audio)
+    if _should_log_hybrid_audio_event(conn, "vad_decision"):
+        conn.logger.bind(tag=TAG).info(
+            "[HYBRID-AUDIO] vad_chunk device={} session={} chunk_len={} audio_format={} have_voice={} buffered_frames={}",
+            conn.device_id or "-",
+            conn.session_id or "-",
+            len(audio) if audio is not None else 0,
+            conn.audio_format,
+            have_voice,
+            len(conn.asr_audio),
+        )
     # 如果设备刚刚被唤醒，短暂忽略VAD检测
     if hasattr(conn, "just_woken_up") and conn.just_woken_up:
         have_voice = False
@@ -60,6 +90,10 @@ async def startToChat(conn: "ConnectionHandler", text):
     except (json.JSONDecodeError, KeyError):
         # 如果解析失败，继续使用原始文本
         pass
+
+    conn.logger.bind(tag=TAG, phase="INPUT").info(
+        f"Pipeline input accepted: {actual_text[:120]}"
+    )
 
     # 保存说话人信息到连接对象
     if speaker_name:

@@ -16,6 +16,8 @@ from core.utils.util import (
     check_vad_update,
     check_asr_update,
     filter_sensitive_info,
+    sanitize_headers,
+    summarize_private_config_for_log,
 )
 from typing import Dict, Any
 from collections import deque
@@ -36,7 +38,7 @@ from plugins_func.register import Action
 from core.auth import AuthenticationError
 from config.config_loader import get_private_config_from_api
 from core.providers.tts.dto.dto import ContentType, TTSMessageDTO, SentenceType
-from config.logger import setup_logging, build_module_string, create_connection_logger
+from config.logger import setup_logging, build_module_string, create_connection_logger, bind_log_context
 from config.manage_api_client import DeviceNotFoundException, DeviceBindException
 from core.utils.prompt_manager import PromptManager
 from core.utils.voiceprint_provider import VoiceprintProvider
@@ -105,7 +107,7 @@ class ConnectionHandler:
         self.common_config = config
         self.config = copy.deepcopy(config)
         self.session_id = str(uuid.uuid4())
-        self.logger = setup_logging()
+        self.logger = bind_log_context(setup_logging(), phase="CONN", session_id=self.session_id)
         self.server = server  # 保存server实例的引用
 
         self.need_bind = False  # 是否需要绑定设备
@@ -233,6 +235,8 @@ class ConnectionHandler:
 
         # 初始化提示词管理器
         self.prompt_manager = PromptManager(self.config, self.logger)
+        self._hybrid_asr_channels_started = False
+        self._hybrid_tts_channels_started = False
 
     def _is_dify_llm(self) -> bool:
         """Check if current LLM is a Dify-based provider (Oriagent)"""
@@ -303,11 +307,14 @@ class ConnectionHandler:
                 self.client_ip = real_ip.split(",")[0].strip()
             else:
                 self.client_ip = ws.remote_address[0]
-            self.logger.bind(tag=TAG).info(
-                f"{self.client_ip} conn - Headers: {self.headers}"
-            )
-
             self.device_id = self.headers.get("device-id", None)
+            self.logger = bind_log_context(
+                self.logger,
+                device_id=self.device_id,
+            )
+            self.logger.bind(tag=TAG).info(
+                f"{self.client_ip} conn - Headers: {sanitize_headers(self.headers)}"
+            )
             self.oriagent_conversation_id = load_conversation_id(self.device_id)
             if self.oriagent_conversation_id:
                 self.logger.bind(tag=TAG).info(
@@ -321,8 +328,22 @@ class ConnectionHandler:
             # 检查是否来自MQTT连接
             request_path = ws.request.path
             self.conn_from_mqtt_gateway = request_path.endswith("?from=mqtt_gateway")
+            transport_name = "HYBRID" if self.conn_from_mqtt_gateway else "WS"
+            self.logger = bind_log_context(
+                self.logger,
+                transport=transport_name,
+                phase="CONN",
+                device_id=self.device_id,
+                session_id=self.session_id,
+            )
+            self.logger.bind(tag=TAG).info(f"Transport selected: {transport_name}")
             if self.conn_from_mqtt_gateway:
                 self.logger.bind(tag=TAG).info("连接来自:MQTT网关")
+                self.logger.bind(tag=TAG).info(
+                    "[HYBRID-LIFECYCLE] handle_connection_start conn={} transport=virtual queue_id={}",
+                    id(self),
+                    id(self.asr_audio_queue),
+                )
 
             # 初始化活动时间戳
             self.first_activity_time = time.time() * 1000
@@ -544,14 +565,17 @@ class ConnectionHandler:
 
     def _initialize_components(self):
         try:
-            if self.tts is None:
-                self.tts = self._initialize_tts()
-            asyncio.run_coroutine_threadsafe(
-                self.tts.open_audio_channels(self), self.loop
-            )
             if self.need_bind:
                 self.bind_completed_event.set()
                 return
+
+            if self.conn_from_mqtt_gateway:
+                self._initialize_hybrid_input_stack()
+
+            if self.tts is None:
+                self.tts = self._initialize_tts()
+            self._open_tts_audio_channels()
+
             self.selected_module_str = build_module_string(
                 self.config.get("selected_module", {})
             )
@@ -567,16 +591,9 @@ class ConnectionHandler:
                 )
 
             """Initialize local components"""
-            if self.vad is None:
-                self.vad = self._vad
-            if self.asr is None:
-                self.asr = self._initialize_asr()
-
-            # Voiceprint
-            self._initialize_voiceprint()
-            asyncio.run_coroutine_threadsafe(
-                self.asr.open_audio_channels(self), self.loop
-            )
+            if not self.conn_from_mqtt_gateway:
+                self._initialize_local_audio_components()
+                self._open_asr_audio_channels()
 
             """Load memory"""
             self._initialize_memory()
@@ -597,6 +614,65 @@ class ConnectionHandler:
 
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"Failed to instantiate components: {e}")
+
+    def _initialize_local_audio_components(self):
+        if self.vad is None:
+            self.vad = self._vad
+        if self.asr is None:
+            self.asr = self._initialize_asr()
+
+        self._initialize_voiceprint()
+
+    def _initialize_hybrid_input_stack(self):
+        self._initialize_local_audio_components()
+        self._open_asr_audio_channels()
+
+    async def _bootstrap_hybrid_audio_input_channels(self):
+        if self.vad is None and self._vad is not None:
+            self.vad = self._vad
+        elif self.vad is None:
+            self.vad = self._vad
+
+        if self.asr is None and self._asr is not None:
+            self.asr = self._asr
+        elif self.asr is None:
+            self.asr = self._initialize_asr()
+        if self._hybrid_asr_channels_started:
+            return
+
+        self.logger.bind(tag=TAG).info(
+            "[HYBRID-LIFECYCLE] early_input_bootstrap conn={} queue_id={} asr={}",
+            id(self),
+            id(self.asr_audio_queue),
+            type(self.asr).__name__,
+        )
+        await self.asr.open_audio_channels(self)
+        self._hybrid_asr_channels_started = True
+
+    def _open_tts_audio_channels(self):
+        if self.tts is None or self._hybrid_tts_channels_started:
+            return
+
+        asyncio.run_coroutine_threadsafe(
+            self.tts.open_audio_channels(self), self.loop
+        )
+        self._hybrid_tts_channels_started = True
+
+    def _open_asr_audio_channels(self):
+        if self.asr is None or self._hybrid_asr_channels_started:
+            return
+
+        self.logger.bind(tag=TAG).info(
+            "[HYBRID-LIFECYCLE] open_audio_channels_called conn={} queue_id={} asr={}",
+            id(self),
+            id(self.asr_audio_queue),
+            type(self.asr).__name__,
+        )
+        future = asyncio.run_coroutine_threadsafe(
+            self.asr.open_audio_channels(self), self.loop
+        )
+        future.result(timeout=5)
+        self._hybrid_asr_channels_started = True
 
     def _init_prompt_enhancement(self):
 
@@ -638,8 +714,20 @@ class ConnectionHandler:
                 self._asr is not None
                 and hasattr(self._asr, "interface_type")
                 and self._asr.interface_type == InterfaceType.LOCAL
+                and not self.read_config_from_api
         ):
             asr = self._asr
+            selected_key = self.config.get("selected_module", {}).get("ASR", "unset")
+            asr_type = (
+                self.config.get("ASR", {}).get(selected_key, {}).get("type", selected_key)
+            )
+            self.logger.bind(tag=TAG).info(
+                "[PROVIDER-SELECT] asr_provider key={} type={} class={} source={}",
+                selected_key or "unset",
+                asr_type or "unset",
+                f"{asr.__class__.__module__}.{asr.__class__.__name__}",
+                "shared_server_instance",
+            )
         else:
             asr = initialize_asr(self.config)
 
@@ -664,7 +752,18 @@ class ConnectionHandler:
     async def _background_initialize(self):
         """Background initialization"""
         try:
+            if self.conn_from_mqtt_gateway:
+                self.logger.bind(tag=TAG).info(
+                    "[HYBRID-LIFECYCLE] background_initialize_start conn={} queue_id={} read_config_from_api={}",
+                    id(self),
+                    id(self.asr_audio_queue),
+                    self.read_config_from_api,
+                )
+                if not self.read_config_from_api:
+                    await self._bootstrap_hybrid_audio_input_channels()
             await self._initialize_private_config_async()
+            if self.conn_from_mqtt_gateway and self.read_config_from_api:
+                await self._bootstrap_hybrid_audio_input_channels()
             self.executor.submit(self._initialize_components)
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"Background initialization failed: {e}")
@@ -683,8 +782,9 @@ class ConnectionHandler:
                 self.headers.get("client-id", self.headers.get("device-id")),
             )
             private_config["delete_audio"] = bool(self.config.get("delete_audio", True))
-            self.logger.bind(tag=TAG).info(
-                f"{time.time() - begin_time} seconds, differential config success: {json.dumps(filter_sensitive_info(private_config), ensure_ascii=False)}"
+            self.logger.bind(tag=TAG, phase="INIT").info(
+                f"{time.time() - begin_time:.3f}s, differential config success: "
+                f"{json.dumps(summarize_private_config_for_log(filter_sensitive_info(private_config)), ensure_ascii=False)}"
             )
             self.need_bind = False
             self.bind_completed_event.set()
@@ -901,7 +1001,7 @@ class ConnectionHandler:
 
     def chat(self, query, depth=0):
         if query is not None:
-            self.logger.bind(tag=TAG).info(f"大模型收到用户消息: {query}")
+            self.logger.bind(tag=TAG, phase="LLM").info(f"LLM input: {query}")
 
         # 为最顶层时新建会话ID和发送FIRST请求
         if depth == 0:
@@ -1404,7 +1504,9 @@ class ConnectionHandler:
             
             # Enhanced Logging: Final message returned to user
             conv_info = f" [ConvID: {self.oriagent_conversation_id}]" if self._is_dify_llm() and self.oriagent_conversation_id else ""
-            self.logger.bind(tag=TAG).info(f"LLM Response complete: {text_buff[:100]}...{conv_info}")
+            self.logger.bind(tag=TAG, phase="LLM").info(
+                f"LLM response complete: {text_buff[:100]}...{conv_info}"
+            )
 
             # 更新工具调用统计：如果没有调用工具，增加计数
             if depth == 0 and not tool_call_flag:

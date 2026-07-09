@@ -19,6 +19,7 @@ from core.handle.receiveAudioHandle import startToChat
 from core.handle.reportHandle import enqueue_asr_report
 from core.utils.util import remove_punctuation_and_length
 from core.handle.receiveAudioHandle import handleAudioMessage
+from core.udp_server import HYBRID_EOS_MARKER
 from typing import Optional, Tuple, List, NamedTuple, TYPE_CHECKING
 
 
@@ -29,22 +30,85 @@ TAG = __name__
 logger = setup_logging()
 
 
+def _should_log_hybrid_asr_event(conn: "ConnectionHandler", event_name: str, interval: int = 25) -> bool:
+    counters = getattr(conn, "_hybrid_asr_log_counters", None)
+    if counters is None:
+        counters = {}
+        setattr(conn, "_hybrid_asr_log_counters", counters)
+
+    count = counters.get(event_name, 0) + 1
+    counters[event_name] = count
+    return count == 1 or count % interval == 0
+
+
+def _is_hybrid_control_message(message) -> bool:
+    return isinstance(message, dict) and message.get("type") == HYBRID_EOS_MARKER
+
+
+def _message_length(message) -> int:
+    if isinstance(message, (bytes, bytearray)):
+        return len(message)
+    return 0
+
+
 class ASRProviderBase(ABC):
     def __init__(self):
         pass
 
-    # 打开音频通道
     async def open_audio_channels(self, conn: "ConnectionHandler"):
+        existing_thread = getattr(conn, "asr_priority_thread", None)
+        if existing_thread is not None and existing_thread.is_alive():
+            conn.logger.bind(tag=TAG).info(
+                "[HYBRID-ASR] asr_consumer_thread_already_running conn={} queue_id={}",
+                id(conn),
+                id(conn.asr_audio_queue),
+            )
+            return
+
+        conn.logger.bind(tag=TAG).info(
+            "[HYBRID-ASR] asr_consumer_thread_start conn={} queue_id={}",
+            id(conn),
+            id(conn.asr_audio_queue),
+        )
         conn.asr_priority_thread = threading.Thread(
             target=self.asr_text_priority_thread, args=(conn,), daemon=True
         )
         conn.asr_priority_thread.start()
 
-    # 有序处理ASR音频
     def asr_text_priority_thread(self, conn: "ConnectionHandler"):
+        if getattr(conn, "_hybrid_asr_wait_logged", False) is False:
+            conn.logger.bind(tag=TAG).info(
+                "[HYBRID-ASR] asr_queue_waiting conn={} queue_id={}",
+                id(conn),
+                id(conn.asr_audio_queue),
+            )
+            conn._hybrid_asr_wait_logged = True
         while not conn.stop_event.is_set():
             try:
                 message = conn.asr_audio_queue.get(timeout=1)
+                if _is_hybrid_control_message(message):
+                    conn.logger.bind(tag=TAG).info(
+                        "[HYBRID-EOS] queue_control device={} session={} marker={} buffered_frames={} listen_mode={}",
+                        conn.device_id or "-",
+                        conn.session_id or "-",
+                        message.get("type"),
+                        len(conn.asr_audio),
+                        conn.client_listen_mode,
+                    )
+                    future = asyncio.run_coroutine_threadsafe(
+                        self.handle_queue_control_message(conn, message),
+                        conn.loop,
+                    )
+                    future.result()
+                    continue
+                if _should_log_hybrid_asr_event(conn, "queue_dequeue"):
+                    conn.logger.bind(tag=TAG).info(
+                        "[HYBRID-AUDIO] queue_dequeue device={} session={} chunk_len={} audio_format={}",
+                        conn.device_id or "-",
+                        conn.session_id or "-",
+                        _message_length(message),
+                        conn.audio_format,
+                    )
                 future = asyncio.run_coroutine_threadsafe(
                     handleAudioMessage(conn, message),
                     conn.loop,
@@ -58,33 +122,81 @@ class ASRProviderBase(ABC):
                 )
                 continue
 
-    # 接收音频
+    async def handle_queue_control_message(self, conn: "ConnectionHandler", message):
+        if not _is_hybrid_control_message(message):
+            return
+
+        buffered_frames = len(conn.asr_audio)
+        conn.client_voice_stop = True
+        conn.logger.bind(tag=TAG).info(
+            "[HYBRID-EOS] end_of_turn_signal device={} session={} buffered_frames={} client_have_voice={} listen_mode={}",
+            conn.device_id or "-",
+            conn.session_id or "-",
+            buffered_frames,
+            conn.client_have_voice,
+            conn.client_listen_mode,
+        )
+
+        if conn.asr.interface_type == InterfaceType.STREAM:
+            if hasattr(conn.asr, "_send_stop_request"):
+                await conn.asr._send_stop_request()
+            return
+
+        if buffered_frames == 0:
+            conn.logger.bind(tag=TAG).info(
+                "[HYBRID-EOS] end_of_turn_ignored device={} session={} reason=no_buffered_audio",
+                conn.device_id or "-",
+                conn.session_id or "-",
+            )
+            return
+
+        asr_audio_task = conn.asr_audio.copy()
+        conn.reset_audio_states()
+        conn.logger.bind(tag=TAG).info(
+            "[HYBRID-ASR] eos_trigger_asr device={} session={} frames={} audio_format={}",
+            conn.device_id or "-",
+            conn.session_id or "-",
+            len(asr_audio_task),
+            conn.audio_format,
+        )
+        await self.handle_voice_stop(conn, asr_audio_task)
+
     async def receive_audio(self, conn: "ConnectionHandler", audio, audio_have_voice):
+        if _should_log_hybrid_asr_event(conn, "receive_audio"):
+            conn.logger.bind(tag=TAG).info(
+                "[HYBRID-AUDIO] receive_audio device={} session={} chunk_len={} audio_format={} have_voice={} listen_mode={}",
+                conn.device_id or "-",
+                conn.session_id or "-",
+                len(audio) if audio is not None else 0,
+                conn.audio_format,
+                audio_have_voice,
+                conn.client_listen_mode,
+            )
+
         if conn.client_listen_mode == "manual":
-            # 手动模式：缓存音频用于ASR识别
             conn.asr_audio.append(audio)
         else:
-            # 自动/实时模式：使用VAD检测
             conn.asr_audio.append(audio)
 
-            # 如果没有语音，且之前也没有声音，缓存部分音频
             if not audio_have_voice and not conn.client_have_voice:
                 conn.asr_audio = conn.asr_audio[-10:]
                 return
 
-            # 自动模式下通过VAD检测到语音停止时触发识别
             if conn.asr.interface_type != InterfaceType.STREAM and conn.client_voice_stop:
                 asr_audio_task = conn.asr_audio.copy()
                 conn.reset_audio_states()
 
                 if len(asr_audio_task) > 15:
+                    conn.logger.bind(tag=TAG).info(
+                        "[HYBRID-AUDIO] vad_voice_stop trigger_asr device={} session={} frames={} audio_format={}",
+                        conn.device_id or "-",
+                        conn.session_id or "-",
+                        len(asr_audio_task),
+                        conn.audio_format,
+                    )
                     await self.handle_voice_stop(conn, asr_audio_task)
 
-    # 处理语音停止
     async def handle_voice_stop(self, conn: "ConnectionHandler", asr_audio_task: List[bytes]):
-        """并行处理ASR和声纹识别"""
-        # Method 4: trigger LLM pool warmup in background while ASR runs (~2-3s).
-        # If pool is already warm this costs ~20ms (HEAD reuse); if cold it saves ~350ms.
         llm = getattr(conn, "llm", None)
         if llm is not None and hasattr(llm, "_warmup_pool"):
             threading.Thread(
@@ -93,21 +205,48 @@ class ASRProviderBase(ABC):
 
         try:
             total_start_time = time.monotonic()
+            conn.logger.bind(tag=TAG, phase="ASR").info(
+                f"ASR start: frames={len(asr_audio_task)} format={conn.audio_format}"
+            )
+            conn.logger.bind(tag=TAG).info(
+                "[HYBRID-ASR] asr_start device={} session={} audio_format={} chunks={}",
+                conn.device_id or "-",
+                conn.session_id or "-",
+                conn.audio_format,
+                len(asr_audio_task),
+            )
 
-            # 准备音频数据
             if conn.audio_format == "pcm":
                 pcm_data = asr_audio_task
             else:
+                conn.logger.bind(tag=TAG).info(
+                    "[HYBRID-ASR] opus_decode_start device={} session={} chunks={}",
+                    conn.device_id or "-",
+                    conn.session_id or "-",
+                    len(asr_audio_task),
+                )
                 pcm_data = self.decode_opus(asr_audio_task)
 
             combined_pcm_data = b"".join(pcm_data)
+            conn.logger.bind(tag=TAG).info(
+                "[HYBRID-ASR] opus_decode_done device={} session={} pcm_frames={} pcm_len={}",
+                conn.device_id or "-",
+                conn.session_id or "-",
+                len(pcm_data),
+                len(combined_pcm_data),
+            )
 
-            # 预先准备WAV数据
             wav_data = None
             if conn.voiceprint_provider and combined_pcm_data:
                 wav_data = self._pcm_to_wav(combined_pcm_data)
 
-            # 定义ASR任务
+            conn.logger.bind(tag=TAG).info(
+                "[HYBRID-ASR] provider_start device={} session={} provider={} audio_format={}",
+                conn.device_id or "-",
+                conn.session_id or "-",
+                type(self).__name__,
+                conn.audio_format,
+            )
             asr_task = self.speech_to_text_wrapper(
                 asr_audio_task, conn.session_id, conn.audio_format
             )
@@ -116,7 +255,6 @@ class ASRProviderBase(ABC):
                 voiceprint_task = conn.voiceprint_provider.identify_speaker(
                     wav_data, conn.session_id
                 )
-                # 并发等待两个结果
                 asr_result, voiceprint_result = await asyncio.gather(
                     asr_task, voiceprint_task, return_exceptions=True
                 )
@@ -124,7 +262,21 @@ class ASRProviderBase(ABC):
                 asr_result = await asr_task
                 voiceprint_result = None
 
-            # 记录识别结果 - 检查是否为异常
+            result_text = ""
+            if isinstance(asr_result, tuple) and asr_result:
+                raw_candidate = asr_result[0]
+                if isinstance(raw_candidate, dict):
+                    result_text = raw_candidate.get("content", "")
+                elif isinstance(raw_candidate, str):
+                    result_text = raw_candidate
+            conn.logger.bind(tag=TAG).info(
+                "[HYBRID-ASR] provider_done device={} session={} provider={} text_len={}",
+                conn.device_id or "-",
+                conn.session_id or "-",
+                type(self).__name__,
+                len(result_text) if result_text else 0,
+            )
+
             if isinstance(asr_result, Exception):
                 logger.bind(tag=TAG).error(f"ASR识别失败: {asr_result}")
                 raw_text = ""
@@ -137,57 +289,56 @@ class ASRProviderBase(ABC):
             else:
                 speaker_name = voiceprint_result
 
-            # 判断 ASR 结果类型
             if isinstance(raw_text, dict):
-                # FunASR 返回的 dict 格式
                 if speaker_name:
                     raw_text["speaker"] = speaker_name
 
-                # 记录识别结果
                 if raw_text.get("language"):
                     logger.bind(tag=TAG).info(f"识别语言: {raw_text['language']}")
                 if raw_text.get("emotion"):
                     logger.bind(tag=TAG).info(f"识别情绪: {raw_text['emotion']}")
                 if raw_text.get("content"):
-                    logger.bind(tag=TAG).info(f"识别文本: {raw_text['content']}")
+                    conn.logger.bind(tag=TAG, phase="ASR").info(
+                        f"ASR text: {raw_text['content']}"
+                    )
                 if speaker_name:
                     logger.bind(tag=TAG).info(f"识别说话人: {speaker_name}")
 
-                # 转换为 JSON 字符串用于下游
                 enhanced_text = json.dumps(raw_text, ensure_ascii=False)
                 content_for_length_check = raw_text.get("content", "")
             else:
-                # 其他 ASR 返回的纯文本
                 if raw_text:
-                    logger.bind(tag=TAG).info(f"识别文本: {raw_text}")
+                    conn.logger.bind(tag=TAG, phase="ASR").info(f"ASR text: {raw_text}")
                 if speaker_name:
                     logger.bind(tag=TAG).info(f"识别说话人: {speaker_name}")
 
-                # 构建包含说话人信息的JSON字符串
                 enhanced_text = self._build_enhanced_text(raw_text, speaker_name)
                 content_for_length_check = raw_text
 
-            # 性能监控
             total_time = time.monotonic() - total_start_time
-            logger.bind(tag=TAG).debug(f"总处理耗时: {total_time:.3f}s")
+            conn.logger.bind(tag=TAG, phase="ASR").info(
+                f"ASR done: elapsed={total_time:.3f}s"
+            )
 
-            # 检查文本长度
             text_len, _ = remove_punctuation_and_length(content_for_length_check)
             self.stop_ws_connection()
 
             if text_len > 0:
                 audio_snapshot = asr_audio_task.copy()
                 enqueue_asr_report(conn, enhanced_text, audio_snapshot)
-                # 使用自定义模块进行上报
                 await startToChat(conn, enhanced_text)
         except Exception as e:
+            conn.logger.bind(tag=TAG).error(
+                "[HYBRID-ASR] asr_error device={} session={} error_type={} message={}",
+                conn.device_id or "-",
+                conn.session_id or "-",
+                type(e).__name__,
+                e,
+            )
             logger.bind(tag=TAG).error(f"处理语音停止失败: {e}")
-            import traceback
-
             logger.bind(tag=TAG).debug(f"异常详情: {traceback.format_exc()}")
 
     def _build_enhanced_text(self, text: str, speaker_name: Optional[str]) -> str:
-        """构建包含说话人信息的文本（仅用于纯文本ASR）"""
         if speaker_name and speaker_name.strip():
             return json.dumps(
                 {"speaker": speaker_name, "content": text}, ensure_ascii=False
@@ -196,22 +347,19 @@ class ASRProviderBase(ABC):
             return text
 
     def _pcm_to_wav(self, pcm_data: bytes) -> bytes:
-        """将PCM数据转换为WAV格式"""
         if len(pcm_data) == 0:
             logger.bind(tag=TAG).warning("PCM数据为空，无法转换WAV")
             return b""
 
-        # 确保数据长度是偶数（16位音频）
         if len(pcm_data) % 2 != 0:
             pcm_data = pcm_data[:-1]
 
-        # 创建WAV文件头
         wav_buffer = io.BytesIO()
         try:
             with wave.open(wav_buffer, "wb") as wav_file:
-                wav_file.setnchannels(1)  # 单声道
-                wav_file.setsampwidth(2)  # 16位
-                wav_file.setframerate(16000)  # 16kHz采样率
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(16000)
                 wav_file.writeframes(pcm_data)
 
             wav_buffer.seek(0)
@@ -230,23 +378,17 @@ class ASRProviderBase(ABC):
 
     class AudioArtifacts(NamedTuple):
         pcm_frames: List[bytes]
-        """PCM音频帧列表"""
         pcm_bytes: bytes
-        """合并后的PCM音频字节数据"""
         file_path: Optional[str]
-        """WAV文件路径"""
         temp_path: Optional[str]
-        """临时WAV文件路径"""
 
     def get_current_artifacts(self) -> Optional["ASRProviderBase.AudioArtifacts"]:
         return self._current_artifacts
 
     def requires_file(self) -> bool:
-        """是否需要文件输入"""
         return False
 
     def prefers_temp_file(self) -> bool:
-        """是否优先使用临时文件"""
         return False
 
     def build_temp_file(self, pcm_bytes: bytes) -> Optional[str]:
@@ -264,14 +406,13 @@ class ASRProviderBase(ABC):
             return None
 
     def save_audio_to_file(self, pcm_data: List[bytes], session_id: str) -> str:
-        """PCM数据保存为WAV文件"""
         module_name = __name__.split(".")[-1]
         file_name = f"asr_{module_name}_{session_id}_{uuid.uuid4()}.wav"
         file_path = os.path.join(self.output_dir, file_name)
 
         with wave.open(file_path, "wb") as wf:
             wf.setnchannels(1)
-            wf.setsampwidth(2)  # 2 bytes = 16-bit
+            wf.setsampwidth(2)
             wf.setframerate(16000)
             wf.writeframes(b"".join(pcm_data))
 
@@ -343,24 +484,15 @@ class ASRProviderBase(ABC):
         audio_format="opus",
         artifacts: Optional[AudioArtifacts] = None,
     ) -> Tuple[Optional[str], Optional[str]]:
-        """将语音数据转换为文本
-
-        :param opus_data: 输入的Opus音频数据
-        :param session_id: 会话ID
-        :param audio_format: 音频格式，默认"opus"
-        :param artifacts: 音频工件，包含PCM数据、文件路径等
-        :return: 识别结果文本和文件路径（如果有）
-        """
         pass
 
     @staticmethod
     def decode_opus(opus_data: List[bytes]) -> List[bytes]:
-        """将Opus音频数据解码为PCM数据"""
         decoder = None
         try:
             decoder = opuslib_next.Decoder(16000, 1)
             pcm_data = []
-            buffer_size = 960  # 每次处理960个采样点 (60ms at 16kHz)
+            buffer_size = 960
 
             for i, opus_packet in enumerate(opus_data):
                 try:
@@ -379,6 +511,9 @@ class ASRProviderBase(ABC):
             return pcm_data
 
         except Exception as e:
+            logger.bind(tag=TAG).error(
+                f"[HYBRID-ASR] opus_decode_error error_type={type(e).__name__} message={e}"
+            )
             logger.bind(tag=TAG).error(f"音频解码过程发生错误: {e}")
             return []
         finally:

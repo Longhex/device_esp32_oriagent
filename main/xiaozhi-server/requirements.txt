@@ -42,3 +42,4 @@ portalocker==3.2.0
 Jinja2==3.1.6
 vosk==0.3.45
 ddgs
+paho-mqtt==1.6.1

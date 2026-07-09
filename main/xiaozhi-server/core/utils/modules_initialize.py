@@ -6,6 +6,37 @@ TAG = __name__
 logger = setup_logging()
 
 
+def _resolve_provider_selection(config: Dict[str, Any], module_name: str):
+    selected_key = config.get("selected_module", {}).get(module_name)
+    module_configs = config.get(module_name, {})
+    provider_config = module_configs.get(selected_key, {}) if selected_key else {}
+    provider_type = provider_config.get("type", selected_key)
+    return selected_key, provider_type, provider_config
+
+
+def _log_provider_selection(
+    logger,
+    module_name: str,
+    selected_key: str,
+    provider_type: str,
+    provider_instance,
+    source: str,
+):
+    provider_class = (
+        f"{provider_instance.__class__.__module__}.{provider_instance.__class__.__name__}"
+        if provider_instance is not None
+        else "uninitialized"
+    )
+    logger.bind(tag=TAG).info(
+        "[PROVIDER-SELECT] {}_provider key={} type={} class={} source={}",
+        module_name.lower(),
+        selected_key or "unset",
+        provider_type or "unset",
+        provider_class,
+        source,
+    )
+
+
 def initialize_modules(
     logger,
     config: Dict[str, Any],
@@ -35,15 +66,20 @@ def initialize_modules(
 
     # 初始化LLM模块
     if init_llm:
-        select_llm_module = config["selected_module"]["LLM"]
-        llm_type = (
-            select_llm_module
-            if "type" not in config["LLM"][select_llm_module]
-            else config["LLM"][select_llm_module]["type"]
+        select_llm_module, llm_type, provider_config = _resolve_provider_selection(
+            config, "LLM"
         )
         modules["llm"] = llm.create_instance(
             llm_type,
-            config["LLM"][select_llm_module],
+            provider_config,
+        )
+        _log_provider_selection(
+            logger,
+            "LLM",
+            select_llm_module,
+            llm_type,
+            modules["llm"],
+            "selected_module_config",
         )
         logger.bind(tag=TAG).info(f"初始化组件: llm成功 {select_llm_module}")
 
@@ -99,31 +135,41 @@ def initialize_modules(
 
 
 def initialize_tts(config):
-    select_tts_module = config["selected_module"]["TTS"]
-    tts_type = (
-        select_tts_module
-        if "type" not in config["TTS"][select_tts_module]
-        else config["TTS"][select_tts_module]["type"]
+    select_tts_module, tts_type, provider_config = _resolve_provider_selection(
+        config, "TTS"
     )
     new_tts = tts.create_instance(
         tts_type,
-        config["TTS"][select_tts_module],
+        provider_config,
         str(config.get("delete_audio", True)).lower() in ("true", "1", "yes"),
+    )
+    _log_provider_selection(
+        logger,
+        "TTS",
+        select_tts_module,
+        tts_type,
+        new_tts,
+        "selected_module_config",
     )
     return new_tts
 
 
 def initialize_asr(config):
-    select_asr_module = config["selected_module"]["ASR"]
-    asr_type = (
-        select_asr_module
-        if "type" not in config["ASR"][select_asr_module]
-        else config["ASR"][select_asr_module]["type"]
+    select_asr_module, asr_type, provider_config = _resolve_provider_selection(
+        config, "ASR"
     )
     new_asr = asr.create_instance(
         asr_type,
-        config["ASR"][select_asr_module],
+        provider_config,
         str(config.get("delete_audio", True)).lower() in ("true", "1", "yes"),
+    )
+    _log_provider_selection(
+        logger,
+        "ASR",
+        select_asr_module,
+        asr_type,
+        new_asr,
+        "selected_module_config",
     )
     logger.bind(tag=TAG).info("ASR module initialization complete")
     return new_asr
@@ -148,4 +194,3 @@ def initialize_voiceprint(asr_instance, config):
     except Exception as e:
         logger.bind(tag=TAG).error(f"动态初始化声纹识别功能失败: {str(e)}")
         return False
-
