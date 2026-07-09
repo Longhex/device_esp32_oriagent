@@ -91,16 +91,16 @@ public class OTAMagController {
     @RequiresPermissions("sys:role:superAdmin")
     public Result<Void> save(@RequestBody OtaEntity entity) {
         if (entity == null) {
-            return new Result<Void>().error("固件信息不能为空");
+            return new Result<Void>().error("Thông tin firmware không được để trống");
         }
         if (StringUtils.isBlank(entity.getFirmwareName())) {
-            return new Result<Void>().error("固件名称不能为空");
+            return new Result<Void>().error("Tên firmware không được để trống");
         }
         if (StringUtils.isBlank(entity.getType())) {
-            return new Result<Void>().error("固件类型不能为空");
+            return new Result<Void>().error("Loại firmware không được để trống");
         }
         if (StringUtils.isBlank(entity.getVersion())) {
-            return new Result<Void>().error("版本号不能为空");
+            return new Result<Void>().error("Số phiên bản không được để trống");
         }
         try {
             otaService.save(entity);
@@ -115,7 +115,7 @@ public class OTAMagController {
     @RequiresPermissions("sys:role:superAdmin")
     public Result<Void> delete(@PathVariable("id") String[] ids) {
         if (ids == null || ids.length == 0) {
-            return new Result<Void>().error("删除的固件ID不能为空");
+            return new Result<Void>().error("ID firmware cần xóa không được để trống");
         }
         otaService.delete(ids);
         return new Result<Void>();
@@ -126,7 +126,7 @@ public class OTAMagController {
     @RequiresPermissions("sys:role:superAdmin")
     public Result<?> update(@PathVariable("id") String id, @RequestBody OtaEntity entity) {
         if (entity == null) {
-            return new Result<>().error("固件信息不能为空");
+            return new Result<>().error("Thông tin firmware không được để trống");
         }
         entity.setId(id);
         try {
@@ -292,19 +292,19 @@ public class OTAMagController {
     @RequiresPermissions("sys:role:superAdmin")
     public Result<String> uploadFirmware(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
-            return new Result<String>().error("上传文件不能为空");
+            return new Result<String>().error("File tải lên không được để trống");
         }
 
         // 检查文件扩展名
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null) {
-            return new Result<String>().error("文件名不能为空");
+            return new Result<String>().error("Tên file không được để trống");
         }
 
         String extension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
         if (!extension.equals(".bin") && !extension.equals(".apk")
                 && !extension.equals(".tar") && !extension.equals(".gz") && !extension.equals(".zip")) {
-            return new Result<String>().error("只允许上传 .bin/.apk/.tar/.gz/.zip 格式的文件");
+            return new Result<String>().error("Chỉ cho phép tải lên file định dạng .bin/.apk/.tar/.gz/.zip");
         }
 
         try {
@@ -335,7 +335,7 @@ public class OTAMagController {
             // 返回文件路径
             return new Result<String>().ok(filePath.toString());
         } catch (IOException | NoSuchAlgorithmException e) {
-            return new Result<String>().error("文件上传失败：" + e.getMessage());
+            return new Result<String>().error("Tải file lên thất bại: " + e.getMessage());
         }
     }
 

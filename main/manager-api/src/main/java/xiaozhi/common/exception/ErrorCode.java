@@ -159,11 +159,11 @@ public interface ErrorCode {
     int MQTT_SECRET_WEAK_PASSWORD = 10125; // mqtt密钥包含弱密码
     int DICT_LABEL_DUPLICATE = 10128; // 字典标签重复
     int SM2_KEY_NOT_CONFIGURED = 10129; // SM2密钥未配置
-    int SM2_DECRYPT_ERROR = 10130; // SM2解密失败
+    int SM2_DECRYPT_ERROR = 10130; // SM2 giải mã thất bại
     int MODEL_TYPE_PROVIDE_CODE_NOT_NULL = 10131; // modelType和provideCode不能为空
 
     // 聊天记录相关错误码
-    int CHAT_HISTORY_NO_PERMISSION = 10132; // 没有权限查看该智能体的聊天记录
+    int CHAT_HISTORY_NO_PERMISSION = 10132; // Không có quyền xem lịch sử hội thoại của agent này
     int CHAT_HISTORY_SESSION_ID_NOT_NULL = 10133; // 会话ID不能为空
     int CHAT_HISTORY_AGENT_ID_NOT_NULL = 10134; // 智能体ID不能为空
     int CHAT_HISTORY_DOWNLOAD_FAILED = 10135; // 聊天记录下载失败
@@ -224,7 +224,7 @@ public interface ErrorCode {
 
     // 音色克隆（补充）
     int VOICE_CLONE_NAME_NOT_NULL = 10181; // 音色克隆名称不能为空
-    int VOICE_CLONE_AUDIO_NOT_FOUND = 10182; // 音色克隆音频不存在
+    int VOICE_CLONE_AUDIO_NOT_FOUND = 10182; // 音色克隆Âm thanh không tồn tại
 
     // 智能体模板相关错误码(补充)
     int AGENT_TEMPLATE_NOT_FOUND = 10183; // 默认智能体未找到
@@ -242,12 +242,12 @@ public interface ErrorCode {
 
     // 设备工具相关错误码
     int DEVICE_ID_NOT_NULL = 10193; // 设备ID不能为空
-    int DEVICE_NOT_EXIST = 10194; // 设备不存在
+    int DEVICE_NOT_EXIST = 10194; // Thiết bị không tồn tại
     int OTA_UPLOAD_COUNT_EXCEED = 10195; // OTA上传次数超过限制
 
     // 智能体标签相关错误码
     int AGENT_TAG_NAME_DUPLICATE = 10196; // 标签名称已存在
-    int AGENT_TAG_NAME_EMPTY = 10197; // 标签名称不能为空
+    int AGENT_TAG_NAME_EMPTY = 10197; // Tên nhãn không được để trống
     int AGENT_TAG_NOT_EXIST = 10198; // 标签不存在
 
     int RAG_DOCUMENT_PARSING_DELETE_ERROR = 10199; // 文档解析中，禁止删除

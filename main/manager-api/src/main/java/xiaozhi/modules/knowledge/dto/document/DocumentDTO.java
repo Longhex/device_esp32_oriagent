@@ -54,7 +54,7 @@ public class DocumentDTO {
         private Map<String, Object> metaFields;
 
         @Schema(description = "文件二进制流 (支持 PDF, DOCX, TXT, MD 等多种格式)", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotNull(message = "上传文件不能为空")
+        @NotNull(message = "File tải lên không được để trống")
         private org.springframework.web.multipart.MultipartFile file;
     }
 

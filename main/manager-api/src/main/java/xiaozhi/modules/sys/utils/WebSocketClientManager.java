@@ -84,7 +84,7 @@ public class WebSocketClientManager implements Closeable {
                 URI.create(b.uri));
         WebSocketSession sess = future.get(b.connectTimeout, b.connectUnit);
         if (sess == null || !sess.isOpen()) {
-            throw new IOException("握手失败或会话未打开");
+            throw new IOException("Bắt tay thất bại hoặc phiên chưa mở");
         }
         // 设置缓冲区
         sess.setTextMessageSizeLimit(b.bufferSize);
@@ -124,12 +124,12 @@ public class WebSocketClientManager implements Closeable {
 
             long remaining = deadline - System.currentTimeMillis();
             if (remaining <= 0) {
-                throw new TimeoutException("等待批量消息超时");
+                throw new TimeoutException("Chờ tin nhắn hàng loạt quá thời gian");
             }
 
             T msg = queue.poll(remaining, TimeUnit.MILLISECONDS);
             if (msg == null) {
-                throw new TimeoutException("等待批量消息超时");
+                throw new TimeoutException("Chờ tin nhắn hàng loạt quá thời gian");
             }
 
             collected.add(msg);
@@ -155,12 +155,12 @@ public class WebSocketClientManager implements Closeable {
 
             long remaining = deadline - System.currentTimeMillis();
             if (remaining <= 0) {
-                throw new TimeoutException("等待批量消息超时");
+                throw new TimeoutException("Chờ tin nhắn hàng loạt quá thời gian");
             }
 
             T msg = queue.poll(remaining, TimeUnit.MILLISECONDS);
             if (msg == null) {
-                throw new TimeoutException("等待批量消息超时");
+                throw new TimeoutException("Chờ tin nhắn hàng loạt quá thời gian");
             }
 
             collected.add(msg);

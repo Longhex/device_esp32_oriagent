@@ -83,7 +83,7 @@ public class AgentChatSummaryServiceImpl implements AgentChatSummaryService {
             return new AgentChatSummaryDTO(sessionId, agentId, summary);
 
         } catch (Exception e) {
-            log.error("生成会话 {} 的聊天记录总结时发生错误: {}", sessionId, e.getMessage());
+            log.error("Lỗi khi tạo tóm tắt lịch sử hội thoại của phiên {}: {}", sessionId, e.getMessage());
             return new AgentChatSummaryDTO(sessionId, "生成总结时发生错误: " + e.getMessage());
         }
     }
@@ -128,7 +128,7 @@ public class AgentChatSummaryServiceImpl implements AgentChatSummaryService {
             return true;
 
         } catch (Exception e) {
-            log.error("保存会话 {} 的聊天记录总结时发生错误: {}", sessionId, e.getMessage());
+            log.error("Lỗi khi lưu tóm tắt lịch sử hội thoại của phiên {}: {}", sessionId, e.getMessage());
             return false;
         }
     }
@@ -146,7 +146,7 @@ public class AgentChatSummaryServiceImpl implements AgentChatSummaryService {
             }
             return agentChatHistoryService.getChatHistoryBySessionId(agentId, sessionId);
         } catch (Exception e) {
-            log.error("获取会话 {} 的聊天记录失败: {}", sessionId, e.getMessage());
+            log.error("Lấy lịch sử hội thoại của phiên {} thất bại: {}", sessionId, e.getMessage());
             return null;
         }
     }
@@ -165,7 +165,7 @@ public class AgentChatSummaryServiceImpl implements AgentChatSummaryService {
             AgentChatHistoryEntity entity = agentChatHistoryService.getOne(wrapper);
             return entity != null ? entity.getAgentId() : null;
         } catch (Exception e) {
-            log.error("根据会话ID {} 查找智能体ID失败: {}", sessionId, e.getMessage());
+            log.error("Tìm agent ID theo session ID {} thất bại: {}", sessionId, e.getMessage());
             return null;
         }
     }
@@ -280,8 +280,8 @@ public class AgentChatSummaryServiceImpl implements AgentChatSummaryService {
 
             return summary;
         } catch (Exception e) {
-            log.error("调用Java端LLM服务失败: {}", e.getMessage());
-            throw new RuntimeException("LLM服务不可用，无法生成聊天总结");
+            log.error("Gọi dịch vụ LLM phía Java thất bại: {}", e.getMessage());
+            throw new RuntimeException("Dịch vụ LLM không khả dụng, không thể tạo tóm tắt hội thoại");
         }
     }
 
@@ -303,7 +303,7 @@ public class AgentChatSummaryServiceImpl implements AgentChatSummaryService {
             // 返回智能体的当前总结记忆
             return agentInfo.getSummaryMemory();
         } catch (Exception e) {
-            log.error("获取智能体历史记忆失败，agentId: {}, 错误: {}", agentId, e.getMessage());
+            log.error("Lấy ký ức lịch sử của agent thất bại, agentId: {}, lỗi: {}", agentId, e.getMessage());
             return null;
         }
     }
@@ -328,10 +328,10 @@ public class AgentChatSummaryServiceImpl implements AgentChatSummaryService {
                 return summary;
             }
 
-            throw new RuntimeException("Java端LLM服务返回异常: " + summary);
+            throw new RuntimeException("Dịch vụ LLM phía Java trả về lỗi: " + summary);
 
         } catch (Exception e) {
-            log.error("调用Java端LLM服务异常，agentId: {}, 错误: {}", agentId, e.getMessage());
+            log.error("Lỗi gọi dịch vụ LLM phía Java, agentId: {}, lỗi: {}", agentId, e.getMessage());
             throw e;
         }
     }
@@ -356,10 +356,10 @@ public class AgentChatSummaryServiceImpl implements AgentChatSummaryService {
                 return summary;
             }
 
-            throw new RuntimeException("Java端LLM服务返回异常: " + summary);
+            throw new RuntimeException("Dịch vụ LLM phía Java trả về lỗi: " + summary);
 
         } catch (Exception e) {
-            log.error("调用Java端LLM服务异常，agentId: {}, 错误: {}", agentId, e.getMessage());
+            log.error("Lỗi gọi dịch vụ LLM phía Java, agentId: {}, lỗi: {}", agentId, e.getMessage());
             throw e;
         }
     }
@@ -402,7 +402,7 @@ public class AgentChatSummaryServiceImpl implements AgentChatSummaryService {
 
             return llmModelId;
         } catch (Exception e) {
-            log.error("获取记忆总结LLM模型ID失败，agentId: {}, 错误: {}", agentId, e.getMessage());
+            log.error("Lấy ID mô hình LLM tóm tắt ký ức thất bại, agentId: {}, lỗi: {}", agentId, e.getMessage());
             return null;
         }
     }
@@ -424,7 +424,7 @@ public class AgentChatSummaryServiceImpl implements AgentChatSummaryService {
             }
             return null;
         } catch (Exception e) {
-            log.error("根据会话ID {} 查找设备信息失败: {}", sessionId, e.getMessage());
+            log.error("Tìm thông tin thiết bị theo session ID {} thất bại: {}", sessionId, e.getMessage());
             return null;
         }
     }

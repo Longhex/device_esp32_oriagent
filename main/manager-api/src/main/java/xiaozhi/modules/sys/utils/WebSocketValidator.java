@@ -53,7 +53,7 @@ public class WebSocketValidator {
             // 等待最多5秒获取连接结果
             return future.get(5, TimeUnit.SECONDS);
         } catch (Exception e) {
-            logger.error("WebSocket连接测试失败: {}", url, e);
+            logger.error("Kiểm tra kết nối WebSocket thất bại: {}", url, e);
             return false;
         }
     }

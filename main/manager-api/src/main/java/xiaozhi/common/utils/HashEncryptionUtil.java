@@ -32,8 +32,8 @@ public class HashEncryptionUtil {
        try {
            md = MessageDigest.getInstance(algorithm);
        } catch (NoSuchAlgorithmException e) {
-           log.error("加密失败的算法：{}",algorithm);
-           throw new RuntimeException("加密失败，"+ algorithm +"哈希算法系统不支持");
+           log.error("Thuật toán mã hóa thất bại: {}",algorithm);
+           throw new RuntimeException("Mã hóa thất bại, "+ algorithm +"Hệ thống không hỗ trợ thuật toán hash");
        }
        // 计算智能体id的MD5值
        byte[] messageDigest = md.digest(context.getBytes());

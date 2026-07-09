@@ -130,7 +130,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
             if (this.config != null) {
                 initialize(this.config);
             } else {
-                throw new RenException(ErrorCode.RAG_CONFIG_NOT_FOUND, "适配器未初始化"); // 应该抛出 RuntimeException
+                throw new RenException(ErrorCode.RAG_CONFIG_NOT_FOUND, "Adapter chưa khởi tạo"); // nên throw RuntimeException
             }
         }
         return this.client;
@@ -159,7 +159,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
                     req.getPageSize() != null ? req.getPageSize() : 10);
 
         } catch (Exception e) {
-            log.error("获取文档列表失败", e);
+            log.error("Lấy danh sách tài liệu thất bại", e);
             throw convertToRenException(e);
         }
     }
@@ -188,7 +188,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
             }
             return null;
         } catch (Exception e) {
-            log.error("获取文档详情失败: documentId={}", documentId, e);
+            log.error("Lấy chi tiết tài liệu thất bại: documentId={}", documentId, e);
             throw convertToRenException(e);
         }
     }
@@ -227,7 +227,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
             return parseUploadResponse(dataObj, datasetId, file);
 
         } catch (Exception e) {
-            log.error("文档上传失败", e);
+            log.error("Tải tài liệu lên thất bại", e);
             throw convertToRenException(e);
         }
     }
@@ -273,7 +273,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
                     req.getIds() != null ? req.getIds().size() : 0);
             getClient().delete("/api/v1/datasets/" + datasetId + "/documents", req);
         } catch (Exception e) {
-            log.error("批量删除文档失败: datasetId={}", datasetId, e);
+            log.error("Xóa hàng loạt tài liệu thất bại: datasetId={}", datasetId, e);
             throw convertToRenException(e);
         }
     }
@@ -288,7 +288,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
             getClient().post("/api/v1/datasets/" + datasetId + "/chunks", body);
             return true;
         } catch (Exception e) {
-            log.error("解析文档失败", e);
+            log.error("Phân tích tài liệu thất bại", e);
             throw convertToRenException(e);
         }
     }
@@ -318,7 +318,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
             }
             return result;
         } catch (Exception e) {
-            log.error("获取切片失败: docId={}", documentId, e);
+            log.error("Lấy phân đoạn thất bại: docId={}", documentId, e);
             throw convertToRenException(e);
         }
     }
@@ -364,7 +364,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
             }
             return result;
         } catch (Exception e) {
-            log.error("召回测试失败", e);
+            log.error("Kiểm tra truy hồi thất bại", e);
             throw convertToRenException(e);
         }
     }
@@ -375,7 +375,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
             getClient().get("/api/v1/health", null);
             return true;
         } catch (Exception e) {
-            log.error("连接测试失败: {}", e.getMessage());
+            log.error("Kiểm tra kết nối thất bại: {}", e.getMessage());
             return false;
         }
     }
@@ -444,7 +444,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
             }
             throw new RenException(ErrorCode.RAG_API_ERROR, "Invalid response from createDataset: missing data object");
         } catch (Exception e) {
-            log.error("创建数据集失败", e);
+            log.error("Tạo tập dữ liệu thất bại", e);
             throw convertToRenException(e);
         }
     }
@@ -461,7 +461,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
             }
             return null;
         } catch (Exception e) {
-            log.error("更新数据集失败", e);
+            log.error("Cập nhật tập dữ liệu thất bại", e);
             throw convertToRenException(e);
         }
     }
@@ -478,7 +478,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
             }
             return null;
         } catch (Exception e) {
-            log.error("批量删除数据集失败", e);
+            log.error("Xóa hàng loạt tập dữ liệu thất bại", e);
             throw convertToRenException(e);
         }
     }
@@ -520,7 +520,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
         try {
             getClient().postStream(endpoint, body, onData);
         } catch (Exception e) {
-            log.error("流式请求失败", e);
+            log.error("Yêu cầu streaming thất bại", e);
             throw convertToRenException(e);
         }
     }
@@ -541,7 +541,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
             getClient().postStream("/api/v1/searchbots/ask", body, onData);
             return null;
         } catch (Exception e) {
-            log.error("SearchBot Ask 失败", e);
+            log.error("SearchBot Ask thất bại", e);
             throw convertToRenException(e);
         }
     }
@@ -553,7 +553,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
         try {
             getClient().postStream("/api/v1/agentbots/" + agentId + "/completions", body, onData);
         } catch (Exception e) {
-            log.error("AgentBot Completion 失败", e);
+            log.error("AgentBot Completion thất bại", e);
             throw convertToRenException(e);
         }
     }
@@ -616,7 +616,7 @@ public class RAGFlowAdapter extends KnowledgeBaseAdapter {
         }
 
         if (result == null) {
-            log.error("未能从RAGFlow响应中提取到documentId，响应内容: {}", dataObj);
+            log.error("Không trích được documentId từ phản hồi RAGFlow, nội dung phản hồi: {}", dataObj);
             // 这里应该返回一个最小化的包含基础信息的 DTO 而不是 null，防止上游 NPE
             result = new KnowledgeFilesDTO();
             result.setDatasetId(datasetId);

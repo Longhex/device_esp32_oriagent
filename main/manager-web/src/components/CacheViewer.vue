@@ -51,10 +51,10 @@
           <h3>{{ $t('cache.cssResources').replace('{count}', cacheData.css.length) }}</h3>
           <el-table :data="cacheData.css" stripe style="width: 100%">
             <el-table-column prop="url" label="URL" width="auto" show-overflow-tooltip />
-            <el-table-column prop="cached" label="状态" width="100">
+            <el-table-column prop="cached" label="Trạng thái" width="100">
               <template slot-scope="scope">
-                <el-tag type="success" v-if="scope.row.cached">已缓存</el-tag>
-                <el-tag type="danger" v-else>未缓存</el-tag>
+                <el-tag type="success" v-if="scope.row.cached">Đã cache</el-tag>
+                <el-tag type="danger" v-else>Chưa cache</el-tag>
               </template>
             </el-table-column>
           </el-table>
@@ -122,10 +122,10 @@ export default {
         this.cacheAvailable = cacheNames.length > 0;
         
         if (this.cacheAvailable) {
-          // 获取CDN缓存状态
+          // 获取CDN缓存Trạng thái
           this.cacheData = await checkCdnCacheStatus();
           
-          // 在控制台输出完整缓存状态
+          // 在控制台输出完整缓存Trạng thái
           await logCacheStatus();
         }
       } catch (error) {

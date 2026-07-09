@@ -100,7 +100,7 @@ public class AgentVoicePrintServiceImpl extends ServiceImpl<AgentVoicePrintDao, 
                 throw e;
             } catch (Exception e) {
                 status.setRollbackOnly(); // 标记事务回滚
-                log.error("保存声纹错误原因：{}", e.getMessage());
+                log.error("Lỗi khi lưu vân giọng, nguyên nhân: {}", e.getMessage());
                 throw new RenException(ErrorCode.VOICE_PRINT_SAVE_ERROR);
             }
         }));
@@ -123,7 +123,7 @@ public class AgentVoicePrintServiceImpl extends ServiceImpl<AgentVoicePrintDao, 
                 return true;
             } catch (Exception e) {
                 status.setRollbackOnly(); // 标记事务回滚
-                log.error("删除声纹存在错误原因：{}", e.getMessage());
+                log.error("Lỗi khi xóa vân giọng, nguyên nhân: {}", e.getMessage());
                 throw new RenException(ErrorCode.VOICEPRINT_DELETE_ERROR);
             }
         }));
@@ -133,7 +133,7 @@ public class AgentVoicePrintServiceImpl extends ServiceImpl<AgentVoicePrintDao, 
                 try {
                     cancelVoicePrint(voicePrintId);
                 }catch (RuntimeException e) {
-                    log.error("删除声纹存在运行时错误原因：{}，id：{}", e.getMessage(),voicePrintId);
+                    log.error("Lỗi runtime khi xóa vân giọng, nguyên nhân: {}, id: {}", e.getMessage(),voicePrintId);
                 }
             });
         }
@@ -208,7 +208,7 @@ public class AgentVoicePrintServiceImpl extends ServiceImpl<AgentVoicePrintDao, 
                 throw e;
             } catch (Exception e) {
                 status.setRollbackOnly(); // 标记事务回滚
-                log.error("修改声纹错误原因：{}", e.getMessage());
+                log.error("Lỗi khi sửa vân giọng, nguyên nhân: {}", e.getMessage());
                 throw new RenException(ErrorCode.VOICEPRINT_UPDATE_ADMIN_ERROR);
             }
         }));
@@ -225,7 +225,7 @@ public class AgentVoicePrintServiceImpl extends ServiceImpl<AgentVoicePrintDao, 
         try {
             return new URI(voicePrint);
         } catch (URISyntaxException e) {
-            log.error("路径格式不正确路径：{}，\n错误信息:{}", voicePrint, e.getMessage());
+            log.error("Định dạng đường dẫn không đúng, đường dẫn: {},\nthông tin lỗi: {}", voicePrint, e.getMessage());
                 throw new RenException(ErrorCode.VOICEPRINT_API_URI_ERROR);
         }
     }
@@ -314,13 +314,13 @@ public class AgentVoicePrintServiceImpl extends ServiceImpl<AgentVoicePrintDao, 
         ResponseEntity<String> response = restTemplate.postForEntity(requestUrl, requestEntity, String.class);
 
         if (response.getStatusCode() != HttpStatus.OK) {
-            log.error("声纹注册失败,请求路径：{}", requestUrl);
+            log.error("Đăng ký vân giọng thất bại, đường dẫn yêu cầu: {}", requestUrl);
             throw new RenException(ErrorCode.VOICEPRINT_REGISTER_REQUEST_ERROR);
         }
         // 检查响应内容
         String responseBody = response.getBody();
         if (responseBody == null || !responseBody.contains("true")) {
-            log.error("声纹注册失败,请求处理失败内容：{}", responseBody == null ? "空内容" : responseBody);
+            log.error("Đăng ký vân giọng thất bại, nội dung xử lý lỗi: {}", responseBody == null ? "Nội dung trống" : responseBody);
             throw new RenException(ErrorCode.VOICEPRINT_REGISTER_PROCESS_ERROR);
         }
     }
@@ -344,13 +344,13 @@ public class AgentVoicePrintServiceImpl extends ServiceImpl<AgentVoicePrintDao, 
         ResponseEntity<String> response = restTemplate.exchange(requestUrl, HttpMethod.DELETE, requestEntity,
                 String.class);
         if (response.getStatusCode() != HttpStatus.OK) {
-            log.error("声纹注销失败,请求路径：{}", requestUrl);
+            log.error("Hủy đăng ký vân giọng thất bại, đường dẫn yêu cầu: {}", requestUrl);
             throw new RenException(ErrorCode.VOICEPRINT_UNREGISTER_REQUEST_ERROR);
         }
         // 检查响应内容
         String responseBody = response.getBody();
         if (responseBody == null || !responseBody.contains("true")) {
-            log.error("声纹注销失败,请求处理失败内容：{}", responseBody == null ? "空内容" : responseBody);
+            log.error("Hủy đăng ký vân giọng thất bại, nội dung xử lý lỗi: {}", responseBody == null ? "Nội dung trống" : responseBody);
             throw new RenException(ErrorCode.VOICEPRINT_UNREGISTER_PROCESS_ERROR);
         }
     }
@@ -398,7 +398,7 @@ public class AgentVoicePrintServiceImpl extends ServiceImpl<AgentVoicePrintDao, 
         ResponseEntity<String> response = restTemplate.postForEntity(requestUrl, requestEntity, String.class);
 
         if (response.getStatusCode() != HttpStatus.OK) {
-            log.error("声纹识别请求失败,请求路径：{}", requestUrl);
+            log.error("Yêu cầu nhận diện vân giọng thất bại, đường dẫn yêu cầu: {}", requestUrl);
             throw new RenException(ErrorCode.VOICEPRINT_IDENTIFY_REQUEST_ERROR);
         }
         // 检查响应内容

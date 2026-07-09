@@ -130,7 +130,7 @@ public class KnowledgeBaseServiceImpl extends BaseServiceImpl<KnowledgeBaseDao, 
                 if (models != null && !models.isEmpty()) {
                     dto.setRagModelId(models.get(0).getId());
                 } else {
-                    throw new RenException(ErrorCode.RAG_CONFIG_NOT_FOUND, "未指定且无可用默认 RAG 模型");
+                    throw new RenException(ErrorCode.RAG_CONFIG_NOT_FOUND, "Chưa chỉ định và không có mô hình RAG mặc định khả dụng");
                 }
             }
 
@@ -143,7 +143,7 @@ public class KnowledgeBaseServiceImpl extends BaseServiceImpl<KnowledgeBaseDao, 
 
             DatasetDTO.InfoVO ragResponse = adapter.createDataset(createReq);
             if (ragResponse == null || StringUtils.isBlank(ragResponse.getId())) {
-                throw new RenException(ErrorCode.RAG_API_ERROR, "RAG创建返回无效: 缺失ID");
+                throw new RenException(ErrorCode.RAG_API_ERROR, "Tạo RAG trả về không hợp lệ: thiếu ID");
             }
             datasetId = ragResponse.getId();
 
@@ -185,7 +185,7 @@ public class KnowledgeBaseServiceImpl extends BaseServiceImpl<KnowledgeBaseDao, 
             knowledgeBaseDao.insert(entity);
             return ConvertUtils.sourceToTarget(entity, KnowledgeBaseDTO.class);
         } catch (Exception e) {
-            log.error("RAG创建或本地保存失败", e);
+            log.error("Tạo RAG hoặc lưu cục bộ thất bại", e);
             // 如果datasetId已生成但在保存本地时失败，尝试回滚RAG (Best Effort)
             if (StringUtils.isNotBlank(datasetId)) {
                 try {
@@ -193,13 +193,13 @@ public class KnowledgeBaseServiceImpl extends BaseServiceImpl<KnowledgeBaseDao, 
                         adapter.deleteDataset(
                                 DatasetDTO.BatchIdReq.builder().ids(Collections.singletonList(datasetId)).build());
                 } catch (Exception rollbackEx) {
-                    log.error("RAG回滚失败: {}", datasetId, rollbackEx);
+                    log.error("Rollback RAG thất bại: {}", datasetId, rollbackEx);
                 }
             }
             if (e instanceof RenException) {
                 throw (RenException) e;
             }
-            throw new RenException(ErrorCode.RAG_API_ERROR, "创建知识库失败: " + e.getMessage());
+            throw new RenException(ErrorCode.RAG_API_ERROR, "Tạo kho tri thức thất bại: " + e.getMessage());
         }
     }
 
@@ -268,12 +268,12 @@ public class KnowledgeBaseServiceImpl extends BaseServiceImpl<KnowledgeBaseDao, 
                     log.info("RAG更新成功: {}", entity.getDatasetId());
                 }
             } catch (Exception e) {
-                log.error("RAG更新失败", e);
+                log.error("Cập nhật RAG thất bại", e);
                 // 恢复事务一致性：RAG失败则整体回滚
                 if (e instanceof RenException) {
                     throw (RenException) e;
                 }
-                throw new RenException(ErrorCode.RAG_API_ERROR, "RAG更新失败: " + e.getMessage());
+                throw new RenException(ErrorCode.RAG_API_ERROR, "Cập nhật RAG thất bại: " + e.getMessage());
             }
         }
 
@@ -316,11 +316,11 @@ public class KnowledgeBaseServiceImpl extends BaseServiceImpl<KnowledgeBaseDao, 
                 }
                 apiDeleteSuccess = true;
             } catch (Exception e) {
-                log.error("RAG删除失败，触发回滚", e);
+                log.error("Xóa RAG thất bại, kích hoạt rollback", e);
                 if (e instanceof RenException) {
                     throw (RenException) e;
                 }
-                throw new RenException(ErrorCode.RAG_API_ERROR, "RAG删除失败: " + e.getMessage());
+                throw new RenException(ErrorCode.RAG_API_ERROR, "Xóa RAG thất bại: " + e.getMessage());
             }
         } else {
             log.warn("datasetId或ragModelId为空，跳过RAG删除");

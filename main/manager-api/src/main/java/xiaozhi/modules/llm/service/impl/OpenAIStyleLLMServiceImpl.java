@@ -66,7 +66,7 @@ public class OpenAIStyleLLMServiceImpl implements LLMService {
             }
 
             if (llmConfig == null || llmConfig.getConfigJson() == null) {
-                log.error("未找到可用的LLM模型配置，modelId: {}", modelId);
+                log.error("Không tìm thấy cấu hình mô hình LLM khả dụng, modelId: {}", modelId);
                 return "未找到可用的LLM模型配置";
             }
 
@@ -78,7 +78,7 @@ public class OpenAIStyleLLMServiceImpl implements LLMService {
             Integer maxTokens = configJson.getInt("max_tokens");
 
             if (StringUtils.isBlank(baseUrl) || StringUtils.isBlank(apiKey)) {
-                log.error("LLM配置不完整，baseUrl或apiKey为空");
+                log.error("Cấu hình LLM chưa đầy đủ, baseUrl hoặc apiKey trống");
                 return "LLM配置不完整，无法生成总结";
             }
 
@@ -128,10 +128,10 @@ public class OpenAIStyleLLMServiceImpl implements LLMService {
                     return messageObj.getStr("content");
                 }
             } else {
-                log.error("LLM API调用失败，状态码：{}，响应：{}", response.getStatusCode(), response.getBody());
+                log.error("Gọi LLM API thất bại, mã trạng thái: {}, phản hồi: {}", response.getStatusCode(), response.getBody());
             }
         } catch (Exception e) {
-            log.error("调用LLM服务生成总结时发生异常，modelId: {}", modelId, e);
+            log.error("Lỗi khi gọi dịch vụ LLM tạo tóm tắt, modelId: {}", modelId, e);
         }
 
         return "生成总结失败，请稍后重试";
@@ -162,7 +162,7 @@ public class OpenAIStyleLLMServiceImpl implements LLMService {
             }
 
             if (llmConfig == null || llmConfig.getConfigJson() == null) {
-                log.error("未找到可用的LLM模型配置，modelId: {}", modelId);
+                log.error("Không tìm thấy cấu hình mô hình LLM khả dụng, modelId: {}", modelId);
                 return "未找到可用的LLM模型配置";
             }
 
@@ -172,7 +172,7 @@ public class OpenAIStyleLLMServiceImpl implements LLMService {
             String apiKey = configJson.getStr("api_key");
 
             if (StringUtils.isBlank(baseUrl) || StringUtils.isBlank(apiKey)) {
-                log.error("LLM配置不完整，baseUrl或apiKey为空");
+                log.error("Cấu hình LLM chưa đầy đủ, baseUrl hoặc apiKey trống");
                 return "LLM配置不完整，无法生成总结";
             }
 
@@ -223,10 +223,10 @@ public class OpenAIStyleLLMServiceImpl implements LLMService {
                     return messageObj.getStr("content");
                 }
             } else {
-                log.error("LLM API调用失败，状态码：{}，响应：{}", response.getStatusCode(), response.getBody());
+                log.error("Gọi LLM API thất bại, mã trạng thái: {}, phản hồi: {}", response.getStatusCode(), response.getBody());
             }
         } catch (Exception e) {
-            log.error("调用LLM服务生成总结时发生异常，modelId: {}", modelId, e);
+            log.error("Lỗi khi gọi dịch vụ LLM tạo tóm tắt, modelId: {}", modelId, e);
         }
 
         return "生成总结失败，请稍后重试";
@@ -247,7 +247,7 @@ public class OpenAIStyleLLMServiceImpl implements LLMService {
             return baseUrl != null && !baseUrl.trim().isEmpty() &&
                     apiKey != null && !apiKey.trim().isEmpty();
         } catch (Exception e) {
-            log.error("检查LLM服务可用性时发生异常：", e);
+            log.error("Lỗi khi kiểm tra tính khả dụng của dịch vụ LLM: ", e);
             return false;
         }
     }
@@ -273,7 +273,7 @@ public class OpenAIStyleLLMServiceImpl implements LLMService {
             return baseUrl != null && !baseUrl.trim().isEmpty() &&
                     apiKey != null && !apiKey.trim().isEmpty();
         } catch (Exception e) {
-            log.error("检查LLM服务可用性时发生异常，modelId: {}", modelId, e);
+            log.error("Lỗi khi kiểm tra tính khả dụng của dịch vụ LLM, modelId: {}", modelId, e);
             return false;
         }
     }
@@ -298,7 +298,7 @@ public class OpenAIStyleLLMServiceImpl implements LLMService {
 
             return llmConfigs.get(0);
         } catch (Exception e) {
-            log.error("获取LLM模型配置时发生异常：", e);
+            log.error("Lỗi khi lấy cấu hình mô hình LLM: ", e);
             return null;
         }
     }

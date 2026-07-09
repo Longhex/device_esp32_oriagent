@@ -37,7 +37,7 @@ public class ResourcesUtils {
                 luaScriptBuilder.append(line).append("\n");
             }
         }  catch (IOException e){
-            log.error("方法：loadString()读取资源失败--{}",e.getMessage());
+            log.error("Phương thức loadString() đọc tài nguyên thất bại--{}",e.getMessage());
             throw new RenException(ErrorCode.RESOURCE_READ_ERROR);
         }
         return luaScriptBuilder.toString();

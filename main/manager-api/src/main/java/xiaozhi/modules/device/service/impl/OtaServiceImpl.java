@@ -59,7 +59,7 @@ public class OtaServiceImpl extends BaseServiceImpl<OtaDao, OtaEntity> implement
                 .ne("id", entity.getId()); // 排除当前记录
 
         if (baseDao.selectCount(queryWrapper) > 0) {
-            throw new RuntimeException("已存在相同类型和版本的固件，请修改后重试");
+            throw new RuntimeException("Đã tồn tại firmware cùng loại và phiên bản, vui lòng sửa rồi thử lại");
         }
 
         entity.setUpdateDate(new Date());

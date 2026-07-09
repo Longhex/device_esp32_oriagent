@@ -93,7 +93,7 @@ public class Oauth2Realm extends AuthorizingRealm {
 
         // 账号锁定
         if (userDetail.getStatus() == null) {
-            logger.error("账号状态异常，status 不能为空");
+            logger.error("Trạng thái tài khoản bất thường, status không được để trống");
             throw new DisabledAccountException(MessageUtils.getMessage(ErrorCode.ACCOUNT_DISABLE));
         }
 

@@ -91,7 +91,7 @@ public class DeviceController {
         try {
             return new Result<String>().ok(deviceService.getDeviceOnlineData(agentId));
         } catch (Exception e) {
-            return new Result<String>().error("转发请求失败: " + e.getMessage());
+            return new Result<String>().error("Chuyển tiếp yêu cầu thất bại: " + e.getMessage());
         }
     }
 
@@ -110,11 +110,11 @@ public class DeviceController {
     public Result<Void> updateDeviceInfo(@PathVariable String id, @Valid @RequestBody DeviceUpdateDTO deviceUpdateDTO) {
         DeviceEntity entity = deviceService.selectById(id);
         if (entity == null) {
-            return new Result<Void>().error("设备不存在");
+            return new Result<Void>().error("Thiết bị không tồn tại");
         }
         UserDetail user = SecurityUser.getUser();
         if (!entity.getUserId().equals(user.getId())) {
-            return new Result<Void>().error("设备不存在");
+            return new Result<Void>().error("Thiết bị không tồn tại");
         }
         BeanUtils.copyProperties(deviceUpdateDTO, entity);
         deviceService.updateById(entity);

@@ -30,7 +30,7 @@ public class AESUtils {
             byte[] encryptedBytes = cipher.doFinal(plainText.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(encryptedBytes);
         } catch (Exception e) {
-            throw new RuntimeException("AES加密失败", e);
+            throw new RuntimeException("AES mã hóa thất bại", e);
         }
     }
 
@@ -54,7 +54,7 @@ public class AESUtils {
             byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
             return new String(decryptedBytes, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            throw new RuntimeException("AES解密失败", e);
+            throw new RuntimeException("AES giải mã thất bại", e);
         }
     }
 

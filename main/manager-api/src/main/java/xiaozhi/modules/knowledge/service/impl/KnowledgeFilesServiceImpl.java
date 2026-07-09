@@ -337,7 +337,7 @@ public class KnowledgeFilesServiceImpl extends BaseServiceImpl<DocumentDao, Docu
             }
 
         } catch (Exception e) {
-            log.error("根据documentId获取文档失败: {}", e.getMessage(), e);
+            log.error("Lấy tài liệu theo documentId thất bại: {}", e.getMessage(), e);
             String errorMessage = e.getMessage() != null ? e.getMessage() : "null";
             if (e instanceof RenException) {
                 throw (RenException) e;
@@ -396,7 +396,7 @@ public class KnowledgeFilesServiceImpl extends BaseServiceImpl<DocumentDao, Docu
         KnowledgeFilesDTO result = adapter.uploadDocument(uploadReq);
 
         if (result == null || StringUtils.isBlank(result.getDocumentId())) {
-            throw new RenException(ErrorCode.RAG_API_ERROR, "远程上传成功但未返回有效 DocumentID");
+            throw new RenException(ErrorCode.RAG_API_ERROR, "Tải lên từ xa thành công nhưng không trả về DocumentID hợp lệ");
         }
 
         // 2. 本地持久化 (通过 self 调用以激活 @Transactional 代理)
@@ -585,7 +585,7 @@ public class KnowledgeFilesServiceImpl extends BaseServiceImpl<DocumentDao, Docu
             }
             return "unknown";
         } catch (Exception e) {
-            log.error("获取文件类型失败: ", e);
+            log.error("Lấy loại file thất bại: ", e);
             return "unknown";
         }
     }
@@ -606,7 +606,7 @@ public class KnowledgeFilesServiceImpl extends BaseServiceImpl<DocumentDao, Docu
 
         // 验证适配器类型是否已注册
         if (!KnowledgeBaseAdapterFactory.isAdapterTypeRegistered(adapterType)) {
-            throw new RenException(ErrorCode.RAG_ADAPTER_TYPE_NOT_SUPPORTED, "适配器类型未注册: " + adapterType);
+            throw new RenException(ErrorCode.RAG_ADAPTER_TYPE_NOT_SUPPORTED, "Loại adapter chưa đăng ký: " + adapterType);
         }
 
         return adapterType;
@@ -648,14 +648,14 @@ public class KnowledgeFilesServiceImpl extends BaseServiceImpl<DocumentDao, Docu
 
                 log.info("文档本地状态已更新为 RUNNING");
             } else {
-                log.error("文档解析失败，datasetId: {}, documentIds: {}", datasetId, documentIds);
-                throw new RenException(ErrorCode.RAG_API_ERROR, "文档解析失败");
+                log.error("Phân tích tài liệu thất bại, datasetId: {}, documentIds: {}", datasetId, documentIds);
+                throw new RenException(ErrorCode.RAG_API_ERROR, "Phân tích tài liệu thất bại");
             }
 
             return result;
 
         } catch (Exception e) {
-            log.error("解析文档失败: {}", e.getMessage(), e);
+            log.error("Phân tích tài liệu thất bại: {}", e.getMessage(), e);
             String errorMessage = e.getMessage() != null ? e.getMessage() : "null";
             if (e instanceof RenException) {
                 throw (RenException) e;
@@ -683,7 +683,7 @@ public class KnowledgeFilesServiceImpl extends BaseServiceImpl<DocumentDao, Docu
             log.info("切片列表获取成功: datasetId={}, total={}", datasetId, result.getTotal());
             return result;
         } catch (Exception e) {
-            log.error("列出切片失败: {}", e.getMessage(), e);
+            log.error("Liệt kê phân đoạn thất bại: {}", e.getMessage(), e);
             String errorMessage = e.getMessage() != null ? e.getMessage() : "null";
             if (e instanceof RenException) {
                 throw (RenException) e;
@@ -697,7 +697,7 @@ public class KnowledgeFilesServiceImpl extends BaseServiceImpl<DocumentDao, Docu
     @Override
     public RetrievalDTO.ResultVO retrievalTest(RetrievalDTO.TestReq req) {
         if (CollectionUtils.isEmpty(req.getDatasetIds())) {
-            throw new RenException("未指定召回测试的知识库");
+            throw new RenException("Chưa chỉ định kho tri thức để kiểm tra truy hồi");
         }
 
         log.info("=== 开始召回测试: req={} ===", req);
@@ -711,7 +711,7 @@ public class KnowledgeFilesServiceImpl extends BaseServiceImpl<DocumentDao, Docu
             log.info("召回测试成功: total={}", result != null ? result.getTotal() : 0);
             return result;
         } catch (Exception e) {
-            log.error("召回测试失败: {}", e.getMessage(), e);
+            log.error("Kiểm tra truy hồi thất bại: {}", e.getMessage(), e);
             String errorMessage = e.getMessage() != null ? e.getMessage() : "null";
             if (e instanceof RenException) {
                 throw (RenException) e;
@@ -787,7 +787,7 @@ public class KnowledgeFilesServiceImpl extends BaseServiceImpl<DocumentDao, Docu
                         log.info("定时任务: 同步修正知识库统计, docId={}, tokenDelta={}", dto.getDocumentId(), tokenDelta);
                     }
                 } catch (Exception e) {
-                    log.error("同步文档 {} 失败: {}", doc.getDocumentId(), e.getMessage());
+                    log.error("Đồng bộ tài liệu {} thất bại: {}", doc.getDocumentId(), e.getMessage());
                 }
             }
         });

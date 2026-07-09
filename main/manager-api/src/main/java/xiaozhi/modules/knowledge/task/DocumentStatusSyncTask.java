@@ -33,7 +33,7 @@ public class DocumentStatusSyncTask {
             // log.debug("开始执行文档状态同步任务...");
             knowledgeFilesService.syncRunningDocuments();
         } catch (Exception e) {
-            log.error("文档状态同步任务异常", e);
+            log.error("Tác vụ đồng bộ trạng thái tài liệu gặp lỗi", e);
         }
     }
 }

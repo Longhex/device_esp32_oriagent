@@ -99,7 +99,7 @@ public class AgentMcpAccessPointServiceImpl implements AgentMcpAccessPointServic
                                 initSucceeded = true;
                                 break;
                             } else if (jsonMap.containsKey("error")) {
-                                log.error("MCP初始化失败，智能体ID: {}, 错误: {}", id, jsonMap.get("error"));
+                                log.error("MCP khởi tạo thất bại, agent ID: {}, lỗi: {}", id, jsonMap.get("error"));
                                 return List.of();
                             }
                         }
@@ -109,7 +109,7 @@ public class AgentMcpAccessPointServiceImpl implements AgentMcpAccessPointServic
                 }
 
                 if (!initSucceeded) {
-                    log.error("未收到有效的MCP初始化响应，智能体ID: {}", id);
+                    log.error("Không nhận được phản hồi khởi tạo MCP hợp lệ, agent ID: {}", id);
                     return List.of();
                 }
 
@@ -153,7 +153,7 @@ public class AgentMcpAccessPointServiceImpl implements AgentMcpAccessPointServic
                                     return result;
                                 }
                             } else if (jsonMap.containsKey("error")) {
-                                log.error("获取工具列表失败，智能体ID: {}, 错误: {}", id, jsonMap.get("error"));
+                                log.error("Lấy danh sách công cụ thất bại, agent ID: {}, lỗi: {}", id, jsonMap.get("error"));
                                 return List.of();
                             }
                         }
@@ -167,7 +167,7 @@ public class AgentMcpAccessPointServiceImpl implements AgentMcpAccessPointServic
 
             }
         } catch (Exception e) {
-            log.error("获取智能体 MCP 工具列表失败，智能体ID: {},错误原因：{}", id, e.getMessage());
+            log.error("Lấy danh sách công cụ MCP của agent thất bại, agent ID: {}, nguyên nhân: {}", id, e.getMessage());
             return List.of();
         }
     }
@@ -182,8 +182,8 @@ public class AgentMcpAccessPointServiceImpl implements AgentMcpAccessPointServic
         try {
             return new URI(url);
         } catch (URISyntaxException e) {
-            log.error("路径格式不正确路径：{}，\n错误信息:{}", url, e.getMessage());
-            throw new RuntimeException("mcp的地址存在错误，请进入参数管理修改mcp接入点地址");
+            log.error("Định dạng đường dẫn không đúng, đường dẫn: {},\nthông tin lỗi: {}", url, e.getMessage());
+            throw new RuntimeException("Địa chỉ MCP bị lỗi, vui lòng vào Quản lý tham số để sửa địa chỉ điểm truy cập MCP");
         }
     }
 

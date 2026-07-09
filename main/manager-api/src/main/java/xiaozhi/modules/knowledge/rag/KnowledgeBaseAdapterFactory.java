@@ -176,7 +176,7 @@ public class KnowledgeBaseAdapterFactory {
             return adapter;
 
         } catch (Exception e) {
-            log.error("创建适配器实例失败: {}", adapterType, e);
+            log.error("Tạo instance adapter thất bại: {}", adapterType, e);
             throw new RenException(ErrorCode.RAG_ADAPTER_CREATION_FAILED,
                     "创建适配器失败: " + adapterType + ", 错误: " + e.getMessage());
         }

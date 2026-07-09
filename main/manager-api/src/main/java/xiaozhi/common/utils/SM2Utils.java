@@ -64,7 +64,7 @@ public class SM2Utils {
             byte[] arrayOfBytes = sm2Engine.processBlock(in, 0, in.length);
             return Hex.toHexString(arrayOfBytes);
         } catch (Exception e) {
-            throw new RuntimeException("SM2加密失败", e);
+            throw new RuntimeException("SM2 mã hóa thất bại", e);
         }
     }
 
@@ -96,7 +96,7 @@ public class SM2Utils {
             byte[] arrayOfBytes = sm2Engine.processBlock(cipherDataByte, 0, cipherDataByte.length);
             return new String(arrayOfBytes, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            throw new RuntimeException("SM2解密失败", e);
+            throw new RuntimeException("SM2 giải mã thất bại", e);
         }
     }
 
@@ -122,7 +122,7 @@ public class SM2Utils {
             result.put(KEY_PRIVATE_KEY, Hex.toHexString(s.getD().toByteArray()));
             return result;
         } catch (Exception e) {
-            throw new RuntimeException("生成SM2密钥对失败", e);
+            throw new RuntimeException("Tạo cặp khóa SM2 thất bại", e);
         }
     }
 

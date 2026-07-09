@@ -87,7 +87,7 @@ public class VoiceCloneController {
             String originalFilename = voiceFile.getOriginalFilename();
             String extension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
             if (!extension.equals(".mp3") && !extension.equals(".wav")) {
-                return new Result<String>().error("只允许上传.mp3和.wav格式的文件");
+                return new Result<String>().error("Chỉ cho phép tải lên file định dạng .mp3 và .wav");
             }
 
             // 验证文件大小 (最大10MB)
@@ -172,7 +172,7 @@ public class VoiceCloneController {
             response.getOutputStream().write(voiceData);
             response.getOutputStream().flush();
         } catch (Exception e) {
-            log.error("播放音频失败", e);
+            log.error("Phát âm thanh thất bại", e);
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
         }
     }

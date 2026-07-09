@@ -52,7 +52,7 @@ public class SysDictDataController {
         ValidatorUtils.validateEntity(params);
         // 强制校验dictTypeId是否存在
         if (!params.containsKey("dictTypeId") || StringUtils.isEmpty(String.valueOf(params.get("dictTypeId")))) {
-            return new Result<PageData<SysDictDataVO>>().error("dictTypeId不能为空");
+            return new Result<PageData<SysDictDataVO>>().error("dictTypeId không được để trống");
         }
 
         PageData<SysDictDataVO> page = sysDictDataService.page(params);

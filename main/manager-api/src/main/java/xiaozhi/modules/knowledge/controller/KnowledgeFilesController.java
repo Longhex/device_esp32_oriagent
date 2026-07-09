@@ -150,14 +150,14 @@ public class KnowledgeFilesController {
 
         List<String> documentIds = requestBody.get("document_ids");
         if (documentIds == null || documentIds.isEmpty()) {
-            return new Result<Void>().error("document_ids参数不能为空");
+            return new Result<Void>().error("Tham số document_ids không được để trống");
         }
 
         boolean success = knowledgeFilesService.parseDocuments(datasetId, documentIds);
         if (success) {
             return new Result<Void>();
         } else {
-            return new Result<Void>().error("文档解析失败，文档可能正在处理中");
+            return new Result<Void>().error("Phân tích tài liệu thất bại, tài liệu có thể đang được xử lý");
         }
     }
 
@@ -220,7 +220,7 @@ public class KnowledgeFilesController {
             return objectMapper.readValue(jsonString, new TypeReference<Map<String, Object>>() {
             });
         } catch (Exception e) {
-            throw new RuntimeException("解析JSON字符串失败: " + jsonString, e);
+            throw new RuntimeException("Phân tích chuỗi JSON thất bại: " + jsonString, e);
         }
     }
 }

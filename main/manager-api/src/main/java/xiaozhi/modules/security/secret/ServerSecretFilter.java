@@ -82,7 +82,7 @@ public class ServerSecretFilter extends AuthenticatingFilter {
             String json = JsonUtils.toJsonString(new Result<Void>().error(ErrorCode.UNAUTHORIZED, message));
             response.getWriter().print(json);
         } catch (IOException e) {
-            log.error("响应输出失败", e);
+            log.error("Xuất phản hồi thất bại", e);
         }
     }
 

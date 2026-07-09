@@ -273,7 +273,7 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
                 String token = generateWebSocketToken(clientId, macAddress);
                 websocket.setToken(token);
             } catch (Exception e) {
-                log.error("生成WebSocket token失败: {}", e.getMessage());
+                log.error("Tạo WebSocket token thất bại: {}", e.getMessage());
                 websocket.setToken("");
             }
         } else {
@@ -281,7 +281,7 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
         }
 
         if (StringUtils.isBlank(wsUrl) || wsUrl.equals("null")) {
-            log.error("WebSocket地址未配置，请登录智控台，在参数管理找到【server.websocket】配置");
+            log.error("Chưa cấu hình địa chỉ WebSocket, vui lòng đăng nhập bảng điều khiển, vào Quản lý tham số tìm cấu hình 【server.websocket】");
             wsUrl = "ws://xiaozhi.server.com:8000/xiaozhi/v1/";
             websocket.setUrl(wsUrl);
         } else {
@@ -290,7 +290,7 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
                 // 随机选择一个WebSocket URL
                 websocket.setUrl(wsUrls[RandomUtil.randomInt(0, wsUrls.length)]);
             } else {
-                log.error("WebSocket地址未配置，请登录智控台，在参数管理找到【server.websocket】配置");
+                log.error("Chưa cấu hình địa chỉ WebSocket, vui lòng đăng nhập bảng điều khiển, vào Quản lý tham số tìm cấu hình 【server.websocket】");
                 websocket.setUrl("ws://xiaozhi.server.com:8000/xiaozhi/v1/");
             }
         }
@@ -310,7 +310,7 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
                     response.setMqtt(mqtt);
                 }
             } catch (Exception e) {
-                log.error("生成MQTT配置失败: {}", e.getMessage());
+                log.error("Tạo cấu hình MQTT thất bại: {}", e.getMessage());
             }
         }
 
@@ -589,7 +589,7 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
             if (compareVersions(ota.getVersion(), currentVersion) > 0) {
                 String otaUrl = sysParamsService.getValue(Constant.SERVER_OTA, true);
                 if (StringUtils.isBlank(otaUrl) || otaUrl.equals("null")) {
-                    log.error("OTA地址未配置，请登录智控台，在参数管理找到【server.ota】配置");
+                    log.error("Chưa cấu hình địa chỉ OTA, vui lòng đăng nhập bảng điều khiển, vào Quản lý tham số tìm cấu hình 【server.ota】");
                     // 尝试从请求中获取
                     HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder
                             .getRequestAttributes())
@@ -722,7 +722,7 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
         // 从系统参数获取密钥
         String secretKey = sysParamsService.getValue(Constant.SERVER_SECRET, false);
         if (StringUtils.isBlank(secretKey)) {
-            throw new IllegalStateException("WebSocket认证密钥未配置(server.secret)");
+            throw new IllegalStateException("Chưa cấu hình khóa xác thực WebSocket (server.secret)");
         }
 
         // 获取当前时间戳(秒)

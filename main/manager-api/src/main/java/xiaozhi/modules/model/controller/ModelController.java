@@ -127,11 +127,11 @@ public class ModelController {
     public Result<Void> enableModelConfig(@PathVariable String id, @PathVariable Integer status) {
         ModelConfigEntity entity = modelConfigService.selectById(id);
         if (entity == null) {
-            return new Result<Void>().error("模型配置不存在");
+            return new Result<Void>().error("Cấu hình mô hình không tồn tại");
         }
         // 不能关闭默认模型
         if (status == 0 && entity.getIsDefault() > 0) {
-            return new Result<Void>().error("默认模型配置不允许关闭");
+            return new Result<Void>().error("Không cho phép tắt cấu hình mô hình mặc định");
         }
         // 不更新ConfigJson字段
         entity.setConfigJson(null);
@@ -146,7 +146,7 @@ public class ModelController {
     public Result<Void> setDefaultModel(@PathVariable String id) {
         ModelConfigEntity entity = modelConfigService.selectById(id);
         if (entity == null) {
-            return new Result<Void>().error("模型配置不存在");
+            return new Result<Void>().error("Cấu hình mô hình không tồn tại");
         }
         // 将其他模型设置为非默认
         modelConfigService.setDefaultModel(entity.getModelType(), 0);

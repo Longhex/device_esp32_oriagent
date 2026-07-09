@@ -146,7 +146,7 @@ public class AgentController {
             // 立即返回成功响应，不等待总结生成完成
             return new Result<Void>().ok(null);
         } catch (Exception e) {
-            return new Result<Void>().error("启动异步总结生成任务失败: " + e.getMessage());
+            return new Result<Void>().error("Khởi động tác vụ tạo tóm tắt bất đồng bộ thất bại: " + e.getMessage());
         }
     }
 
@@ -210,7 +210,7 @@ public class AgentController {
 
         // 检查权限
         if (!agentService.checkAgentPermission(id, user.getId())) {
-            return new Result<List<AgentChatHistoryDTO>>().error("没有权限查看该智能体的聊天记录");
+            return new Result<List<AgentChatHistoryDTO>>().error("Không có quyền xem lịch sử hội thoại của agent này");
         }
 
         // 查询聊天记录
@@ -228,7 +228,7 @@ public class AgentController {
 
         // 检查权限
         if (!agentService.checkAgentPermission(id, user.getId())) {
-            return new Result<List<AgentChatHistoryUserVO>>().error("没有权限查看该智能体的聊天记录");
+            return new Result<List<AgentChatHistoryUserVO>>().error("Không có quyền xem lịch sử hội thoại của agent này");
         }
 
         // 查询聊天记录
@@ -252,7 +252,7 @@ public class AgentController {
     public Result<String> getAudioId(@PathVariable("audioId") String audioId) {
         byte[] audioData = agentChatAudioService.getAudio(audioId);
         if (audioData == null) {
-            return new Result<String>().error("音频不存在");
+            return new Result<String>().error("Âm thanh không tồn tại");
         }
         String uuid = UUID.randomUUID().toString();
         redisUtils.set(RedisKeys.getAgentAudioIdKey(uuid), audioId);
@@ -285,7 +285,7 @@ public class AgentController {
     public Result<AgentTagEntity> createTag(@RequestBody Map<String, String> params) {
         String tagName = params.get("tagName");
         if (StringUtils.isBlank(tagName)) {
-            return new Result<AgentTagEntity>().error("标签名称不能为空");
+            return new Result<AgentTagEntity>().error("Tên nhãn không được để trống");
         }
         AgentTagEntity tag = agentTagService.saveTag(tagName);
         return new Result<AgentTagEntity>().ok(tag);

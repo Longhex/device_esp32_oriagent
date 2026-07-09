@@ -98,7 +98,7 @@ public class AgentChatHistoryBizServiceImpl implements AgentChatHistoryBizServic
                 audioId = agentChatAudioService.saveAudio(audioData);
                 log.info("音频数据保存成功，audioId={}", audioId);
             } catch (Exception e) {
-                log.error("音频数据保存失败", e);
+                log.error("Lưu dữ liệu âm thanh thất bại", e);
                 return null;
             }
         }
