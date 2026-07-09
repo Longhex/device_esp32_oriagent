@@ -602,7 +602,7 @@ export default {
       // 文件上传前的验证
       const isLt10M = file.size / 1024 / 1024 < 10;
       if (!isLt10M) {
-        this.$message.error('文件大小不能超过10MB!');
+        this.$message.error('Kích thước file không được vượt quá 10MB!');
         return;
       }
 
@@ -617,7 +617,7 @@ export default {
       // 文件上传前的验证
       const isLt10M = file.size / 1024 / 1024 < 10;
       if (!isLt10M) {
-        this.$message.error('文件大小不能超过10MB!');
+        this.$message.error('Kích thước file không được vượt quá 10MB!');
         return false;
       }
       // 保存文件到uploadForm
@@ -641,7 +641,7 @@ export default {
     // 批量上传提交
     handleBatchUploadSubmit: function () {
       if (this.selectedFilesList.length === 0) {
-        this.$message.error('请选择要上传的文件');
+        this.$message.error('Vui lòng chọn file cần tải lên');
         return;
       }
 
@@ -683,12 +683,12 @@ export default {
           const failedCount = results.filter(r => !r.success).length;
 
           if (successCount > 0) {
-            this.$message.success(`成功上传 ${successCount} 个文件`);
+            this.$message.success(`Tải lên thành công ${successCount} file`);
           }
 
           if (failedCount > 0) {
             const failedFiles = results.filter(r => !r.success).map(r => r.fileName);
-            this.$message.error(`上传失败 ${failedCount} 个文件: ${failedFiles.join(', ')}`);
+            this.$message.error(`Tải lên thất bại ${failedCount} file: ${failedFiles.join(', ')}`);
           }
 
           if (successCount > 0) {
@@ -698,8 +698,8 @@ export default {
         })
         .catch(error => {
           this.uploading = false;
-          this.$message.error('批量上传失败');
-          console.error('批量上传失败:', error);
+          this.$message.error('Tải lên hàng loạt thất bại');
+          console.error('Tải lên hàng loạt thất bại:', error);
         });
     },
 
@@ -747,7 +747,7 @@ export default {
         KnowledgeBaseAPI.parseDocument(this.datasetId, row.id,
           ({ data }) => {
             if (data && data.code === 0) {
-              this.$message.success('请求已提交，解析中');
+              this.$message.success('Đã gửi yêu cầu, đang phân tích');
               
               // 立即更新文档状态为处理中
               const document = this.fileList.find(doc => doc.id === row.id);
@@ -961,7 +961,7 @@ export default {
             // 解析切片列表数据
             this.parseSliceData(data.data);
           } else {
-            this.$message.error(data?.msg || '获取切片列表失败');
+            this.$message.error(data?.msg || 'Lấy danh sách phân đoạn thất bại');
             this.sliceList = [];
             this.sliceTotal = 0;
           }
@@ -970,11 +970,11 @@ export default {
           this.sliceLoading = false;
           // 错误回调处理后端返回的错误信息
           if (err && err.data) {
-            this.$message.error(err.data.msg || err.msg || '获取切片列表失败');
+            this.$message.error(err.data.msg || err.msg || 'Lấy danh sách phân đoạn thất bại');
           } else {
-            this.$message.error('获取切片列表失败');
+            this.$message.error('Lấy danh sách phân đoạn thất bại');
           }
-          console.error('获取切片列表失败:', err);
+          console.error('Lấy danh sách phân đoạn thất bại:', err);
           this.sliceList = [];
           this.sliceTotal = 0;
         }
@@ -1083,20 +1083,20 @@ export default {
           this.retrievalTestLoading = false;
           if (data && data.code === 0) {
             this.retrievalTestResult = data.data || data;
-            this.$message.success('召回测试完成');
+            this.$message.success('Kiểm tra truy hồi hoàn tất');
           } else {
-            this.$message.error(data?.msg || '召回测试失败');
+            this.$message.error(data?.msg || 'Kiểm tra truy hồi thất bại');
           }
         },
         (err) => {
           this.retrievalTestLoading = false;
           // 错误回调处理后端返回的错误信息
           if (err && err.data) {
-            this.$message.error(err.data.msg || err.msg || '召回测试失败');
+            this.$message.error(err.data.msg || err.msg || 'Kiểm tra truy hồi thất bại');
           } else {
-            this.$message.error('召回测试失败');
+            this.$message.error('Kiểm tra truy hồi thất bại');
           }
-          console.error('召回测试失败:', err);
+          console.error('Kiểm tra truy hồi thất bại:', err);
         }
       );
     },

@@ -311,9 +311,9 @@ export default {
                             this.fetchVoiceCloneList();
                         }
                     } catch (error) {
-                        // 处理响应时出错，刷新列表
-                        console.error('处理响应时出错:', error);
-                        this.$message.error('处理响应时出错');
+                        // Lỗi khi xử lý phản hồi，刷新列表
+                        console.error('Lỗi khi xử lý phản hồi:', error);
+                        this.$message.error('Lỗi khi xử lý phản hồi');
                         this.fetchVoiceCloneList();
                     } finally {
                         this.$set(row, '_cloning', false);
@@ -321,14 +321,14 @@ export default {
                 }, (error) => {
                     // API调用失败，刷新列表以获取最新状态
                     console.error('API调用失败:', error);
-                    this.$message.error('克隆失败，请将鼠标悬停在错误提示上，查看错误详情');
+                    this.$message.error('Nhân bản thất bại, di chuột vào thông báo lỗi để xem chi tiết');
                     this.fetchVoiceCloneList();
                     this.$set(row, '_cloning', false);
                 });
             } catch (error) {
-                // 调用API时出错，刷新列表
-                console.error('调用API时出错:', error);
-                this.$message.error('调用API时出错');
+                // Lỗi khi gọi API，刷新列表
+                console.error('Lỗi khi gọi API:', error);
+                this.$message.error('Lỗi khi gọi API');
                 this.fetchVoiceCloneList();
                 this.$set(row, '_cloning', false);
             }
@@ -407,9 +407,9 @@ export default {
             Api.voiceClone.updateName(params, (res) => {
                 res = res.data;
                 if (res.code === 0) {
-                    this.$message.success(this.$t('voiceClone.updateNameSuccess') || '名称更新成功');
+                    this.$message.success(this.$t('voiceClone.updateNameSuccess') || 'Cập nhật tên thành công');
                 } else {
-                    this.$message.error(res.msg || this.$t('voiceClone.updateNameFailed') || '名称更新失败');
+                    this.$message.error(res.msg || this.$t('voiceClone.updateNameFailed') || 'Cập nhật tên thất bại');
                     // 失败时恢复原值
                     this.fetchVoiceCloneList();
                 }
@@ -465,13 +465,13 @@ export default {
                     });
 
                     audio.play().catch(err => {
-                        console.error('播放失败:', err);
-                        this.$message.error(this.$t('voiceClone.playFailed') || '播放失败');
+                        console.error('Phát thất bại:', err);
+                        this.$message.error(this.$t('voiceClone.playFailed') || 'Phát thất bại');
                         this.playingRowId = null;
                         this.currentAudio = null;
                     });
                 } else {
-                    this.$message.error(res.msg || this.$t('voiceClone.audioNotExist') || '音频不存在');
+                    this.$message.error(res.msg || this.$t('voiceClone.audioNotExist') || 'Âm thanh không tồn tại');
                 }
             });
         },

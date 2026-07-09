@@ -35,8 +35,8 @@ export default {
         callback(res.data?.data || [])
       })
       .networkFail((err) => {
-        console.error('获取供应器列表失败:', err)
-        this.$message.error('获取供应器列表失败')
+        console.error('Lấy danh sách nhà cung cấp thất bại:', err)
+        this.$message.error('Lấy danh sách nhà cung cấp thất bại')
         RequestService.reAjaxFun(() => {
           this.getModelProviders(modelType, callback)
         })
@@ -67,8 +67,8 @@ export default {
         callback(res)
       })
       .networkFail((err) => {
-        console.error('新增模型失败:', err)
-        this.$message.error(err.msg || '新增模型失败')
+        console.error('Thêm mô hình thất bại:', err)
+        this.$message.error(err.msg || 'Thêm mô hình thất bại')
         RequestService.reAjaxFun(() => {
           this.addModel(params, callback)
         })
@@ -84,8 +84,8 @@ export default {
         callback(res)
       })
       .networkFail((err) => {
-        console.error('删除模型失败:', err)
-        this.$message.error(err.msg || '删除模型失败')
+        console.error('Xóa mô hình thất bại:', err)
+        this.$message.error(err.msg || 'Xóa mô hình thất bại')
         RequestService.reAjaxFun(() => {
           this.deleteModel(id, callback)
         })
@@ -151,8 +151,8 @@ export default {
         callback(res)
       })
       .networkFail((err) => {
-        console.error('获取模型配置失败:', err)
-        this.$message.error(err.msg || '获取模型配置失败')
+        console.error('Lấy cấu hình mô hình thất bại:', err)
+        this.$message.error(err.msg || 'Lấy cấu hình mô hình thất bại')
         RequestService.reAjaxFun(() => {
           this.getModelConfig(id, callback)
         })
@@ -168,8 +168,8 @@ export default {
         callback(res)
       })
       .networkFail((err) => {
-        console.error('更新模型状态失败:', err)
-        this.$message.error(err.msg || '更新模型状态失败')
+        console.error('Cập nhật trạng thái mô hình thất bại:', err)
+        this.$message.error(err.msg || 'Cập nhật trạng thái mô hình thất bại')
         RequestService.reAjaxFun(() => {
           this.updateModelStatus(id, status, callback)
         })
@@ -191,8 +191,8 @@ export default {
         callback(res);
       })
       .networkFail((err) => {
-        console.error('更新模型失败:', err);
-        this.$message.error(err.msg || '更新模型失败');
+        console.error('Cập nhật mô hình thất bại:', err);
+        this.$message.error(err.msg || 'Cập nhật mô hình thất bại');
         RequestService.reAjaxFun(() => {
           this.updateModel(params, callback);
         });
@@ -208,8 +208,8 @@ export default {
         callback(res)
       })
       .networkFail((err) => {
-        console.error('设置默认模型失败:', err)
-        this.$message.error(err.msg || '设置默认模型失败')
+        console.error('Đặt mô hình mặc định thất bại:', err)
+        this.$message.error(err.msg || 'Đặt mô hình mặc định thất bại')
         RequestService.reAjaxFun(() => {
           this.setDefaultModel(id, callback)
         })
@@ -237,7 +237,7 @@ export default {
         callback(res);
       })
       .networkFail((err) => {
-        this.$message.error(err.msg || '获取供应器列表失败');
+        this.$message.error(err.msg || 'Lấy danh sách nhà cung cấp thất bại');
         RequestService.reAjaxFun(() => {
           this.getModelProviders(params, callback);
         });
@@ -267,8 +267,8 @@ export default {
         callback(res);
       })
       .networkFail((err) => {
-        console.error('新增模型供应器失败:', err)
-        this.$message.error(err.msg || '新增模型供应器失败')
+        console.error('Thêm nhà cung cấp mô hình thất bại:', err)
+        this.$message.error(err.msg || 'Thêm nhà cung cấp mô hình thất bại')
         RequestService.reAjaxFun(() => {
           this.addModelProvider(params, callback);
         });
@@ -299,7 +299,7 @@ export default {
         callback(res);
       })
       .networkFail((err) => {
-        this.$message.error(err.msg || '更新模型供应器失败')
+        this.$message.error(err.msg || 'Cập nhật nhà cung cấp mô hình thất bại')
         RequestService.reAjaxFun(() => {
           this.updateModelProvider(params, callback);
         });
@@ -316,7 +316,7 @@ export default {
         callback(res);
       })
       .networkFail((err) => {
-        this.$message.error(err.msg || '删除模型供应器失败')
+        this.$message.error(err.msg || 'Xóa nhà cung cấp mô hình thất bại')
         RequestService.reAjaxFun(() => {
           this.deleteModelProviderByIds(ids, callback)
         })
@@ -332,7 +332,7 @@ export default {
         callback(res)
       })
       .networkFail((err) => {
-        this.$message.error(err.msg || '获取插件列表失败')
+        this.$message.error(err.msg || 'Lấy danh sách plugin thất bại')
         RequestService.reAjaxFun(() => {
           this.getPluginFunctionList(params, callback)
         })
@@ -349,8 +349,8 @@ export default {
         callback(res)
       })
       .networkFail((err) => {
-        console.error('获取RAG模型列表失败:', err)
-        this.$message.error(err.msg || '获取RAG模型列表失败')
+        console.error('Lấy danh sách mô hình RAG thất bại:', err)
+        this.$message.error(err.msg || 'Lấy danh sách mô hình RAG thất bại')
         RequestService.reAjaxFun(() => {
           this.getRAGModels(callback)
         })

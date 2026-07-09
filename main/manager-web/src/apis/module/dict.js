@@ -19,8 +19,8 @@ export default {
                 callback(res)
             })
             .networkFail((err) => {
-                console.error('获取字典类型列表失败:', err)
-                this.$message.error(err.msg || '获取字典类型列表失败')
+                console.error('Lấy danh sách loại từ điển thất bại:', err)
+                this.$message.error(err.msg || 'Lấy danh sách loại từ điển thất bại')
                 RequestService.reAjaxFun(() => {
                     this.getDictTypeList(params, callback)
                 })
@@ -37,8 +37,8 @@ export default {
                 callback(res)
             })
             .networkFail((err) => {
-                console.error('获取字典类型详情失败:', err)
-                this.$message.error(err.msg || '获取字典类型详情失败')
+                console.error('Lấy chi tiết loại từ điển thất bại:', err)
+                this.$message.error(err.msg || 'Lấy chi tiết loại từ điển thất bại')
                 RequestService.reAjaxFun(() => {
                     this.getDictTypeDetail(id, callback)
                 })
@@ -56,8 +56,8 @@ export default {
                 callback(res)
             })
             .networkFail((err) => {
-                console.error('新增字典类型失败:', err)
-                this.$message.error(err.msg || '新增字典类型失败')
+                console.error('Thêm loại từ điển thất bại:', err)
+                this.$message.error(err.msg || 'Thêm loại từ điển thất bại')
                 RequestService.reAjaxFun(() => {
                     this.addDictType(data, callback)
                 })
@@ -75,8 +75,8 @@ export default {
                 callback(res)
             })
             .networkFail((err) => {
-                console.error('更新字典类型失败:', err)
-                this.$message.error(err.msg || '更新字典类型失败')
+                console.error('Cập nhật loại từ điển thất bại:', err)
+                this.$message.error(err.msg || 'Cập nhật loại từ điển thất bại')
                 RequestService.reAjaxFun(() => {
                     this.updateDictType(data, callback)
                 })
@@ -94,8 +94,8 @@ export default {
                 callback(res)
             })
             .networkFail((err) => {
-                console.error('删除字典类型失败:', err)
-                this.$message.error(err.msg || '删除字典类型失败')
+                console.error('Xóa loại từ điển thất bại:', err)
+                this.$message.error(err.msg || 'Xóa loại từ điển thất bại')
                 RequestService.reAjaxFun(() => {
                     this.deleteDictType(ids, callback)
                 })
@@ -120,8 +120,8 @@ export default {
                 callback(res)
             })
             .networkFail((err) => {
-                console.error('获取字典数据列表失败:', err)
-                this.$message.error(err.msg || '获取字典数据列表失败')
+                console.error('Lấy danh sách dữ liệu từ điển thất bại:', err)
+                this.$message.error(err.msg || 'Lấy danh sách dữ liệu từ điển thất bại')
                 RequestService.reAjaxFun(() => {
                     this.getDictDataList(params, callback)
                 })
@@ -138,8 +138,8 @@ export default {
                 callback(res)
             })
             .networkFail((err) => {
-                console.error('获取字典数据详情失败:', err)
-                this.$message.error(err.msg || '获取字典数据详情失败')
+                console.error('Lấy chi tiết dữ liệu từ điển thất bại:', err)
+                this.$message.error(err.msg || 'Lấy chi tiết dữ liệu từ điển thất bại')
                 RequestService.reAjaxFun(() => {
                     this.getDictDataDetail(id, callback)
                 })
@@ -157,8 +157,8 @@ export default {
                 callback(res)
             })
             .networkFail((err) => {
-                console.error('新增字典数据失败:', err)
-                this.$message.error(err.msg || '新增字典数据失败')
+                console.error('Thêm dữ liệu từ điển thất bại:', err)
+                this.$message.error(err.msg || 'Thêm dữ liệu từ điển thất bại')
                 RequestService.reAjaxFun(() => {
                     this.addDictData(data, callback)
                 })
@@ -176,8 +176,8 @@ export default {
                 callback(res)
             })
             .networkFail((err) => {
-                console.error('更新字典数据失败:', err)
-                this.$message.error(err.msg || '更新字典数据失败')
+                console.error('Cập nhật dữ liệu từ điển thất bại:', err)
+                this.$message.error(err.msg || 'Cập nhật dữ liệu từ điển thất bại')
                 RequestService.reAjaxFun(() => {
                     this.updateDictData(data, callback)
                 })
@@ -195,8 +195,8 @@ export default {
                 callback(res)
             })
             .networkFail((err) => {
-                console.error('删除字典数据失败:', err)
-                this.$message.error(err.msg || '删除字典数据失败')
+                console.error('Xóa dữ liệu từ điển thất bại:', err)
+                this.$message.error(err.msg || 'Xóa dữ liệu từ điển thất bại')
                 RequestService.reAjaxFun(() => {
                     this.deleteDictData(ids, callback)
                 })
@@ -214,11 +214,11 @@ export default {
                     if (res.data && res.data.code === 0) {
                         resolve(res.data)
                     } else {
-                        reject(new Error(res.data?.msg || '获取字典数据列表失败'))
+                        reject(new Error(res.data?.msg || 'Lấy danh sách dữ liệu từ điển thất bại'))
                     }
                 })
                 .networkFail((err) => {
-                    console.error('获取字典数据列表失败:', err)
+                    console.error('Lấy danh sách dữ liệu từ điển thất bại:', err)
                     reject(err)
                 }).send()
         })

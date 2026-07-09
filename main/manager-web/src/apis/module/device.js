@@ -61,8 +61,8 @@ export default {
                 callback(res)
             })
             .networkFail((err) => {
-                console.error('更新OTA状态失败:', err)
-                this.$message.error(err.msg || '更新OTA状态失败')
+                console.error('Cập nhật trạng thái OTA thất bại:', err)
+                this.$message.error(err.msg || 'Cập nhật trạng thái OTA thất bại')
                 RequestService.reAjaxFun(() => {
                     this.updateDeviceInfo(id, payload, callback)
                 })

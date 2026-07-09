@@ -129,8 +129,8 @@ export default {
           await logCacheStatus();
         }
       } catch (error) {
-        console.error('加载缓存数据失败:', error);
-        this.$message.error('加载缓存数据失败');
+        console.error('Tải dữ liệu cache thất bại:', error);
+        this.$message.error('Tải dữ liệu cache thất bại');
       } finally {
         this.isLoading = false;
       }

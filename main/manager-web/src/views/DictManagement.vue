@@ -348,7 +348,7 @@ export default {
         },
         handleSearch() {
             if (!this.selectedDictType) {
-                this.$message.warning('请先选择字典类型')
+                this.$message.warning('Vui lòng chọn loại từ điển trước')
                 return
             }
             this.currentPage = 1
