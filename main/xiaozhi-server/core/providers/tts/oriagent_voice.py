@@ -150,6 +150,15 @@ class TTSProvider(TTSProviderBase):
         self._fetch_semaphore = None
         self._http = None  # httpx.AsyncClient, lazy-init trong event loop
 
+        # ── Prewarm WS (đòn #1: giấu token+connect khỏi TTFA segment đầu) ──────
+        # Mở sẵn stream-token + WebSocket ngay đầu turn (song song LLM), segment 0
+        # tái dùng -> tiết kiệm ~200ms token+connect. Tắt bằng enable_ws_prewarm=false
+        # nếu muốn tiết kiệm quota (token prewarm trừ theo prewarm_text_length).
+        self._prewarm_enabled = config.get("enable_ws_prewarm", True) is not False
+        self._prewarm_chars = int(config.get("prewarm_text_length", 200))
+        self._prewarm_max_age = 25.0  # giây; token sống 60s, nginx idle ~30s -> coi stale sớm
+        self._prewarmed = None  # (ws, session_id, monotonic_ts) hoặc None
+
         if not self.api_key:
             logger.bind(tag=TAG).warning(
                 "Oriagent Voice TTS: chưa resolve được api_key (voices rỗng?) — TTS sẽ lỗi khi gọi."
@@ -301,6 +310,8 @@ class TTSProvider(TTSProviderBase):
                     await asyncio.sleep(0.1)
 
     def _flush_pipeline(self):
+        # Đóng WS prewarm còn treo từ turn trước (nếu segment 0 chưa kịp tái dùng).
+        self._drop_prewarmed()
         for task in list(self._fetch_tasks):
             if not task.done():
                 task.cancel()
@@ -400,6 +411,76 @@ class TTSProvider(TTSProviderBase):
         sep = "&" if parts.query else "?"
         return f"{ws_url}{sep}{urlencode({'token': token})}"
 
+    # ── Prewarm: mở sẵn token+WS đầu turn, segment 0 tái dùng ─────────────────
+    async def _safe_close_ws(self, ws):
+        try:
+            await ws.close()
+        except Exception:
+            pass
+
+    async def _prewarm_ws(self, session_id):
+        """Lấy stream-token + mở WS ngay đầu turn (song song LLM). Best-effort:
+        lỗi thì bỏ qua, segment 0 tự lấy token/WS như bình thường. Server chờ ở
+        receive_json() nên giữ socket mở mà chưa gửi `start` là hợp lệ (~<30s)."""
+        if self._ws_disabled:
+            return
+        ws = None
+        try:
+            token, ws_url = await self._get_stream_token(self._prewarm_chars)
+            if not token or not ws_url or self.current_session_id != session_id:
+                return
+            full_ws_url = self._build_ws_url(ws_url, token)
+            use_ssl = self._ssl_ctx if full_ws_url.startswith("wss") else None
+            ws = await asyncio.wait_for(
+                websockets.connect(full_ws_url, ssl=use_ssl, ping_interval=20.0, ping_timeout=20.0),
+                timeout=WS_CONNECT_TIMEOUT,
+            )
+            if self.current_session_id != session_id or self.conn.client_abort:
+                await self._safe_close_ws(ws)
+                return
+            self._prewarmed = (ws, session_id, time.monotonic())
+        except Exception as e:
+            if ws is not None:
+                await self._safe_close_ws(ws)
+            # 404/rejected -> đường chính (_do_fetch_ws) sẽ tự phát hiện & tắt WS.
+            logger.bind(tag=TAG).debug(f"prewarm WS bỏ qua: {e}")
+
+    def _take_prewarmed(self, session_id, need_chars):
+        """Trả WS đã mở sẵn nếu còn hợp lệ cho segment đầu; None nếu không dùng được
+        (đóng luôn socket stale). Chạy trên event loop -> ensure_future an toàn."""
+        pw = self._prewarmed
+        if not pw:
+            return None
+        self._prewarmed = None
+        ws, sid, ts = pw
+        stale = (
+            session_id != sid
+            or need_chars > self._prewarm_chars
+            or (time.monotonic() - ts) > self._prewarm_max_age
+            or self.conn.client_abort
+        )
+        if stale:
+            asyncio.ensure_future(self._safe_close_ws(ws))
+            return None
+        return ws
+
+    def _schedule_prewarm(self, session_id):
+        if not self._prewarm_enabled or self._ws_disabled:
+            return
+        asyncio.run_coroutine_threadsafe(self._prewarm_ws(session_id), self.conn.loop)
+
+    def _drop_prewarmed(self):
+        """Đóng WS prewarm còn treo (gọi khi flush/turn mới/close)."""
+        pw = self._prewarmed
+        if not pw:
+            return
+        self._prewarmed = None
+        ws = pw[0]
+        try:
+            asyncio.run_coroutine_threadsafe(self._safe_close_ws(ws), self.conn.loop)
+        except Exception:
+            pass
+
     async def _do_fetch(self, idx, text, session_id, attempt=0) -> bool:
         """Dispatcher: ưu tiên WS realtime; nếu WS không khả dụng (404) -> blocking /tts/generate."""
         if not self._ws_disabled:
@@ -419,31 +500,35 @@ class TTSProvider(TTSProviderBase):
         t_send = None
         ws = None
         try:
-            stream_token, ws_url = await self._get_stream_token(len(text))
-            if not stream_token or not ws_url:
-                return False
-            if self.conn.client_abort or self.current_session_id != session_id:
-                return True
+            # Segment đầu (attempt đầu): tái dùng WS đã prewarm để giấu token+connect.
+            if idx == 0 and attempt == 0:
+                ws = self._take_prewarmed(session_id, len(text))
+            if ws is None:
+                stream_token, ws_url = await self._get_stream_token(len(text))
+                if not stream_token or not ws_url:
+                    return False
+                if self.conn.client_abort or self.current_session_id != session_id:
+                    return True
 
-            full_ws_url = self._build_ws_url(ws_url, stream_token)
-            use_ssl = self._ssl_ctx if full_ws_url.startswith("wss") else None
-            try:
-                ws = await asyncio.wait_for(
-                    websockets.connect(full_ws_url, ssl=use_ssl, ping_interval=20.0, ping_timeout=20.0),
-                    timeout=WS_CONNECT_TIMEOUT,
-                )
-            except Exception as conn_err:
-                # Endpoint WS chưa deploy (404/rejected) -> tắt WS, chuyển hẳn sang blocking.
-                if isinstance(conn_err, getattr(websockets.exceptions, "InvalidStatus", ())) \
-                        or "404" in str(conn_err) or "rejected" in str(conn_err).lower():
-                    if not self._ws_warned:
-                        logger.bind(tag=TAG).warning(
-                            "Oriagent WS realtime không khả dụng (HTTP 404) — chuyển sang blocking /tts/generate."
-                        )
-                        self._ws_warned = True
-                    self._ws_disabled = True
-                    _WS_DEAD_BASES.add(self.api_base)
-                raise
+                full_ws_url = self._build_ws_url(ws_url, stream_token)
+                use_ssl = self._ssl_ctx if full_ws_url.startswith("wss") else None
+                try:
+                    ws = await asyncio.wait_for(
+                        websockets.connect(full_ws_url, ssl=use_ssl, ping_interval=20.0, ping_timeout=20.0),
+                        timeout=WS_CONNECT_TIMEOUT,
+                    )
+                except Exception as conn_err:
+                    # Endpoint WS chưa deploy (404/rejected) -> tắt WS, chuyển hẳn sang blocking.
+                    if isinstance(conn_err, getattr(websockets.exceptions, "InvalidStatus", ())) \
+                            or "404" in str(conn_err) or "rejected" in str(conn_err).lower():
+                        if not self._ws_warned:
+                            logger.bind(tag=TAG).warning(
+                                "Oriagent WS realtime không khả dụng (HTTP 404) — chuyển sang blocking /tts/generate."
+                            )
+                            self._ws_warned = True
+                        self._ws_disabled = True
+                        _WS_DEAD_BASES.add(self.api_base)
+                    raise
 
             start_msg = {
                 "type": "start",
@@ -613,6 +698,8 @@ class TTSProvider(TTSProviderBase):
                     self.processed_chars = 0
                     self.segment_counter = 0
                     self._flush_pipeline()
+                    # Đòn #1: mở sẵn token+WS song song với LLM -> segment 0 khỏi chờ.
+                    self._schedule_prewarm(self.current_session_id)
                     logger.bind(tag=TAG).info(f"Reset SID: {self.current_session_id}")
 
                 if self.conn.client_abort:
@@ -738,6 +825,10 @@ class TTSProvider(TTSProviderBase):
 
     async def close(self):
         self._playback_active = False
+        if self._prewarmed:
+            ws = self._prewarmed[0]
+            self._prewarmed = None
+            await self._safe_close_ws(ws)
         for task in list(self._fetch_tasks):
             if not task.done():
                 task.cancel()
