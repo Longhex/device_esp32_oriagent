@@ -89,7 +89,7 @@ class VirtualWebsocket:
                     self.logger.bind(tag=TAG).debug(f"UDP Session {self.session_id} not found for audio.")
             return
 
-        topic = f"devices/{self.device_id}/command"
+        topic = f"{self.device_id}/MONITOR"
         try:
             self.mqtt_client.publish(topic, message)
             self.logger.bind(tag=TAG).debug(f"Published to {topic}: {message[:200]}")

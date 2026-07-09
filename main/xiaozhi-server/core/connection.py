@@ -1577,8 +1577,26 @@ class ConnectionHandler:
         asyncio.run_coroutine_threadsafe(_send(), self.loop)
         self.logger.bind(tag=TAG).info(f"show_image -> {url}")
 
+    def _send_play_video(self, url):
+        """Gửi lệnh hiển thị video xuống thiết bị + web caller.
+        Contract: {"type": "cmd", "cmd": "play_avi", "url": "http..."}
+        """
+        if not url or not url.lower().startswith(("http://", "https://")):
+            return
+        message = json.dumps({"cmd": "play_avi", "url": url}, ensure_ascii=False)
+
+        async def _send():
+            try:
+                if self.websocket:
+                    await self.websocket.send(message)
+            except Exception as e:
+                self.logger.bind(tag=TAG).warning(f"Gửi play_avi thất bại: {e}")
+
+        asyncio.run_coroutine_threadsafe(_send(), self.loop)
+        self.logger.bind(tag=TAG).info(f"play_avi -> {url}")
+
     def fire_pending_images_up_to(self, offset):
-        """Bắn show_image cho các ảnh có offset <= offset (đã phát audio tới đó).
+        """Bắn show_image hoặc play_avi cho các URL có offset <= offset (đã phát audio tới đó).
 
         Gọi từ playback (đồng bộ theo segment) và từ _audio_play_priority_thread
         lúc LAST (flush phần còn lại). Dùng float('inf') để flush tất cả.
@@ -1587,7 +1605,10 @@ class ConnectionHandler:
         q = self._pending_image_signals
         while q and q[0][0] <= offset:
             _pos, url = q.pop(0)
-            self._send_show_image(url)
+            if url.lower().endswith(('.avi', '.mp4', '.mov', '.mkv')):
+                self._send_play_video(url)
+            else:
+                self._send_show_image(url)
 
     def _get_tool_summary(self, functions: list) -> str:
         """
