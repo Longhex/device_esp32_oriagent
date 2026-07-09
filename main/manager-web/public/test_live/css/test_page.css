@@ -24,22 +24,41 @@ body {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-image: url('../images/1.png');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    transition: background-image 0.5s ease-in-out;
+    background: #f4f5f7; /* nền trơn sáng, đồng bộ box Testing (bỏ ảnh phòng anime) */
     z-index: -2;
 }
 
 .background-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.3);
-    z-index: -1;
+    display: none;
+}
+
+/* Vòng tròn trắng + sóng âm giữa màn (đồng bộ style box Testing idle) */
+.voice-visual {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.voice-circle {
+    width: min(360px, 62vw);
+    aspect-ratio: 1 / 1;
+    max-width: 78vh;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.voice-waveform {
+    width: 42%;
+    height: auto;
+    fill: #c7c9cf;
 }
 
 /* ==================== 主容器 ==================== */
@@ -269,24 +288,23 @@ body {
     padding: 12px 16px;
     border: none;
     border-radius: 24px;
-    background: rgba(35, 39, 42, 0.85);
-    backdrop-filter: blur(10px);
-    color: white;
+    background: #ffffff;
+    color: #313133;
     font-size: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e6e6e8;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     transition: all 0.3s ease;
 }
 
 .chat-ipt input::placeholder {
-    color: rgba(255, 255, 255, 0.5);
+    color: #9a9a9a;
 }
 
 .chat-ipt input:focus {
     outline: none;
-    border-color: rgba(88, 101, 242, 0.6);
-    box-shadow: 0 4px 16px rgba(88, 101, 242, 0.3);
-    background: rgba(45, 49, 52, 0.9);
+    border-color: #08c45b;
+    box-shadow: 0 4px 16px rgba(8, 196, 91, 0.15);
+    background: #ffffff;
 }
 
 .chat-message {
@@ -295,26 +313,23 @@ body {
 }
 
 .chat-message.ai .message-bubble {
-    background: transparent;
-    color: white;
+    background: #ffffff;
+    color: #313133;
     align-self: flex-end;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    border: 1px solid #ececed;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .chat-message.user .message-bubble {
-    background: rgba(88, 101, 242, 0.7);
-    color: white;
+    background: #08c45b;
+    color: #ffffff;
     align-self: flex-start;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(5px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .chat-message.system .message-bubble {
     background: transparent;
-    color: #b9bbbe;
+    color: #8a8b90;
     align-self: center;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .message-bubble {
@@ -323,8 +338,6 @@ body {
     font-size: 14px;
     max-width: 250px;
     word-wrap: break-word;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
     animation: fadeIn 0.3s ease-out;
 }
 

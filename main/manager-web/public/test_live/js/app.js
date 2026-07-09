@@ -51,8 +51,7 @@ class App {
         await this.checkMicrophoneAvailability();
         // 检查摄像头可用性
         this.checkCameraAvailability();
-        // 初始化Live2D
-        await this.initLive2D();
+        // (Đã bỏ nhân vật Live2D — đồng bộ style box Testing)
         // 初始化摄像头
         this.initCamera();
         // 关闭加载loading

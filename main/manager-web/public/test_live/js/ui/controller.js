@@ -54,11 +54,7 @@ class UIController {
 
         // Initialize status display
         this.updateConnectionUI(false);
-        // Apply saved background
-        const backgroundContainer = document.querySelector('.background-container');
-        if (backgroundContainer) {
-            backgroundContainer.style.backgroundImage = `url('./images/${this.backgroundImages[this.currentBackgroundIndex]}')`;
-        }
+        // (Đã bỏ nền ảnh phòng anime — giữ nền trơn từ CSS, đồng bộ box Testing)
 
         this.updateDialButton(false);
 
@@ -303,13 +299,14 @@ class UIController {
         const statusDot = document.querySelector('.status-dot');
 
         if (connectionStatus) {
+            const t = window.t || {};
             if (isConnected) {
-                connectionStatus.textContent = '已连接';
+                connectionStatus.textContent = t.connected || 'Đã kết nối';
                 if (statusDot) {
                     statusDot.className = 'status-dot status-connected';
                 }
             } else {
-                connectionStatus.textContent = '离线';
+                connectionStatus.textContent = t.offline || 'Ngoại tuyến';
                 if (statusDot) {
                     statusDot.className = 'status-dot status-disconnected';
                 }
