@@ -1565,7 +1565,7 @@ class ConnectionHandler:
         """
         if not url or not url.lower().startswith(("http://", "https://")):
             return
-        message = json.dumps({"cmd": "show_image", "url": url}, ensure_ascii=False)
+        message = json.dumps({"type": "cmd", "cmd": "show_image", "url": url}, ensure_ascii=False)
 
         async def _send():
             try:
@@ -1583,7 +1583,7 @@ class ConnectionHandler:
         """
         if not url or not url.lower().startswith(("http://", "https://")):
             return
-        message = json.dumps({"cmd": "play_avi", "url": url}, ensure_ascii=False)
+        message = json.dumps({"type": "cmd", "cmd": "play_avi", "url": url}, ensure_ascii=False)
 
         async def _send():
             try:
