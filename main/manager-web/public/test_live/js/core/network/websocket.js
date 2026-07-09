@@ -80,6 +80,14 @@ export class WebSocketHandler {
             }
             return;
         }
+
+        if (message.cmd === 'play_avi') {
+            if (message.url && /^https?:\/\//i.test(message.url)) {
+                log(`Hiển thị video: ${message.url}`, 'info');
+                uiController.addChatVideo(message.url);
+            }
+            return;
+        }
         if (message.type === 'hello') {
             log(`服务器回应：${JSON.stringify(message, null, 2)}`, 'success');
             window.cameraAvailable = true;

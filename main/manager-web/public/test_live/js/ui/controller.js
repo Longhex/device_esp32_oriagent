@@ -21,6 +21,7 @@ class UIController {
         this.updateDialButton = this.updateDialButton.bind(this);
         this.addChatMessage = this.addChatMessage.bind(this);
         this.addChatImage = this.addChatImage.bind(this);
+        this.addChatVideo = this.addChatVideo.bind(this);
         this.switchBackground = this.switchBackground.bind(this);
         this.switchLive2DModel = this.switchLive2DModel.bind(this);
         this.showModal = this.showModal.bind(this);
@@ -449,8 +450,28 @@ class UIController {
         bubble.appendChild(img);
         messageDiv.appendChild(bubble);
         chatStream.appendChild(messageDiv);
+        this.scrollToBottom();
+    }
 
-        chatStream.scrollTop = chatStream.scrollHeight;
+    addChatVideo(url) {
+        const chatStream = document.getElementById('chatStream');
+        if (!chatStream) return;
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'chat-message ai';
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        const video = document.createElement('video');
+        video.src = url;
+        video.controls = true;
+        video.autoplay = true;
+        video.style.maxWidth = '100%';
+        video.style.borderRadius = '8px';
+        video.onerror = () => { messageDiv.remove(); };
+        bubble.appendChild(video);
+        messageDiv.appendChild(bubble);
+        chatStream.appendChild(messageDiv);
+        this.scrollToBottom();
     }
 
     // Add chat message
