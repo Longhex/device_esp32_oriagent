@@ -121,7 +121,11 @@ class TTSProvider(TTSProviderBase):
 
         # Tham số tổng hợp (theo doc VoxCPM)
         self.cfg_value = config.get("cfg_value", 2.0)
-        self.dit_steps = config.get("dit_steps", 6)
+        # Chiến thuật fast-start: segment đầu dùng ít bước diffusion hơn để giảm TTFB
+        # (audio ra sớm), các segment sau dùng nhiều bước hơn cho chất lượng — độ trễ
+        # thêm bị che khuất vì fetch song song trong lúc segment trước đang phát.
+        self.dit_steps = config.get("dit_steps", 8)
+        self.dit_steps_first = config.get("dit_steps_first", 6)
         self.streaming_mode = config.get("streaming_mode", "stable")
         self.control_instruction = config.get("control_instruction", "")
 
@@ -536,7 +540,8 @@ class TTSProvider(TTSProviderBase):
                 "language": self.language,
                 "control_instruction": self.control_instruction or "",
                 "cfg_value": self.cfg_value,
-                "dit_steps": self.dit_steps,
+                # Segment đầu ưu tiên tốc độ (TTFB), segment sau ưu tiên chất lượng.
+                "dit_steps": self.dit_steps_first if idx == 0 else self.dit_steps,
                 "streaming_mode": self.streaming_mode,
             }
             t_send = time.perf_counter()
@@ -725,10 +730,11 @@ class TTSProvider(TTSProviderBase):
                             self.playback_queue.put((idx, idx == 0, segment, self.current_session_id, seg_end_offset)),
                             self.conn.loop,
                         )
-                        # segment0: thêm 2 khoảng trắng đầu câu cho TTS (warm-up, tránh clip âm
-                        # tiết đầu); text hiển thị giữ nguyên.
-                        fetch_text = "  " + segment if idx == 0 else segment
-                        self._schedule_fetch(idx, fetch_text, self.current_session_id, False)
+                        # KHÔNG prepend khoảng trắng vào segment đầu: VoxCPM (diffusion clone)
+                        # có xu hướng "phát âm" padding đầu -> chèn âm lạ đầu câu. Việc chống
+                        # clip/dead-air đầu câu đã do LEAD_IN_SILENCE_BYTES (im lặng thật phía
+                        # client) đảm nhiệm, không cần padding text.
+                        self._schedule_fetch(idx, segment, self.current_session_id, False)
 
                 if message.sentence_type == SentenceType.LAST:
                     full_text = "".join(self.tts_text_buff)
@@ -743,8 +749,8 @@ class TTSProvider(TTSProviderBase):
                             self.playback_queue.put((idx, idx == 0, remaining, self.current_session_id, len(full_text))),
                             self.conn.loop,
                         )
-                        fetch_text = "  " + remaining if idx == 0 else remaining
-                        self._schedule_fetch(idx, fetch_text, self.current_session_id, True)
+                        # Xem chú thích trên: không prepend khoảng trắng đầu câu.
+                        self._schedule_fetch(idx, remaining, self.current_session_id, True)
                     target_q = self.tts_audio_queue
                     self.conn.executor.submit(self._wait_for_all_and_finish, message.content_detail, self.current_session_id, target_q)
             except queue.Empty:
