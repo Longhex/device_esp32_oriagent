@@ -78,7 +78,7 @@ export default {
       method: 'GET',
       callback: callback,
       errorCallback: errorCallback,
-      errorMessage: '获取知识库列表失败',
+      errorMessage: 'Lấy danh sách kho tri thức thất bại',
       retryFunction: () => this.getKnowledgeBaseList(params, callback, errorCallback)
     });
   },
@@ -112,7 +112,7 @@ export default {
           errorCallback(err);
         }
       },
-      errorMessage: '创建知识库失败',
+      errorMessage: 'Tạo kho tri thức thất bại',
       retryFunction: () => this.createKnowledgeBase(data, callback, errorCallback)
     });
   },
@@ -135,7 +135,7 @@ export default {
       headers: { 'Content-Type': 'application/json' },
       callback: callback,
       errorCallback: errorCallback,
-      errorMessage: '更新知识库失败',
+      errorMessage: 'Cập nhật kho tri thức thất bại',
       retryFunction: () => this.updateKnowledgeBase(datasetId, data, callback, errorCallback)
     });
   },
@@ -155,7 +155,7 @@ export default {
       method: 'DELETE',
       callback: callback,
       errorCallback: errorCallback,
-      errorMessage: '删除知识库失败',
+      errorMessage: 'Xóa kho tri thức thất bại',
       retryFunction: () => this.deleteKnowledgeBase(datasetId, callback, errorCallback)
     });
   },
@@ -175,7 +175,7 @@ export default {
       method: 'DELETE',
       callback: callback,
       errorCallback: errorCallback,
-      errorMessage: '批量删除知识库失败',
+      errorMessage: 'Xóa hàng loạt kho tri thức thất bại',
       retryFunction: () => this.deleteKnowledgeBases(ids, callback, errorCallback)
     });
   },
@@ -199,7 +199,7 @@ export default {
       method: 'GET',
       callback: callback,
       errorCallback: errorCallback,
-      errorMessage: '获取文档列表失败',
+      errorMessage: 'Lấy danh sách tài liệu thất bại',
       retryFunction: () => this.getDocumentList(datasetId, params, callback, errorCallback)
     });
   },
@@ -219,7 +219,7 @@ export default {
       headers: { 'Content-Type': 'multipart/form-data' },
       callback: callback,
       errorCallback: errorCallback,
-      errorMessage: '上传文档失败',
+      errorMessage: 'Tải tài liệu lên thất bại',
       retryFunction: () => this.uploadDocument(datasetId, formData, callback, errorCallback)
     });
   },
@@ -243,7 +243,7 @@ export default {
       headers: { 'Content-Type': 'application/json' },
       callback: callback,
       errorCallback: errorCallback,
-      errorMessage: '解析文档失败',
+      errorMessage: 'Phân tích tài liệu thất bại',
       retryFunction: () => this.parseDocument(datasetId, documentId, callback, errorCallback)
     });
   },
@@ -261,7 +261,7 @@ export default {
       method: 'DELETE',
       callback: callback,
       errorCallback: errorCallback,
-      errorMessage: '删除文档失败',
+      errorMessage: 'Xóa tài liệu thất bại',
       retryFunction: () => this.deleteDocument(datasetId, documentId, callback, errorCallback)
     });
   },
@@ -290,7 +290,7 @@ export default {
       method: 'GET',
       callback: callback,
       errorCallback: errorCallback,
-      errorMessage: '获取切片列表失败',
+      errorMessage: 'Lấy danh sách phân đoạn thất bại',
       retryFunction: () => this.listChunks(datasetId, documentId, params, callback, errorCallback)
     });
   },
@@ -310,7 +310,7 @@ export default {
       headers: { 'Content-Type': 'application/json' },
       callback: callback,
       errorCallback: errorCallback,
-      errorMessage: '召回测试失败',
+      errorMessage: 'Kiểm thử truy hồi thất bại',
       retryFunction: () => this.retrievalTest(datasetId, data, callback, errorCallback)
     });
   }

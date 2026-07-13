@@ -1,4 +1,5 @@
 <template>
+  <SettingsLayout active-key="params">
     <div class="welcome">
 
         <div class="operation-bar">
@@ -99,14 +100,16 @@
             <version-footer />
         </el-footer>
     </div>
+  </SettingsLayout>
 </template>
 
 <script>
 import Api from "@/apis/api";
 import ParamDialog from "@/components/ParamDialog.vue";
 import VersionFooter from "@/components/VersionFooter.vue";
+import SettingsLayout from "@/components/SettingsLayout.vue";
 export default {
-    components: { ParamDialog, VersionFooter },
+    components: { ParamDialog, VersionFooter, SettingsLayout },
     data() {
         return {
             searchCode: "",
@@ -117,7 +120,7 @@ export default {
             pageSizeOptions: [10, 20, 50, 100],
             total: 0,
             dialogVisible: false,
-            dialogTitle: "新增参数",
+            dialogTitle: "Thêm tham số",
             isAllSelected: false,
             sensitive_keys: ["api_key", "personal_access_token", "access_token", "token", "secret", "access_key_secret", "secret_key", "password", "mqtt_signature_key", "private_key"],
             paramForm: {
@@ -364,28 +367,28 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import "@/views/studio.scss";
+
 .welcome {
-    min-width: 900px;
-    min-height: 506px;
-    height: 100vh;
+    @include studio-panel;
+    flex: 1;
+    min-width: 0;
     display: flex;
     position: relative;
     flex-direction: column;
-    background-size: cover;
-    background: linear-gradient(to bottom right, #dce8ff, #e4eeff, #e6cbfd) center;
-    -webkit-background-size: cover;
-    -o-background-size: cover;
+    padding: 18px 20px;
+    box-sizing: border-box;
     overflow: hidden;
 }
 
 .main-wrapper {
-    // 顶部 63px 底部 35px 查询72px
-    height: calc(100vh - 63px - 35px - 72px);
-    margin: 0 22px;
-    border-radius: 15px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
     position: relative;
-    background: rgba(237, 242, 255, 0.5);
+    background: transparent;
     display: flex;
     flex-direction: column;
 }
@@ -394,7 +397,7 @@ export default {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 24px;
+    padding: 0 0 12px;
 }
 
 .page-title {
@@ -423,9 +426,9 @@ export default {
     display: flex;
     overflow: hidden;
     height: 100%;
-    border-radius: 15px;
+    border-radius: 0;
     background: transparent;
-    border: 1px solid #fff;
+    border: none;
 }
 
 .content-area {

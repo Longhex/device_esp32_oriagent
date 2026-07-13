@@ -1,5 +1,6 @@
 <template>
-  <div class="welcome">
+  <SettingsLayout active-key="feature">
+    <div class="welcome settings-panel">
 
     <div class="operation-bar">
           <h2 class="page-title">{{ $t('header.featureManagement') }}</h2>
@@ -94,6 +95,7 @@
       <VersionFooter />
     </el-footer>
   </div>
+  </SettingsLayout>
 </template>
 
 <script>
@@ -315,6 +317,25 @@ export default {
 </script>
 
 <style scoped>
+.welcome.settings-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  padding: 18px 20px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.welcome.settings-panel .main-wrapper {
+  background: transparent;
+  box-shadow: none;
+  margin: 0;
+  height: auto;
+  border-radius: 0;
+}
 .welcome {
   min-width: 900px;
   min-height: 506px;

@@ -225,7 +225,7 @@ class FeatureManager {
                         }
                     }),
                     valueType: 'json',
-                    remark: '系统功能菜单配置'
+                    remark: 'Cấu hình menu chức năng hệ thống'
                 },
                 (updateResult) => {
                     if (updateResult.code === 0) {

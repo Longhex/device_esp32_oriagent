@@ -227,11 +227,11 @@ export function generateSm2KeyPairHex() {
  */
 export function sm2Encrypt(publicKey, plainText) {
     if (!publicKey) {
-        throw new Error('公钥不能为null或undefined');
+        throw new Error('Khóa công khai không được null hoặc undefined');
     }
     
     if (!plainText) {
-        throw new Error('明文不能为空');
+        throw new Error('Văn bản gốc không được để trống');
     }
     
     const sm2 = require('sm-crypto').sm2;

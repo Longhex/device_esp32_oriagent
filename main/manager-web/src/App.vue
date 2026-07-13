@@ -119,7 +119,10 @@ export default {
     isStudioPage() {
       // Mở dần theo từng đợt redesign: thêm 'ModelConfig' (Đợt 2), 'AgentConfig' (Đợt 3)
       // khi màn tương ứng chuyển sang StudioLayout
-      const studioPages = ['home', 'ModelConfig', 'AgentConfig'];
+      const studioPages = ['home', 'ModelConfig', 'AgentConfig', 'ParamsManagement',
+        'UserManagement', 'OtaManagement', 'DeviceMonitor', 'SerialManagement',
+        'EmojiManagement', 'ProviderManagement', 'AgentTemplateManagement',
+        'DictManagement', 'ServerSideManager', 'FeatureManagement'];
       return studioPages.includes(this.$route.name);
     }
   },

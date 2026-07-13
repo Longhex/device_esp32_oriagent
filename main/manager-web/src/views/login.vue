@@ -248,7 +248,7 @@ export default {
           this.$store.commit("setUserInfo", data.data);
           goToPage("/home");
         } else {
-          showDanger("用户信息获取失败");
+          showDanger("Lấy thông tin người dùng thất bại");
         }
       });
     },
@@ -299,7 +299,7 @@ export default {
         },
         (err) => {
           // 直接使用后端返回的国际化消息
-          let errorMessage = err.data.msg || "登录失败";
+          let errorMessage = err.data.msg || "Đăng nhập thất bại";
 
           showDanger(errorMessage);
         }

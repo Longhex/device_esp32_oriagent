@@ -1,5 +1,6 @@
 <template>
-    <div class="welcome">
+    <SettingsLayout active-key="dict">
+    <div class="welcome settings-panel">
 
         <div class="operation-bar">
             <h2 class="page-title">{{ $t('dictManagement.pageTitle') }}</h2>
@@ -27,7 +28,7 @@
                         </el-button>
                     </div>
                     <el-table ref="dictTypeTable" :data="dictTypeList" style="width: 100%" v-loading="dictTypeLoading"
-                        element-loading-text="拼命加载中" element-loading-spinner="el-icon-loading"
+                        element-loading-text="Đang tải..." element-loading-spinner="el-icon-loading"
                         element-loading-background="rgba(255, 255, 255, 0.7)" @row-click="handleDictTypeRowClick"
                         @selection-change="handleDictTypeSelectionChange" :row-class-name="tableRowClassName"
                         class="dict-type-table" :header-cell-class-name="headerCellClassName">
@@ -45,7 +46,7 @@
                 <div class="content-area">
                     <el-card class="dict-data-card" shadow="never">
                         <el-table ref="dictDataTable" :data="dictDataList" style="width: 100%"
-                            v-loading="dictDataLoading" element-loading-text="拼命加载中"
+                            v-loading="dictDataLoading" element-loading-text="Đang tải..."
                             element-loading-spinner="el-icon-loading"
                             element-loading-background="rgba(255, 255, 255, 0.7)" class="transparent-table"
                             header-row-class-name="table-header">
@@ -121,6 +122,7 @@
             <version-footer />
         </el-footer>
     </div>
+  </SettingsLayout>
 </template>
 
 <script>
@@ -143,7 +145,7 @@ export default {
             selectedDictType: null,
             selectedDictTypes: [],  // 恢复多选数组
             dictTypeDialogVisible: false,
-            dictTypeDialogTitle: '新增字典类型',
+            dictTypeDialogTitle: 'Thêm loại từ điển',
             dictTypeForm: {
                 id: null,
                 dictName: '',
@@ -155,7 +157,7 @@ export default {
             dictDataLoading: false,
             isAllDictDataSelected: false,
             dictDataDialogVisible: false,
-            dictDataDialogTitle: '新增字典数据',
+            dictDataDialogTitle: 'Thêm dữ liệu từ điển',
             dictDataForm: {
                 id: null,
                 dictTypeId: null,
@@ -443,6 +445,25 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.welcome.settings-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  padding: 18px 20px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.welcome.settings-panel .main-wrapper {
+  background: transparent;
+  box-shadow: none;
+  margin: 0;
+  height: auto;
+  border-radius: 0;
+}
 .welcome {
     min-width: 900px;
     min-height: 506px;

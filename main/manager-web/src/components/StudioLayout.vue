@@ -41,30 +41,75 @@
         <div class="studio-guide-btn">
           <span class="studio-ic studio-ic--guide"></span><span>Guide Document</span>
         </div>
-        <el-dropdown trigger="click" class="studio-account" @command="onAccount">
-          <div class="studio-account-pill">
+        <el-popover
+          placement="top-start"
+          trigger="click"
+          popper-class="account-popover"
+          :width="252"
+          :visible-arrow="false"
+        >
+          <div class="account-menu">
+            <div class="account-header">
+              <span class="account-avatar">{{ userInitial }}</span>
+              <div class="account-id">
+                <div class="account-name">{{ userName }}</div>
+                <div class="account-email" v-if="userEmail">{{ userEmail }}</div>
+              </div>
+            </div>
+
+            <div class="account-block">
+              <div class="account-ws-label">{{ $t('account.workspace') }}</div>
+              <div class="account-ws-pill">
+                <span class="account-ws-dot">{{ userInitial }}</span>
+                <span class="account-ws-name">{{ $t('account.workspaceName') }}</span>
+                <i class="el-icon-arrow-right account-ws-caret"></i>
+              </div>
+            </div>
+
+            <div class="account-block">
+              <div class="account-item" @click="settingsVisible = true">{{ $t('account.settings') }}</div>
+              <div class="account-item">{{ $t('account.feedback') }}</div>
+              <div class="account-item">{{ $t('account.community') }}</div>
+              <div class="account-item">{{ $t('account.helpCenter') }}</div>
+              <div class="account-item account-item--about">
+                <span>{{ $t('account.about') }}</span>
+                <span class="account-ver">
+                  <span class="account-ver-num">{{ appVersion }}</span>
+                  <span class="account-ver-dot"></span>
+                </span>
+              </div>
+            </div>
+
+            <div class="account-logout-row" @click="onLogout">
+              <span>{{ $t('header.logout') }}</span>
+              <i class="el-icon-switch-button account-logout-ic"></i>
+            </div>
+          </div>
+
+          <div slot="reference" class="studio-account-pill">
             <span class="studio-ic studio-ic--account"></span><span>My Account</span>
             <span class="studio-ic studio-ic--caret studio-account-caret"></span>
           </div>
-          <el-dropdown-menu slot="dropdown">
-            <el-dropdown-item command="logout">{{ $t('header.logout') }}</el-dropdown-item>
-          </el-dropdown-menu>
-        </el-dropdown>
+        </el-popover>
       </div>
     </aside>
 
     <main class="studio-content">
       <slot />
     </main>
+
+    <SettingsModal v-model="settingsVisible" />
   </div>
 </template>
 
 <script>
 import { mapActions } from "vuex";
 import { goToPage } from "@/utils";
+import SettingsModal from "@/components/SettingsModal.vue";
 
 export default {
   name: "StudioLayout",
+  components: { SettingsModal },
   props: {
     active: {
       type: String,
@@ -73,18 +118,33 @@ export default {
     },
     contextLabel: { type: String, default: "Agent Builder" },
   },
+  data() {
+    return { appVersion: "0.1.0", settingsVisible: false };
+  },
+  computed: {
+    userInfo() {
+      return this.$store.getters.getUserInfo || {};
+    },
+    userName() {
+      return this.userInfo.username || "User";
+    },
+    userEmail() {
+      return this.userInfo.email || "";
+    },
+    userInitial() {
+      return (this.userName || "U").charAt(0).toUpperCase();
+    },
+  },
   methods: {
     ...mapActions(["logout"]),
     go(path) {
       if (this.$route.path !== path) goToPage(path);
     },
-    async onAccount(cmd) {
-      if (cmd === "logout") {
-        try {
-          await this.logout();
-        } catch (error) {
-          this.$message.error(this.$t("message.error"));
-        }
+    async onLogout() {
+      try {
+        await this.logout();
+      } catch (error) {
+        this.$message.error(this.$t("message.error"));
       }
     },
   },
@@ -253,4 +313,65 @@ export default {
   flex-direction: column;
   gap: $studio-gap;
 }
+
+/* el-popover reference: kéo full-width như pill cũ */
+.studio-sidebar-bottom ::v-deep .el-popover__reference-wrapper {
+  display: block;
+  width: 100%;
+}
+</style>
+
+<style lang="scss">
+/* Menu tài khoản: el-popover render ra body nên style KHÔNG dùng scoped */
+.account-popover.el-popover {
+  padding: 0;
+  border-radius: 12px;
+  border: 1px solid #eeeeee;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+.account-popover .account-menu { font-size: 14px; color: #313133; }
+.account-popover .account-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px; border-bottom: 1px solid #f2f2f2;
+}
+.account-popover .account-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #dff5e8; color: #069d49;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; flex-shrink: 0;
+}
+.account-popover .account-id { min-width: 0; }
+.account-popover .account-name { font-size: 14px; color: #1d2939; font-weight: 500; word-break: break-all; }
+.account-popover .account-email { font-size: 12px; color: #667085; word-break: break-all; }
+.account-popover .account-block { padding: 6px 8px; border-bottom: 1px solid #f2f2f2; }
+.account-popover .account-ws-label { font-size: 12px; font-weight: 500; color: #667085; padding: 4px 8px 6px; }
+.account-popover .account-ws-pill {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px; border-radius: 8px; cursor: pointer;
+}
+.account-popover .account-ws-pill:hover { background: #f7f7f7; }
+.account-popover .account-ws-dot {
+  width: 24px; height: 24px; border-radius: 6px;
+  background: #1a1a1c; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+}
+.account-popover .account-ws-name { flex: 1; font-size: 13px; }
+.account-popover .account-ws-caret { color: #98a2b3; font-size: 14px; }
+.account-popover .account-item {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 36px; padding: 0 12px; border-radius: 8px;
+  color: #475467; cursor: pointer;
+}
+.account-popover .account-item:hover { background: #f7f7f7; }
+.account-popover .account-ver { display: flex; align-items: center; gap: 6px; }
+.account-popover .account-ver-num { font-size: 12px; color: #667085; }
+.account-popover .account-ver-dot { width: 8px; height: 8px; border-radius: 50%; background: #12b76a; }
+.account-popover .account-logout-row {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 40px; padding: 0 16px; cursor: pointer; color: #475467;
+}
+.account-popover .account-logout-row:hover { background: #f7f7f7; }
+.account-popover .account-logout-ic { color: #98a2b3; font-size: 14px; }
 </style>

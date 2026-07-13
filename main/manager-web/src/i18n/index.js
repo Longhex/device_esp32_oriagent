@@ -6,6 +6,13 @@ import en from './en';
 import de from './de';
 import vi from './vi';
 import ptBR from './pt_BR';
+// Locale mặc định của Element UI cho từng ngôn ngữ (phân trang, hộp thoại, bảng...)
+import elzhCN from 'element-ui/lib/locale/lang/zh-CN';
+import elzhTW from 'element-ui/lib/locale/lang/zh-TW';
+import elEn from 'element-ui/lib/locale/lang/en';
+import elDe from 'element-ui/lib/locale/lang/de';
+import elVi from 'element-ui/lib/locale/lang/vi';
+import elPtBr from 'element-ui/lib/locale/lang/pt-br';
 
 Vue.use(VueI18n);
 
@@ -36,14 +43,15 @@ const getDefaultLanguage = () => {
 
 const i18n = new VueI18n({
   locale: getDefaultLanguage(),
-  fallbackLocale: 'zh_CN',
+  // Fallback sang tiếng Anh (KHÔNG phải tiếng Trung) khi thiếu key -> tránh rò chữ Trung.
+  fallbackLocale: 'en',
   messages: {
-    'zh_CN': zhCN,
-    'zh_TW': zhTW,
-    'en': en,
-    'de': de,
-    'vi': vi,
-    'pt_BR': ptBR
+    'zh_CN': { ...zhCN, ...elzhCN },
+    'zh_TW': { ...zhTW, ...elzhTW },
+    'en': { ...en, ...elEn },
+    'de': { ...de, ...elDe },
+    'vi': { ...vi, ...elVi },
+    'pt_BR': { ...ptBR, ...elPtBr }
   }
 });
 

@@ -70,7 +70,7 @@ export default {
           this.$store.commit("setUserInfo", data.data);
           goToPage("/home");
         } else {
-          showDanger("获取用户信息失败");
+          showDanger("Lấy thông tin người dùng thất bại");
           goToPage('/login');
         }
       });

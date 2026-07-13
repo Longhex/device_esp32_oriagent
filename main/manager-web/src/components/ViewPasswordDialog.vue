@@ -45,7 +45,7 @@ export default {
     copyPassword() {
       navigator.clipboard.writeText(this.password)
       this.$message.success({
-        message: '密码已复制',
+        message: 'Đã sao chép mật khẩu',
         showClose: true
       })
     }

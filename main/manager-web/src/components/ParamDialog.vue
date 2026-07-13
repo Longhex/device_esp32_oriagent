@@ -72,7 +72,7 @@ export default {
   props: {
     title: {
       type: String,
-      default: '新增参数'
+      default: 'Thêm tham số'
     },
     visible: {
       type: Boolean,

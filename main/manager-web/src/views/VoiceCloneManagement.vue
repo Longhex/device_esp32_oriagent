@@ -182,19 +182,19 @@ export default {
     methods: {
         getTooltipContent(row) {
             if (!row.hasVoice) {
-                return '待上传';
+                return 'Chờ tải lên';
             }
             switch (row.trainStatus) {
                 case 0:
-                    return '待复刻';
+                    return 'Chờ nhân bản';
                 case 2:
-                    return '训练成功';
+                    return 'Huấn luyện thành công';
                 case 3:
                     // 训练失败时，根据错误信息智能展示
                     if (row.trainError) {
-                        return `训练失败：${row.trainError}`;
+                        return `Huấn luyện thất bại: ${row.trainError}`;
                     }
-                    return '训练失败';
+                    return 'Huấn luyện thất bại';
                 default:
                     return '';
             }

@@ -5,19 +5,19 @@ export const register = () => {
     window.addEventListener('load', () => {
       const swUrl = `${process.env.BASE_URL}service-worker.js`;
       
-      console.info(`[Dịch vụ Xiaozhi] Đang thử đăng ký Service Worker, URL: ${swUrl}`);
+      console.info(`[Oriagent] Đang thử đăng ký Service Worker, URL: ${swUrl}`);
       
       // 先检查Service Worker是否已注册
       navigator.serviceWorker.getRegistrations().then(registrations => {
         if (registrations.length > 0) {
-          console.info('[Dịch vụ Xiaozhi] Đã tìm thấy Service Worker đã được đăng ký, đang kiểm tra cập nhật');
+          console.info('[Oriagent] Đã tìm thấy Service Worker đã được đăng ký, đang kiểm tra cập nhật');
         }
         
         // 继续注册Service Worker
         navigator.serviceWorker
           .register(swUrl)
           .then(registration => {
-            console.info('[Dịch vụ Xiaozhi] Đăng ký Service Worker thành công');
+            console.info('[Oriagent] Đăng ký Service Worker thành công');
             
             // 更新处理
             registration.onupdatefound = () => {
@@ -29,7 +29,7 @@ export const register = () => {
                 if (installingWorker.state === 'installed') {
                   if (navigator.serviceWorker.controller) {
                     // 内容已缓存更新，通知用户刷新
-                    console.log('[Dịch vụ Xiaozhi] Nội dung mới đã có sẵn, vui lòng làm mới trang');
+                    console.log('[Oriagent] Có nội dung mới, vui lòng làm mới trang');
                     // 可以在这里展示更新提示
                     const updateNotification = document.createElement('div');
                     updateNotification.style.cssText = `
@@ -45,7 +45,7 @@ export const register = () => {
                     `;
                     updateNotification.innerHTML = `
                       <div style="display: flex; align-items: center;">
-                        <span style="margin-right: 10px;">Đã tìm thấy phiên bản mới; hãy chạm để làm mới ứng dụng.</span>
+                        <span style="margin-right: 10px;">Đã có phiên bản mới, nhấn để làm mới ứng dụng</span>
                         <button style="background: white; color: #000000; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Làm mới</button>
                       </div>
                     `;
@@ -55,7 +55,7 @@ export const register = () => {
                     });
                   } else {
                     // 一切正常，Service Worker已成功安装
-                    console.log('[Dịch vụ Xiaozhi] Nội dung đã được lưu vào bộ nhớ đệm để sử dụng khi ngoại tuyến.');
+                    console.log('[Oriagent] Nội dung đã được lưu vào bộ nhớ đệm để sử dụng khi ngoại tuyến.');
                     
                     // 可以在这里初始化缓存
                     setTimeout(() => {
@@ -87,7 +87,7 @@ export const register = () => {
             console.error('Đăng ký Service Worker thất bại:', error);
             
             if (error.name === 'TypeError' && error.message.includes('Failed to register a ServiceWorker')) {
-              console.warn('[Dịch vụ Xiaozhi] Lỗi mạng khi đăng ký Service Worker, tài nguyên CDN có thể không được lưu vào bộ nhớ đệm');
+              console.warn('[Oriagent] Lỗi mạng khi đăng ký Service Worker, tài nguyên CDN có thể không được lưu vào bộ nhớ đệm');
               if (process.env.NODE_ENV === 'production') {
                 console.info(
                   'Nguyên nhân có thể: 1. Máy chủ chưa cấu hình đúng loại MIME 2. Lỗi chứng chỉ SSL của máy chủ 3. Máy chủ không trả về file service-worker.js'

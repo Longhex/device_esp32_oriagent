@@ -1,5 +1,6 @@
 <template>
-  <div class="welcome">
+  <SettingsLayout active-key="agentTemplate">
+    <div class="welcome settings-panel">
 
     <div class="operation-bar">
       <h2 class="page-title">{{ $t("agentTemplateManagement.title") }}</h2>
@@ -139,6 +140,7 @@
       <version-footer />
     </el-footer>
   </div>
+  </SettingsLayout>
 </template>
 
 <script>
@@ -438,6 +440,25 @@ export default {
 
 <style scoped lang="scss">
 /* 基础背景和布局设置 */
+.welcome.settings-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  padding: 18px 20px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.welcome.settings-panel .main-wrapper {
+  background: transparent;
+  box-shadow: none;
+  margin: 0;
+  height: auto;
+  border-radius: 0;
+}
 .welcome {
   min-height: 100vh;
   display: flex;

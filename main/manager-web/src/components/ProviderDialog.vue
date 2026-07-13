@@ -276,7 +276,7 @@ export default {
           });
       }).catch(() => {
         this.$message.info({
-          message: '已取消删除',
+          message: 'Đã hủy xóa',
           showClose: true
         });
       });

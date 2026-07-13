@@ -1,5 +1,6 @@
 <template>
-  <div class="welcome">
+  <SettingsLayout active-key="provider">
+    <div class="welcome settings-panel">
 
     <div class="operation-bar">
       <h2 class="page-title">{{ $t('header.providerManagement') }}</h2>
@@ -27,7 +28,7 @@
         <div class="content-area">
           <el-card class="provider-card" shadow="never">
             <el-table ref="providersTable" :data="filteredProvidersList" class="transparent-table" v-loading="loading"
-              element-loading-text="拼命加载中" element-loading-spinner="el-icon-loading"
+              element-loading-text="Đang tải..." element-loading-spinner="el-icon-loading"
               element-loading-background="rgba(255, 255, 255, 0.7)" :header-cell-class-name="headerCellClassName">
               <el-table-column :label="$t('modelConfig.select')" align="center" width="120">
                 <template slot-scope="scope">
@@ -123,6 +124,7 @@
       <version-footer />
     </el-footer>
   </div>
+  </SettingsLayout>
 </template>
 
 <script>
@@ -154,7 +156,7 @@ export default {
       pageSizeOptions: [10, 20, 50, 100],
       total: 0,
       dialogVisible: false,
-      dialogTitle: "新增供应器",
+      dialogTitle: "Thêm nhà cung cấp",
       isAllSelected: false,
       isDropdownOpen: false,
       sensitive_keys: ["api_key", "personal_access_token", "access_token", "token", "secret", "access_key_secret", "secret_key"],
@@ -242,7 +244,7 @@ export default {
             this.total = data.data.total;
           } else {
             this.$message.error({
-              message: data.msg || '获取参数列表失败'
+              message: data.msg || 'Lấy danh sách tham số thất bại'
             });
           }
         }
@@ -443,6 +445,25 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.welcome.settings-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  padding: 18px 20px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.welcome.settings-panel .main-wrapper {
+  background: transparent;
+  box-shadow: none;
+  margin: 0;
+  height: auto;
+  border-radius: 0;
+}
 .welcome {
   min-width: 900px;
   min-height: 506px;
