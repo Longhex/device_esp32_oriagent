@@ -1378,11 +1378,10 @@ class ConnectionHandler:
                             tts_content, extracted_images = self._image_extractor.feed(
                                 display_content
                             )
-                            # Không bắn ngay: gắn ảnh với offset = cuối đoạn text vừa
-                            # đẩy vào TTS, để show đúng lúc audio phát tới đó (đồng bộ).
-                            _img_offset = self._tts_emitted_chars + len(tts_content)
+                            # GỬI ẢNH NGAY LẬP TỨC khi extract được URL — không chờ audio offset.
+                            # Resizer chạy async (download+resize) song song với TTS.
                             for _alt, _img_url in extracted_images:
-                                self._pending_image_signals.append((_img_offset, _img_url))
+                                self._send_show_image(_img_url)
                             self._tts_emitted_chars += len(tts_content)
                         if tts_content:
                             self.tts.tts_text_queue.put(
@@ -1521,11 +1520,9 @@ class ConnectionHandler:
             # Nhả nốt text extractor còn giữ (đuôi nghi là form ảnh nhưng stream đã hết)
             if self._image_extractor is not None:
                 _tail, _tail_images = self._image_extractor.flush()
-                # Ảnh ở đuôi: gắn offset cuối cùng, sẽ được flush khi audio kết thúc
-                # (LAST) — xem fire_pending_images_up_to gọi từ _audio_play_priority_thread.
-                _tail_offset = self._tts_emitted_chars + len(_tail)
+                # GỬI ẢNH NGAY LẬP TỨC (flush cuối stream)
                 for _alt, _img_url in _tail_images:
-                    self._pending_image_signals.append((_tail_offset, _img_url))
+                    self._send_show_image(_img_url)
                 self._tts_emitted_chars += len(_tail)
                 if _tail and _tail.strip() and not self.client_abort:
                     self.tts.tts_text_queue.put(
