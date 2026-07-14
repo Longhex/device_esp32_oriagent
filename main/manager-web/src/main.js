@@ -3,10 +3,12 @@ import 'normalize.css/normalize.css'; // A modern alternative to CSS resets
 import Vue from 'vue';
 import ElementUI from 'element-ui';
 import ElementLocale from 'element-ui/lib/locale';
-import SettingsLayout from './components/SettingsLayout.vue';
 import App from './App.vue';
 import router from './router';
 import store from './store';
+// Import SAU store: SettingsLayout kéo theo chuỗi ChangePasswordDialog -> apis/module/user;
+// nếu import trước store sẽ front-load user.js -> circular import -> Api.user undefined.
+import SettingsLayout from './components/SettingsLayout.vue';
 import i18n from './i18n';
 import './styles/global.scss';
 import { register as registerServiceWorker } from './registerServiceWorker';
