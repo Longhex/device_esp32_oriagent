@@ -1,5 +1,14 @@
 # Hướng dẫn chạy dự án Xiaozhi Server (Môi trường Dev Local)
 
+
+================================================
+cd /opt/oriagent/app/deploy
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml build --no-cache   
+docker compose -f docker-compose.prod.yml logs -f xiaozhi-server
+
+
+
 Đây là cách tốt nhất và nhanh nhất để chạy dự án trên máy Mac của bạn, giúp bạn vừa có thể sửa code giao diện (Frontend) vừa có Backend chạy ổn định trong Docker.
 
 ## 1. Yêu cầu hệ thống
@@ -34,3 +43,5 @@ npm run serve
 -   **Lỗi kết nối database:** Kiểm tra xem Docker đã chạy chưa bằng lệnh `docker ps`.
 -   **Lỗi NPM:** Nếu gặp lỗi thư viện, hãy xóa thư mục `node_modules` và chạy lại `npm install`.
 -   **Cổng (Port) bị chiếm:** Đảm bảo không có dịch vụ nào khác đang chạy trên cổng 3306, 6379, 8001, 8002.
+
+

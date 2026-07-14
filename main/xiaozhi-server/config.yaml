@@ -79,6 +79,27 @@ enable_websocket_ping: false
 #   > 0: Use fixed delay (ms), for example: 60
 tts_audio_send_delay: 0
 
+# ── Image Display Configuration ─────────────────────────────────────────────
+# Khi LLM trả về link ảnh, server download → resize → re-host với extension đúng
+# để firmware biết format lưu/hiển thị. Firmware GET ảnh từ public_url_base.
+image_display:
+  # Bật/tắt chức năng resize + re-host. Tắt = gửi URL gốc.
+  enabled: true
+  # Kích thước tối đa resize (giữ tỉ lệ). Tuỳ LCD firmware.
+  max_width: 320
+  max_height: 240
+  # JPEG quality khi encode (1-100). Không áp dụng cho GIF/PNG.
+  quality: 85
+  # Thư mục cache ảnh đã resize (relative to working dir)
+  cache_dir: data/image_cache
+  # TTL cache (giờ). File cũ hơn sẽ tự xoá.
+  cache_ttl_hours: 24
+  # Base URL mà firmware dùng để GET ảnh.
+  # PHẢI reachable từ device (IP/domain mà ESP32 connect được).
+  # Production: dùng domain qua Nginx. Local dev: dùng IP LAN trực tiếp.
+  # Ví dụ: https://device.oriagent.com hoặc http://192.168.1.100:8003
+  public_url_base: "https://device.oriagent.com"
+
 exit_commands:
   - "退出"
   - "关闭"

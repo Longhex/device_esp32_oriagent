@@ -37,11 +37,11 @@ def load_config():
             loop = asyncio.get_running_loop()
             # 如果已经在事件循环中，使用异步版本
             config = asyncio.run_coroutine_threadsafe(
-                get_config_from_api_async(custom_config), loop
+                get_config_from_api_async(custom_config, default_config), loop
             ).result()
         except RuntimeError:
             # 如果不在事件循环中（启动时），创建新的事件循环
-            config = asyncio.run(get_config_from_api_async(custom_config))
+            config = asyncio.run(get_config_from_api_async(custom_config, default_config))
     else:
         # 合并配置
         config = merge_configs(default_config, custom_config)
@@ -53,7 +53,7 @@ def load_config():
     return config
 
 
-async def get_config_from_api_async(config):
+async def get_config_from_api_async(config, default_config=None):
     """从Java API获取配置（异步版本）"""
     # 初始化API客户端
     init_service(config)
@@ -106,6 +106,11 @@ async def get_config_from_api_async(config):
     # 如果服务器没有prompt_template，则从本地配置读取
     if not config_data.get("prompt_template"):
         config_data["prompt_template"] = config.get("prompt_template")
+    # image_display: API không trả field này → lấy từ default config (config.yaml)
+    if not config_data.get("image_display"):
+        _local_img = (default_config or {}).get("image_display") or config.get("image_display")
+        if _local_img:
+            config_data["image_display"] = _local_img
     return config_data
 
 

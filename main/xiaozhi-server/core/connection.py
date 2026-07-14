@@ -43,6 +43,7 @@ from config.manage_api_client import DeviceNotFoundException, DeviceBindExceptio
 from core.utils.prompt_manager import PromptManager
 from core.utils.voiceprint_provider import VoiceprintProvider
 from core.utils.image_extractor import StreamingImageExtractor
+from core.utils.image_resizer import ImageResizer
 from core.utils.util import get_system_error_response
 from core.utils import textUtils
 from core.utils.device_conversation_store import (
@@ -53,6 +54,10 @@ from core.utils.device_conversation_store import (
 
 
 TAG = __name__
+
+# Module-level singleton cho ImageResizer (shared across all connections)
+_image_resizer_instance: ImageResizer | None = None
+_image_resizer_initialized = False
 
 # 工具调用规则 - 用于动态注入提醒
 TOOL_CALLING_RULES = """
@@ -1557,33 +1562,74 @@ class ConnectionHandler:
 
         return True
 
+    def _get_image_resizer(self) -> ImageResizer | None:
+        """Lấy singleton ImageResizer (lazy init từ config lần đầu)."""
+        global _image_resizer_instance, _image_resizer_initialized
+        if not _image_resizer_initialized:
+            _image_resizer_initialized = True
+            img_cfg = self.config.get("image_display", {})
+            if img_cfg.get("enabled", False):
+                _image_resizer_instance = ImageResizer(self.config)
+        return _image_resizer_instance
+
     def _send_show_image(self, url):
         """Gửi lệnh hiển thị ảnh xuống thiết bị + web caller.
 
         Contract đã chốt với đội device: {"cmd": "show_image", "url": "http..."}.
         Gọi được từ thread pool (chat chạy trong executor) — đẩy về event loop.
+
+        Nếu image_display.enabled: download ảnh → resize → re-host với extension
+        đúng trước khi gửi URL xuống firmware.
         """
         if not url or not url.lower().startswith(("http://", "https://")):
             return
-        message = json.dumps({"type": "cmd", "cmd": "show_image", "url": url}, ensure_ascii=False)
 
-        async def _send():
+        async def _process_and_send():
             try:
+                final_url = url
+                # Resize + re-host nếu ImageResizer đã khởi tạo
+                resizer = self._get_image_resizer()
+                if resizer:
+                    processed = await resizer.process(url)
+                    if processed:
+                        final_url = processed
+                    else:
+                        # Process fail — log nhưng vẫn thử gửi URL gốc (nếu có extension)
+                        self.logger.bind(tag=TAG).warning(
+                            f"show_image resize failed, trying original: {url[:80]}"
+                        )
+
+                # Safety check: URL cuối phải có extension ảnh, firmware cần biết format
+                import os
+                from urllib.parse import urlparse
+                path = urlparse(final_url).path
+                _, ext = os.path.splitext(path)
+                if ext.lower() not in ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'):
+                    # URL gốc không có extension VÀ resizer cũng fail/disabled
+                    # → không gửi được cho firmware
+                    self.logger.bind(tag=TAG).warning(
+                        f"show_image skipped (no extension): {final_url[:80]}"
+                    )
+                    return
+
+                message = json.dumps(
+                    {"cmd": "show_image", "url": final_url}, ensure_ascii=False
+                )
                 if self.websocket:
                     await self.websocket.send(message)
+                self.logger.bind(tag=TAG).info(f"show_image -> {final_url}")
             except Exception as e:
                 self.logger.bind(tag=TAG).warning(f"Gửi show_image thất bại: {e}")
 
-        asyncio.run_coroutine_threadsafe(_send(), self.loop)
-        self.logger.bind(tag=TAG).info(f"show_image -> {url}")
+        asyncio.run_coroutine_threadsafe(_process_and_send(), self.loop)
 
     def _send_play_video(self, url):
         """Gửi lệnh hiển thị video xuống thiết bị + web caller.
-        Contract: {"type": "cmd", "cmd": "play_avi", "url": "http..."}
+        Contract: {"cmd": "play_avi", "url": "http..."}
         """
         if not url or not url.lower().startswith(("http://", "https://")):
             return
-        message = json.dumps({"type": "cmd", "cmd": "play_avi", "url": url}, ensure_ascii=False)
+        message = json.dumps({"cmd": "play_avi", "url": url}, ensure_ascii=False)
 
         async def _send():
             try:

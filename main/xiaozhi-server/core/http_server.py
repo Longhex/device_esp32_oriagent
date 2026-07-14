@@ -1,4 +1,6 @@
 import asyncio
+from pathlib import Path
+
 from aiohttp import web
 from config.logger import setup_logging
 from core.api.ota_handler import OTAHandler
@@ -88,6 +90,17 @@ class SimpleHttpServer:
                             "/mcp/filler/preview", self.filler_preview_handler.handle_post
                         ),
                     ]
+                )
+
+                # Serve ảnh đã resize — firmware GET /images/{hash}.{ext}
+                image_cache_dir = self.config.get("image_display", {}).get(
+                    "cache_dir", "data/image_cache"
+                )
+                image_cache_path = Path(image_cache_dir)
+                image_cache_path.mkdir(parents=True, exist_ok=True)
+                app.router.add_static("/images/", path=str(image_cache_path), name="images")
+                self.logger.bind(tag=TAG).info(
+                    f"Static /images/ → {image_cache_path.resolve()}"
                 )
 
                 # 运行服务
