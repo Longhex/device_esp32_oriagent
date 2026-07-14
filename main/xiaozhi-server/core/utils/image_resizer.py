@@ -71,7 +71,8 @@ class ImageResizer:
         self.max_width = int(img_config.get("max_width", 320))
         self.max_height = int(img_config.get("max_height", 240))
         self.quality = int(img_config.get("quality", 85))
-        self.cache_ttl_hours = int(img_config.get("cache_ttl_hours", 24))
+        # Cache TTL tính bằng phút (default 1 phút — firmware đã lưu SD, server không cần giữ lâu)
+        self.cache_ttl_minutes = int(img_config.get("cache_ttl_minutes", 1))
 
         # Cache directory
         cache_dir = img_config.get("cache_dir", "data/image_cache")
@@ -115,7 +116,12 @@ class ImageResizer:
 
         try:
             # 1. Hash URL gốc → cache key
-            url_hash = hashlib.md5(original_url.encode()).hexdigest()[:12]
+            # Chỉ hash phần path (bỏ query params) vì signed URL đổi mỗi lần
+            # nhưng path (chứa file_id) cố định cho cùng 1 ảnh.
+            from urllib.parse import urlparse
+            parsed = urlparse(original_url)
+            cache_key = parsed.scheme + parsed.netloc + parsed.path
+            url_hash = hashlib.md5(cache_key.encode()).hexdigest()[:12]
             logger.bind(tag=TAG).info(
                 f"Processing image: len={len(original_url)} url={original_url[:250]}"
             )
@@ -158,8 +164,8 @@ class ImageResizer:
         for f in self.cache_dir.iterdir():
             if f.is_file() and f.stem == url_hash:
                 # Check TTL
-                age_hours = (time.time() - f.stat().st_mtime) / 3600
-                if age_hours < self.cache_ttl_hours:
+                age_minutes = (time.time() - f.stat().st_mtime) / 60
+                if age_minutes < self.cache_ttl_minutes:
                     return f
                 else:
                     # Expired → xoá
@@ -254,7 +260,7 @@ class ImageResizer:
         """Best-effort xoá file cũ hơn TTL. Non-blocking."""
         try:
             now = time.time()
-            max_age = self.cache_ttl_hours * 3600
+            max_age = self.cache_ttl_minutes * 60
             count = 0
             for f in self.cache_dir.iterdir():
                 if f.is_file() and (now - f.stat().st_mtime) > max_age:

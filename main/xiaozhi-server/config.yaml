@@ -92,8 +92,8 @@ image_display:
   quality: 85
   # Thư mục cache ảnh đã resize (relative to working dir)
   cache_dir: data/image_cache
-  # TTL cache (giờ). File cũ hơn sẽ tự xoá.
-  cache_ttl_hours: 24
+  # TTL cache (phút). File cũ hơn sẽ tự xoá. Firmware đã lưu SD nên server không cần giữ lâu.
+  cache_ttl_minutes: 1
   # Base URL mà firmware dùng để GET ảnh.
   # PHẢI reachable từ device (IP/domain mà ESP32 connect được).
   # Production: dùng domain qua Nginx. Local dev: dùng IP LAN trực tiếp.
