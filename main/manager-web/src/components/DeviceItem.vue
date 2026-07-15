@@ -8,11 +8,16 @@
         </el-tooltip>
         <div class="card-sub">Agent</div>
       </div>
-      <div class="card-actions">
-        <img src="@/assets/home/delete.png" class="card-icon" @click.stop="handleDelete" />
-        <el-tooltip effect="light" :content="device.systemPrompt" placement="top" popper-class="custom-tooltip">
-          <img src="@/assets/home/info.png" class="card-icon" />
-        </el-tooltip>
+      <!-- @click.stop trên cả cụm: chặn click lọt xuống thẻ (thẻ điều hướng sang agent-config) -->
+      <div class="card-actions" @click.stop>
+        <el-dropdown trigger="click" placement="bottom-end" @command="handleCommand">
+          <span class="card-more"><i class="el-icon-more"></i></span>
+          <el-dropdown-menu slot="dropdown">
+            <el-dropdown-item command="edit">{{ $t('agentCard.editInfo') }}</el-dropdown-item>
+            <el-dropdown-item command="duplicate">{{ $t('agentCard.duplicate') }}</el-dropdown-item>
+            <el-dropdown-item command="delete" divided class="menu-danger">{{ $t('agentCard.delete') }}</el-dropdown-item>
+          </el-dropdown-menu>
+        </el-dropdown>
       </div>
     </div>
 
@@ -76,8 +81,10 @@ export default {
     }
   },
   methods: {
-    handleDelete() {
-      this.$emit('delete', this.device.agentId)
+    handleCommand(command) {
+      if (command === 'edit') this.$emit('edit-info', this.device);
+      else if (command === 'duplicate') this.$emit('duplicate', this.device);
+      else if (command === 'delete') this.$emit('delete', this.device.agentId);
     },
     handleCardClick() {
       this.$router.push({ path: '/agent-config', query: { agentId: this.device.agentId } });
@@ -144,13 +151,22 @@ export default {
 
 .card-actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
 
-  .card-icon {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-  }
+.card-more {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  color: $studio-text-sub;
+  font-size: 16px;
+
+  &:hover { background: $studio-soft-bg; color: $studio-text; }
 }
 
 .card-chips {
@@ -196,8 +212,12 @@ export default {
 </style>
 
 <style>
-.custom-tooltip {
-  max-width: 400px;
-  word-break: break-word;
+/* el-dropdown-menu render ra body nên style KHÔNG dùng scoped */
+.el-dropdown-menu__item.menu-danger {
+  color: #f56c6c;
+}
+.el-dropdown-menu__item.menu-danger:hover {
+  background: #fef0f0;
+  color: #f56c6c;
 }
 </style>

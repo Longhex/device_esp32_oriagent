@@ -52,12 +52,13 @@
       <template v-else>
         <DeviceItem v-for="(item, index) in devices" :key="index" :device="item" :feature-status="featureStatus"
           @configure="goToRoleConfig" @deviceManage="handleDeviceManage" @delete="handleDeleteAgent"
-          @chat-history="handleShowChatHistory" />
+          @chat-history="handleShowChatHistory" @edit-info="handleEditInfo" @duplicate="handleDuplicateAgent" />
       </template>
       </div>
     </div>
 
     <AddWisdomBodyDialog :visible.sync="addDeviceDialogVisible" @confirm="handleWisdomBodyAdded" />
+    <EditAgentInfoDialog :visible.sync="editInfoVisible" :agent="editingAgent" @saved="fetchAgentList" />
     <chat-history-dialog :visible.sync="showChatHistory" :agent-id="currentAgentId" :agent-name="currentAgentName" />
   </StudioLayout>
 </template>
@@ -67,12 +68,13 @@ import Api from '@/apis/api';
 import AddWisdomBodyDialog from '@/components/AddWisdomBodyDialog.vue';
 import ChatHistoryDialog from '@/components/ChatHistoryDialog.vue';
 import DeviceItem from '@/components/DeviceItem.vue';
+import EditAgentInfoDialog from '@/components/EditAgentInfoDialog.vue';
 import StudioLayout from '@/components/StudioLayout.vue';
 import featureManager from '@/utils/featureManager';
 
 export default {
   name: 'HomePage',
-  components: { DeviceItem, AddWisdomBodyDialog, ChatHistoryDialog, StudioLayout },
+  components: { DeviceItem, AddWisdomBodyDialog, ChatHistoryDialog, EditAgentInfoDialog, StudioLayout },
   data() {
     return {
       addDeviceDialogVisible: false,
@@ -84,6 +86,9 @@ export default {
       skeletonCount: localStorage.getItem('skeletonCount') || 8,
       showChatHistory: false,
       showHistory: false,
+      editInfoVisible: false,
+      editingAgent: null,
+      duplicating: false,
       currentAgentId: '',
       currentAgentName: '',
       searchHistory: [],
@@ -180,12 +185,91 @@ export default {
       }, () => { this.isLoading = false; });
     },
     handleDeleteAgent(agentId) {
-      this.$confirm(this.$t('message.deleteConfirm'), this.$t('message.tips'), { type: 'warning' }).then(() => {
+      // HTML tĩnh từ i18n, không nội suy dữ liệu người dùng -> không có đường XSS.
+      const body = `<div class="ac-confirm-title">${this.$t('agentCard.deleteTitle')}</div>`
+        + `<div class="ac-confirm-desc">${this.$t('agentCard.deleteDesc')}</div>`;
+      this.$confirm(body, {
+        dangerouslyUseHTMLString: true,
+        showClose: false,
+        type: 'warning',
+        confirmButtonText: this.$t('agentCard.confirm'),
+        cancelButtonText: this.$t('agentCard.cancel'),
+        customClass: 'agent-delete-confirm'
+      }).then(() => {
         Api.agent.deleteAgent(agentId, ({ data }) => {
           if (data.code === 0) {
             this.$message.success(this.$t('message.success'));
             this.fetchAgentList();
           }
+        });
+      }).catch(() => { });
+    },
+    handleEditInfo(device) {
+      this.editingAgent = device;
+      this.editInfoVisible = true;
+    },
+    parseParamInfo(value) {
+      if (typeof value === 'string') {
+        try { return JSON.parse(value || '{}'); } catch (e) { return {}; }
+      }
+      return value || {};
+    },
+    // Chép cấu hình sang agent mới. KHÔNG chép summaryMemory (ký ức tích luỹ của agent gốc)
+    // và agentCode (định danh) — bản sao bắt đầu sạch.
+    buildDuplicatePayload(cfg) {
+      return {
+        asrModelId: cfg.asrModelId,
+        vadModelId: cfg.vadModelId,
+        llmModelId: cfg.llmModelId,
+        vllmModelId: cfg.vllmModelId,
+        ttsModelId: cfg.ttsModelId,
+        ttsVoiceId: cfg.ttsVoiceId,
+        ttsLanguage: cfg.ttsLanguage,
+        ttsVolume: cfg.ttsVolume,
+        ttsRate: cfg.ttsRate,
+        ttsPitch: cfg.ttsPitch,
+        memModelId: cfg.memModelId,
+        intentModelId: cfg.intentModelId,
+        systemPrompt: cfg.systemPrompt,
+        chatHistoryConf: cfg.chatHistoryConf,
+        langCode: cfg.langCode,
+        language: cfg.language,
+        oriagentApiKey: cfg.oriagentApiKey,
+        oriagentModelName: cfg.oriagentModelName,
+        fillerEnabled: cfg.fillerEnabled,
+        fillerDelayMs: cfg.fillerDelayMs,
+        fillerPhrases: cfg.fillerPhrases,
+        contextProviders: cfg.contextProviders || [],
+        // PUT nhận paramInfo dạng object (xem AgentConfig.vue:266) — parse phòng khi GET trả chuỗi.
+        functions: (cfg.functions || []).map(f => ({
+          pluginId: f.pluginId,
+          paramInfo: this.parseParamInfo(f.paramInfo)
+        }))
+      };
+    },
+    handleDuplicateAgent(device) {
+      if (this.duplicating) return;
+      this.duplicating = true;
+      const fail = (msg) => {
+        this.duplicating = false;
+        this.$message.error(msg || this.$t('agentCard.duplicateFailed'));
+      };
+
+      Api.agent.getDeviceConfig(device.agentId, ({ data }) => {
+        if (data?.code !== 0 || !data.data) return fail(data?.msg);
+        const cfg = data.data;
+        const newName = `${cfg.agentName || device.agentName} ${this.$t('agentCard.duplicateSuffix')}`.slice(0, 64);
+
+        Api.agent.addAgent(newName, ({ data: created }) => {
+          if (created?.code !== 0 || !created.data) return fail(created?.msg);
+
+          Api.agent.updateAgentConfig(created.data, this.buildDuplicatePayload(cfg), ({ data: updated }) => {
+            this.duplicating = false;
+            // Agent đã tạo xong; nếu đắp cấu hình lỗi thì nó vẫn tồn tại (rỗng) -> báo rõ, vẫn refresh.
+            if (updated?.code === 0) this.$message.success(this.$t('agentCard.duplicateSuccess'));
+            else this.$message.warning(this.$t('agentCard.duplicatePartial'));
+            this.fetchAgentList();
+          });
         });
       });
     },
@@ -357,5 +441,58 @@ export default {
 @keyframes shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(200%); }
+}
+</style>
+
+<style>
+/* el-message-box render ra body nên style KHÔNG dùng scoped */
+.agent-delete-confirm {
+  width: 420px;
+  border-radius: 14px;
+  padding: 22px;
+}
+.agent-delete-confirm .el-message-box__header { display: none; }
+.agent-delete-confirm .el-message-box__content { padding: 0; }
+/* Icon cảnh báo: Element định vị absolute khi có title -> ép về luồng thường, nằm trên tiêu đề */
+.agent-delete-confirm .el-message-box__status {
+  position: static;
+  display: block;
+  font-size: 22px !important;
+  margin-bottom: 12px;
+  transform: none;
+}
+.agent-delete-confirm .el-message-box__message { padding-left: 0; }
+.agent-delete-confirm .ac-confirm-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1d2939;
+  margin-bottom: 8px;
+}
+.agent-delete-confirm .ac-confirm-desc {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #667085;
+}
+/* row-reverse: DOM là [Hủy, Xác nhận] -> hiện thành [Xác nhận][Hủy], giống Dify */
+.agent-delete-confirm .el-message-box__btns {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 22px;
+}
+.agent-delete-confirm .el-message-box__btns .el-button {
+  margin: 0;
+  height: 36px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+.agent-delete-confirm .el-message-box__btns .el-button--primary {
+  background: #1a1a1c;
+  border-color: #1a1a1c;
+}
+.agent-delete-confirm .el-message-box__btns .el-button--primary:hover {
+  opacity: 0.88;
 }
 </style>
