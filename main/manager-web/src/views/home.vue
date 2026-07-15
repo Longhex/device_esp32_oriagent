@@ -260,10 +260,11 @@ export default {
 .studio-board-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 380px));
+  /* Cận trên PHẢI là 1fr, không được để số cố định (vd 380px): auto-fill đếm số cột
+     theo cận trên nếu nó cố định -> cột kịch trần rồi chừa chỗ thừa thành khoảng trống. */
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
   align-content: start;
-  justify-content: start;
 }
 
 .search-status {
