@@ -1,12 +1,15 @@
 <template>
   <div class="studio-shell">
     <aside class="studio-sidebar">
-      <div class="studio-sidebar-top">
+      <!-- Logo nằm NGOÀI .studio-sidebar-top: vùng đó cuộn, để trong thì logo trôi mất -->
+      <div class="studio-sidebar-head">
         <div class="studio-logo-row">
           <img src="@/assets/auth/logo.svg" alt="Oriagent" class="studio-logo" />
           <!-- TODO: icon thu gọn hiển thị tĩnh, chức năng làm sau -->
           <i class="el-icon-copy-document studio-collapse-icon"></i>
         </div>
+      </div>
+      <div class="studio-sidebar-top">
         <div class="studio-context-pill">
           <span class="studio-ic studio-ic--agent-builder"></span>
           <span>{{ contextLabel }}</span>
@@ -154,10 +157,14 @@ export default {
 <style lang="scss" scoped>
 @import "@/views/studio.scss";
 
+/* Shell khoá cứng theo viewport: height (KHÔNG phải min-height) + overflow:hidden.
+   min-height cũ làm shell phình theo nội dung -> trang cuộn toàn cục và khu vực phải
+   thò xuống dưới đáy sidebar. Nội dung dài phải cuộn nội bộ trong .studio-content. */
 .studio-shell {
   display: flex;
   gap: $studio-gap;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   padding: $studio-gap;
   background: $studio-page-bg;
   box-sizing: border-box;
@@ -171,13 +178,19 @@ export default {
   display: flex;
   flex-direction: column;
   padding: 10px 14px 18px; /* top 10 = khớp padding nav bar -> logo thẳng hàng tab */
-  position: sticky;
-  top: $studio-gap;
-  height: calc(100vh - #{$studio-gap * 2});
+  /* Không set height/sticky: shell đã khoá 100vh nên flex stretch cho sidebar đúng
+     chiều cao khả dụng. Trước đây sticky + calc(100vh) chạy độc lập với shell nên
+     hai bên lệch nhau (màn cao thì hụt, màn thấp thì thò). */
+  min-height: 0;
   overflow: hidden; /* phần cuộn nằm ở .studio-sidebar-top */
 }
 
 /* Nhóm nav cuộn khi màn thấp; đáy (Guide/My Account) luôn ghim, không bị che */
+/* Đầu sidebar: giữ cố định, không cuộn theo menu */
+.studio-sidebar-head {
+  flex-shrink: 0;
+}
+
 .studio-sidebar-top {
   flex: 1 1 auto;
   min-height: 0;
@@ -306,9 +319,14 @@ export default {
   .studio-account-caret { margin-left: auto; }
 }
 
+/* min-height:0 để flex item co được dưới kích thước nội dung -> overflow-y mới ăn.
+   Nội dung dài cuộn TRONG đây, không kéo dài shell (xem .studio-shell). */
 .studio-content {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: $studio-gap;

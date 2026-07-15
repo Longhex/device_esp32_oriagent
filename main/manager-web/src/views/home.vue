@@ -289,10 +289,13 @@ export default {
 @import "./studio.scss";
 
 /* 1 panel nội dung lớn: chứa hàng search+Create + lưới card (như Figma) */
+/* min-height:0 -> panel đứng yên đúng chiều cao khả dụng (đáy trùng card ORIAGENT),
+   phần cuộn đẩy xuống .studio-board-grid để ô tìm kiếm + nút Create không trôi. */
 .studio-content-panel {
   @include studio-panel;
   background: $studio-soft-bg;
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -343,6 +346,8 @@ export default {
 
 .studio-board-grid {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: grid;
   /* Cận trên PHẢI là 1fr, không được để số cố định (vd 380px): auto-fill đếm số cột
      theo cận trên nếu nó cố định -> cột kịch trần rồi chừa chỗ thừa thành khoảng trống. */

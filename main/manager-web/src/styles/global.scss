@@ -46,6 +46,24 @@ body, html, * {
   flex-direction: column;
 }
 
+/* .welcome ép min-height:100vh — hợp lý cho trang độc lập (login, đổi mật khẩu),
+   nhưng TRONG studio shell thì container đã là 100vh-32: ép thêm 100vh làm tràn
+   32px -> cả trang cuộn, khung phải thò dưới đáy card ORIAGENT.
+   Vô hiệu hoá đúng trong shell, không đụng các trang độc lập. */
+.studio-shell .welcome {
+  min-height: 0 !important;
+  flex: 1;
+}
+
+/* Nội dung trong .welcome phải lấp hết chiều cao panel, KỂ CẢ khi nội dung ngắn:
+   chỉ 3/18 trang settings có .main-wrapper{flex:1}, 15 trang còn lại thiếu nên
+   nội dung co lại ở trên và thanh phân trang lửng lơ giữa panel. Vá đồng loạt ở
+   global, chỉ trong studio shell (không đụng trang login/đổi mật khẩu độc lập). */
+.studio-shell .welcome > .main-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 /* ─────────────────────────────────────────────────────────────
    Responsive desktop: giao diện co dãn theo cửa sổ Chrome.
    Panel cố định thu nhỏ khi cửa sổ hẹp -> không tràn ngang,

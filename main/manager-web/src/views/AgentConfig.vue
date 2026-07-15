@@ -32,26 +32,7 @@
 
       <!-- Overview Section -->
       <div v-if="activeTab === 'overview'" class="config-content-view">
-        <div class="overview-section card-style">
-           <div class="overview-header">
-              <img src="@/assets/dashboard/overview.svg" class="header-icon" />
-              <h3>{{ $t('roleConfig.tabOverview') }}</h3>
-           </div>
-           <div class="overview-grid">
-              <div class="stat-card">
-                 <span class="label">{{ $t("roleConfig.statAgentName") }}</span>
-                 <span class="value">{{ agentForm.agentName }}</span>
-              </div>
-              <div class="stat-card">
-                 <span class="label">{{ $t("roleConfig.statLlmProvider") }}</span>
-                 <span class="value">{{ llmModeTypeMap[agentForm.model.llmModelId] || 'Oriagent' }}</span>
-              </div>
-              <div class="stat-card">
-                 <span class="label">{{ $t("roleConfig.statDevicesOnline") }}</span>
-                 <span class="value">{{ onlineDeviceCount }}</span>
-              </div>
-           </div>
-        </div>
+        <AgentOverviewSection :agent-name="agentForm.agentName" :devices="deviceList" />
       </div>
 
       <!-- History Section -->
@@ -102,6 +83,7 @@ import ChatHistorySection from "@/components/ChatHistorySection.vue";
 import FunctionDialog from "@/components/FunctionDialog.vue";
 import ContextProviderDialog from "@/components/ContextProviderDialog.vue";
 import AgentConfigTabs from "@/components/AgentConfigTabs.vue";
+import AgentOverviewSection from "@/components/AgentOverviewSection.vue";
 import AddDeviceDialog from "@/components/AddDeviceDialog.vue";
 import ManualAddDeviceDialog from "@/components/ManualAddDeviceDialog.vue";
 
@@ -110,7 +92,7 @@ export default {
   components: {
     StudioLayout, RoleConfigSection, DeviceManagementSection,
     ChatHistorySection, FunctionDialog, ContextProviderDialog,
-    AgentConfigTabs, AddDeviceDialog, ManualAddDeviceDialog
+    AgentConfigTabs, AddDeviceDialog, ManualAddDeviceDialog, AgentOverviewSection
   },
   data() {
     return {
@@ -140,11 +122,6 @@ export default {
       allFunctions: [],
       currentContextProviders: [],
     };
-  },
-  computed: {
-    onlineDeviceCount() {
-      return this.deviceList.filter(d => d.deviceStatus === 'online').length;
-    }
   },
   methods: {
     handleTabChange(id) {
@@ -194,6 +171,8 @@ export default {
           this.deviceList = data.data.map(d => ({
             device_id: d.id, model: d.board, macAddress: d.macAddress,
             remark: d.alias, otaSwitch: d.autoUpdate === 1,
+            // lastConnectedAt/appVersion: tab Tổng quan cần để tính robots online
+            lastConnectedAt: d.lastConnectedAt, appVersion: d.appVersion,
             selected: false, deviceStatus: 'offline'
           }));
           this.initialDeviceList = JSON.parse(JSON.stringify(this.deviceList));
@@ -300,9 +279,13 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+/* min-height:0 xuyên suốt chuỗi flex (giống .studio-model-wrap của trang Model AI):
+   thiếu nó thì flex item không co được dưới kích thước nội dung -> chuỗi chiều cao
+   đứt, panel con không lấp đủ chiều cao và overflow không ăn. */
 .agent-config-view {
    background: transparent; // nen xam do StudioLayout lo, tranh 2 lop nen
    flex: 1;
+   min-height: 0;
    display: flex;
    flex-direction: column;
    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -310,17 +293,21 @@ export default {
 
 .sections-container {
   width: 100%; /* full-width khớp khung canh lề của top bar (nav header cùng nằm trong agent-config-view) */
-  padding: 24px 0 16px; /* khe thở dọc top bar -> cụm 3 box (24 = đồng bộ gap ngang giữa box) */
+  /* padding-bottom PHẢI = 0: đáy khung nội dung phải trùng tuyệt đối đáy card
+     ORIAGENT. Trước để 16px nên panel trắng hụt đúng 16px so với đáy sidebar. */
+  padding: 24px 0 0; /* khe thở dọc top bar -> cụm 3 box (24 = đồng bộ gap ngang giữa box) */
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.config-content-view { 
+.config-content-view {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
+  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card-style { 
@@ -336,12 +323,4 @@ export default {
   to { opacity: 1; transform: translateY(0); }
 }
 
-.overview-section {
-   .overview-header { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; .header-icon { width: 24px; } h3 { margin: 0; font-size: 20px; color: #313133; font-weight: 700; } }
-   .overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
-   .stat-card { background: white; padding: 28px; border-radius: 20px; display: flex; flex-direction: column; gap: 12px; border: 1px solid #f1f5f9; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-      .label { color: #64748b; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; }
-      .value { color: #313133; font-size: 24px; font-weight: 800; }
-   }
-}
 </style>

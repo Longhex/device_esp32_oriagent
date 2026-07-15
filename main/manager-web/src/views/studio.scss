@@ -101,6 +101,11 @@ $studio-fs-body: 15px;    /* phụ — weight 400 */
 .studio-ic--cat-tts { -webkit-mask-image: url("~@/assets/studio/icons/ic-cat-tts.svg"); mask-image: url("~@/assets/studio/icons/ic-cat-tts.svg"); }
 .studio-ic--arrow   { width: 16px; -webkit-mask-image: url("~@/assets/studio/icons/ic-arrow.svg"); mask-image: url("~@/assets/studio/icons/ic-arrow.svg"); }
 .studio-ic--eye     { -webkit-mask-image: url("~@/assets/studio/icons/ic-eye.svg"); mask-image: url("~@/assets/studio/icons/ic-eye.svg"); }
+/* Icon KPI trang Tổng quan — trích từ @fortawesome/free-solid-svg-icons v6 (CC BY 4.0) */
+.studio-ic--stat-robot    { -webkit-mask-image: url("~@/assets/studio/icons/ic-stat-robot.svg"); mask-image: url("~@/assets/studio/icons/ic-stat-robot.svg"); }
+.studio-ic--stat-comments { -webkit-mask-image: url("~@/assets/studio/icons/ic-stat-comments.svg"); mask-image: url("~@/assets/studio/icons/ic-stat-comments.svg"); }
+.studio-ic--stat-tools    { -webkit-mask-image: url("~@/assets/studio/icons/ic-stat-tools.svg"); mask-image: url("~@/assets/studio/icons/ic-stat-tools.svg"); }
+.studio-ic--stat-bolt     { -webkit-mask-image: url("~@/assets/studio/icons/ic-stat-bolt.svg"); mask-image: url("~@/assets/studio/icons/ic-stat-bolt.svg"); }
 .studio-ic--tab-setup    { -webkit-mask-image: url("~@/assets/studio/icons/ic-tab-setup.svg"); mask-image: url("~@/assets/studio/icons/ic-tab-setup.svg"); }
 .studio-ic--tab-history  { -webkit-mask-image: url("~@/assets/studio/icons/ic-tab-history.svg"); mask-image: url("~@/assets/studio/icons/ic-tab-history.svg"); }
 .studio-ic--tab-overview { -webkit-mask-image: url("~@/assets/studio/icons/ic-tab-overview.svg"); mask-image: url("~@/assets/studio/icons/ic-tab-overview.svg"); }
