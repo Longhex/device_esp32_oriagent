@@ -261,6 +261,7 @@ services:
     environment:
       CLIENT_MAX_BODY_SIZE: ${CLIENT_MAX_BODY_SIZE:-100m}
       PROXY_READ_TIMEOUT: ${PROXY_READ_TIMEOUT:-300s}
+      FIRMWARE_TRANSPORT_POLICY: ${FIRMWARE_TRANSPORT_POLICY:-mqtt_only}
       VIRTUAL_HOST: ${PUBLIC_DOMAIN:-device.oriagent.com}
       LETSENCRYPT_HOST: ${PUBLIC_DOMAIN:-device.oriagent.com}
       LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:-gamo100@proton.me}
@@ -274,7 +275,7 @@ services:
       - /bin/sh
       - -c
       - |
-        envsubst '$$CLIENT_MAX_BODY_SIZE $$PROXY_READ_TIMEOUT' \
+        envsubst '$$CLIENT_MAX_BODY_SIZE $$PROXY_READ_TIMEOUT $$FIRMWARE_TRANSPORT_POLICY' \
           < /etc/nginx/templates/default.conf.template \
           > /etc/nginx/conf.d/default.conf && \
         nginx -g 'daemon off;'
