@@ -90,6 +90,12 @@ def main():
         if not ok_act:
             return
 
+        # Re-activate is idempotent so OTA discovery does not rotate the
+        # credential on every reboot.
+        st2, cfg2 = http("POST", "/activate", {"serial": SERIAL, "mac": "aa:bb:cc:00:00:99"})
+        check("activate lặp lại giữ nguyên credential",
+              st2 == 200 and (cfg2 or {}).get("mqtt", {}).get("password") == pwd)
+
         # 4) thiết bị dùng credential vừa cấp để kết nối
         env = dict(os.environ); env["PYTHONIOENCODING"] = "utf-8"
         sim = subprocess.Popen([PY, os.path.join(ROOT, "sim_device.py"), SERIAL, pwd, "2"],

@@ -19,6 +19,7 @@ logger = setup_logging()
 VALID_TRANSPORT_MODES = {
     "websocket_legacy",
     "mqtt_udp_hybrid",
+    "mqtt_udp_hk",
     "livekit_bridge",
 }
 
@@ -28,6 +29,9 @@ def _is_truthy_env(value: str) -> bool:
 
 
 def resolve_transport_mode() -> str:
+    transport_policy = os.environ.get(
+        "FIRMWARE_TRANSPORT_POLICY", "websocket_only"
+    ).strip().lower()
     transport_mode_env = os.environ.get("TRANSPORT_MODE")
     if transport_mode_env is not None:
         transport_mode = transport_mode_env.strip().lower()
@@ -41,14 +45,52 @@ def resolve_transport_mode() -> str:
                 "TRANSPORT_MODE=livekit_bridge is not implemented in Phase 1, fallback to websocket_legacy"
             )
             return "websocket_legacy"
+        if transport_policy == "mqtt_only" and transport_mode != "mqtt_udp_hk":
+            logger.bind(tag=TAG).warning(
+                f"FIRMWARE_TRANSPORT_POLICY=mqtt_only overrides {transport_mode_env}; "
+                "using mqtt_udp_hk"
+            )
+            return "mqtt_udp_hk"
+        if transport_mode in {"mqtt_udp_hybrid", "mqtt_udp_hk"} and transport_policy == "websocket_only":
+            logger.bind(tag=TAG).warning(
+                "Hybrid transport requested but FIRMWARE_TRANSPORT_POLICY=websocket_only; "
+                "keeping WebSocket voice for current HK firmware"
+            )
+            return "websocket_legacy"
         return transport_mode
 
     logger.bind(tag=TAG).info(
         "TRANSPORT_MODE not set, using ENABLE_HYBRID_GATEWAY compatibility flag"
     )
-    if _is_truthy_env(os.environ.get("ENABLE_HYBRID_GATEWAY", "false")):
+    if transport_policy == "mqtt_only":
+        return "mqtt_udp_hk"
+    if (
+        transport_policy != "websocket_only"
+        and _is_truthy_env(os.environ.get("ENABLE_HYBRID_GATEWAY", "false"))
+    ):
         return "mqtt_udp_hybrid"
     return "websocket_legacy"
+
+
+def validate_hybrid_runtime_config() -> None:
+    required = [
+        "MQTT_HOST",
+        "MQTT_PORT",
+        "MQTT_USERNAME",
+        "MQTT_PASSWORD",
+        "PUBLIC_UDP_HOST",
+    ]
+    missing = [name for name in required if not os.environ.get(name, "").strip()]
+    if missing:
+        raise RuntimeError(
+            "Hybrid transport configuration is incomplete: " + ", ".join(missing)
+        )
+    try:
+        udp_port = int(os.environ.get("UDP_PORT", "5000"))
+    except ValueError as exc:
+        raise RuntimeError("UDP_PORT must be an integer") from exc
+    if not 1 <= udp_port <= 65535:
+        raise RuntimeError("UDP_PORT must be between 1 and 65535")
 
 
 def resolve_server_auth_key(config: dict) -> str:
@@ -103,6 +145,8 @@ async def main():
     config = load_config()
     transport_mode = resolve_transport_mode()
     logger.bind(tag=TAG).info(f"Transport mode resolved: {transport_mode}")
+    if transport_mode in {"mqtt_udp_hybrid", "mqtt_udp_hk"}:
+        validate_hybrid_runtime_config()
 
     config["server"]["auth_key"] = resolve_server_auth_key(config)
 
@@ -119,16 +163,23 @@ async def main():
 
     # 启动 WebSocket 服务器
     ws_server = WebSocketServer(config)
-    ws_task = asyncio.create_task(ws_server.start())
+    ws_task = None
+    if transport_mode != "mqtt_udp_hk":
+        ws_task = asyncio.create_task(ws_server.start())
+    else:
+        logger.bind(tag=TAG).info(
+            "MQTT-only voice enabled: WebSocket listener is disabled"
+        )
 
     udp_manager = None
     udp_task = None
     mqtt_server = None
     mqtt_task = None
-    if transport_mode == "mqtt_udp_hybrid":
+    if transport_mode in {"mqtt_udp_hybrid", "mqtt_udp_hk"}:
         logger.bind(tag=TAG).info("Hybrid gateway enabled: starting MQTT signaling + UDP media services")
         from core.udp_server import udp_manager
-        udp_task = asyncio.create_task(udp_manager.start_server(port=5000))
+        udp_port = int(os.environ.get("UDP_PORT", "5000"))
+        udp_task = asyncio.create_task(udp_manager.start_server(port=udp_port))
 
         from core.mqtt_server import MqttServer
         mqtt_server = MqttServer(config, ws_server)
@@ -170,18 +221,16 @@ async def main():
     if isinstance(server_config, dict):
         websocket_port = int(server_config.get("port", 8000))
 
-    logger.bind(tag=TAG).info(
-        "Websocket Address:\tws://{}:{}/xiaozhi/v1/",
-        get_local_ip(),
-        websocket_port,
-    )
-
-    logger.bind(tag=TAG).info(
-        "======= Above is the websocket address, do not visit with a browser ======="
-    )
-    logger.bind(tag=TAG).info(
-        "To test websocket, please open test/test_page.html in Chrome"
-    )
+    if ws_task:
+        logger.bind(tag=TAG).info(
+            "Websocket Address:\tws://{}:{}/xiaozhi/v1/",
+            get_local_ip(),
+            websocket_port,
+        )
+    else:
+        logger.bind(tag=TAG).info(
+            "Device voice transport: MQTT signaling + UDP AES-CTR (no WebSocket listener)"
+        )
     logger.bind(tag=TAG).info(
         "=============================================================\n"
     )
@@ -208,7 +257,8 @@ async def main():
 
         # 取消所有任务（关键修复点）
         stdin_task.cancel()
-        ws_task.cancel()
+        if ws_task:
+            ws_task.cancel()
         if mqtt_task:
             mqtt_task.cancel()
         if udp_task:
@@ -217,7 +267,9 @@ async def main():
             ota_task.cancel()
 
         # 等待任务终止（必须加超时）
-        wait_tasks = [stdin_task, ws_task]
+        wait_tasks = [stdin_task]
+        if ws_task:
+            wait_tasks.append(ws_task)
         if ota_task:
             wait_tasks.append(ota_task)
         if udp_task:

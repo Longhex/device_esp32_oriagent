@@ -6,23 +6,26 @@
 # Runtime transport selection is controlled by env in Phase 1:
 #   TRANSPORT_MODE=websocket_legacy
 #   TRANSPORT_MODE=mqtt_udp_hybrid
+#   TRANSPORT_MODE=mqtt_udp_hk      # HK topics + UDP AES-CTR, no WS listener
 #   TRANSPORT_MODE=livekit_bridge   # planned only, falls back to websocket_legacy
 # If TRANSPORT_MODE is unset, the server keeps backward compatibility with ENABLE_HYBRID_GATEWAY.
 
 # #####################################################################################
 # ############################# Basic Server Configuration ############################
 server:
-  # Server listening address and port
+  # WebSocket fallback listening address/port; unused in mqtt_udp_hk mode.
   ip: 0.0.0.0
   port: 8000
+  websocket_protocol_version: 1
+  supported_websocket_protocol_versions: [1]
   # HTTP service port, used for simple OTA interface and vision analysis interface
   http_port: 8003
   # This websocket configuration refers to the websocket address sent by the OTA interface to the device
   # By default, the OTA interface automatically generates it. 
   # This may not be accurate when using Docker or public deployments (using SSL/domain).
-  # If using Docker, set websocket to the local area network address.
-  # If using public deployment, set websocket to the public address.
-  websocket: ws://10.17.0.111:8000/xiaozhi/v1/
+  # Production should set PUBLIC_WEBSOCKET_URL or PUBLIC_DOMAIN. Leave this
+  # empty to derive the URL from trusted reverse-proxy headers.
+  websocket: ""
   # Vision analysis interface address sent to the device
   # By default, the system automatically generates it.
   vision_explain: http://your_ip_or_domain:port/mcp/vision/explain
@@ -35,12 +38,6 @@ server:
     # Whitelist of device ID lists. Devices in the whitelist will skip token validation.
     allowed_devices:
       - "11:22:33:44:55:66"
- # MQTT gateway configuration, used for OTA delivery, formatted as host:port based on mqtt_gateway .env
-  mqtt_gateway: null
-  # MQTT signature key for generating MQTT passwords
-  mqtt_signature_key: null
-  # UDP gateway configuration
-  udp_gateway: null
 log:
   # Console log format: time, log level, tag, message
   log_format: "<green>{time:YYMMDD HH:mm:ss}</green>[{version}_{selected_module}][<light-blue>{extra[tag]}</light-blue>]-<level>{level}</level>-<light-green>{message}</light-green>"

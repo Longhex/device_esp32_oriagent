@@ -73,17 +73,17 @@ class SerialStore:
             self._save(serial, rec)
             return rec, True
 
-    def activate(self, serial, mac=None):
-        """Kích hoạt serial đã khai báo -> sinh password, đánh dấu activated.
-        Trả (rec, error). error != None nếu serial chưa khai báo."""
+    def activate(self, serial, mac=None, rotate=False):
+        """Activate idempotently; rotate only when explicitly requested."""
         with self._lock:
             rec = self._load(serial)
             if not rec:
                 return None, "serial chưa được khai báo trên server"
-            rec["password"] = gen_password()
+            if rotate or not rec.get("password"):
+                rec["password"] = gen_password()
             rec["status"] = STATUS_ACTIVATED
             rec["mac"] = mac or rec.get("mac")
-            rec["activated_at"] = self._now()
+            rec["activated_at"] = rec.get("activated_at") or self._now()
             self._save(serial, rec)
             return rec, None
 
@@ -97,6 +97,19 @@ class SerialStore:
                 serials = self._redis.smembers(KEY_INDEX)
                 return [self._load(s) for s in serials]
             return list(self._mem.values())
+
+    def find_by_mac(self, mac):
+        """Return the serial record bound to a MAC address, if any."""
+        if not mac:
+            return None
+        wanted = str(mac).strip().lower().replace("-", ":")
+        for rec in self.all():
+            if not rec or not rec.get("mac"):
+                continue
+            candidate = str(rec["mac"]).strip().lower().replace("-", ":")
+            if candidate == wanted:
+                return rec
+        return None
 
     def remove(self, serial):
         with self._lock:

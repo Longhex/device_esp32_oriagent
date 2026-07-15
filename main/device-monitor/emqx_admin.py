@@ -49,6 +49,8 @@ class EmqxAdmin:
 
     # ---------- auth ----------
     def login(self):
+        if not self.password:
+            raise EmqxError("EMQX dashboard password is not configured")
         status, data = self._request(
             "POST", "/login", body={"username": self.user, "password": self.password}, auth=False)
         if status != 200 or not data or "token" not in data:
@@ -97,24 +99,60 @@ class EmqxAdmin:
         return status
 
     def set_device_acl(self, username, topics_prefix=None):
-        """Cho phép user pub/sub chỉ trong devices/{username}/# (hoặc prefix tùy chỉnh)."""
+        """Set canonical ACL plus the minimum current-HK compatibility rules."""
         prefix = topics_prefix or f"devices/{username}/#"
+        rules = [{"permission": "allow", "action": "all", "topic": prefix}]
+        if common.ENABLE_HK_LEGACY_BRIDGE:
+            rules.extend([
+                {
+                    "permission": "allow",
+                    "action": "publish",
+                    "topic": username,
+                },
+                {
+                    "permission": "allow",
+                    "action": "publish",
+                    "topic": common.LEGACY_MONITOR_TOPIC,
+                },
+                {
+                    "permission": "allow",
+                    "action": "subscribe",
+                    "topic": common.legacy_command_topic(username),
+                },
+            ])
         self._request("DELETE",
                       f"/authorization/sources/built_in_database/rules/users/{username}", silent=True)
         status, _ = self._request(
             "POST", "/authorization/sources/built_in_database/rules/users",
-            body=[{"username": username, "rules": [
-                {"permission": "allow", "action": "all", "topic": prefix}]}],
+            body=[{"username": username, "rules": rules}],
             ok_conflict=True)
         return status
 
     def set_full_acl(self, username, topic="devices/#"):
+        rules = [{"permission": "allow", "action": "all", "topic": topic}]
+        if common.ENABLE_HK_LEGACY_BRIDGE:
+            rules.extend([
+                {
+                    "permission": "allow",
+                    "action": "subscribe",
+                    "topic": "+",
+                },
+                {
+                    "permission": "allow",
+                    "action": "subscribe",
+                    "topic": common.LEGACY_MONITOR_TOPIC,
+                },
+                {
+                    "permission": "allow",
+                    "action": "publish",
+                    "topic": "+/MONITOR",
+                },
+            ])
         self._request("DELETE",
                       f"/authorization/sources/built_in_database/rules/users/{username}", silent=True)
         status, _ = self._request(
             "POST", "/authorization/sources/built_in_database/rules/users",
-            body=[{"username": username, "rules": [
-                {"permission": "allow", "action": "all", "topic": topic}]}],
+            body=[{"username": username, "rules": rules}],
             ok_conflict=True)
         return status
 

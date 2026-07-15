@@ -132,7 +132,12 @@ class ConnectionHandler:
         self.max_output_size = 0
         self.chat_history_conf = 0
         self.audio_format = "opus"
-        self.sample_rate = 24000  # 默认采样率，从客户端 hello 消息中动态更新
+        self.client_audio_params = {}
+        self.input_sample_rate = 16000
+        self.output_sample_rate = 24000
+        # Backward-compatible alias used by existing TTS providers. This is
+        # always the server-to-device output rate, never the client uplink rate.
+        self.sample_rate = self.output_sample_rate
 
         # 客户端状态相关
         self.client_abort = False
@@ -357,15 +362,24 @@ class ConnectionHandler:
             # 启动超时检查任务
             self.timeout_task = asyncio.create_task(self._check_timeout())
 
-            self.welcome_msg = self.config["xiaozhi"]
+            # Each connection owns its welcome payload. The hello handler must
+            # never mutate the shared server configuration or another device's
+            # negotiated audio metadata.
+            self.welcome_msg = copy.deepcopy(self.config["xiaozhi"])
             self.welcome_msg["session_id"] = self.session_id
 
-            # 从配置中读取采样率
-            self.sample_rate = self.welcome_msg["audio_params"]["sample_rate"]
-            self.logger.bind(tag=TAG).info(f"配置输出音频采样率为: {self.sample_rate}")
+            # Server hello describes the downlink/TTS format. Client hello is
+            # stored separately by helloHandle as uplink/ASR metadata.
+            self.output_sample_rate = int(
+                self.welcome_msg["audio_params"]["sample_rate"]
+            )
+            self.sample_rate = self.output_sample_rate
+            self.logger.bind(tag=TAG).info(f"配置输出音频采样率为: {self.output_sample_rate}")
 
             # 在后台初始化配置和组件（完全不阻塞主循环）
-            self.logger.bind(tag=TAG).info(f"Configured output audio sample rate: {self.sample_rate}")
+            self.logger.bind(tag=TAG).info(
+                f"Configured output audio sample rate: {self.output_sample_rate}"
+            )
 
             # Background initialization
             asyncio.create_task(self._background_initialize())

@@ -43,10 +43,54 @@ async def handleHelloMessage(conn: "ConnectionHandler", msg_json):
     """处理hello消息"""
     audio_params = msg_json.get("audio_params")
     if audio_params:
-        format = audio_params.get("format")
-        conn.logger.bind(tag=TAG).debug(f"Client audio format: {format}")
-        conn.audio_format = format
-        conn.welcome_msg["audio_params"] = audio_params
+        audio_format = str(audio_params.get("format", "opus")).lower()
+        try:
+            input_sample_rate = int(audio_params.get("sample_rate", 16000))
+            channels = int(audio_params.get("channels", 1))
+            frame_duration = int(audio_params.get("frame_duration", 60))
+        except (TypeError, ValueError):
+            input_sample_rate, channels, frame_duration = -1, -1, -1
+
+        if (
+            audio_format != "opus"
+            or input_sample_rate not in {8000, 12000, 16000, 24000, 48000}
+            or channels != 1
+            or frame_duration != 60
+        ):
+            conn.logger.bind(tag=TAG).warning(
+                "Unsupported client audio params "
+                f"format={audio_format} sample_rate={input_sample_rate} "
+                f"channels={channels} frame_duration={frame_duration}"
+            )
+            await conn.websocket.send(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "code": "unsupported_audio_params",
+                        "supported": {
+                            "format": "opus",
+                            "sample_rates": [8000, 12000, 16000, 24000, 48000],
+                            "channels": 1,
+                            "frame_duration": 60,
+                        },
+                    }
+                )
+            )
+            await conn.websocket.close(code=1003, reason="Unsupported audio params")
+            return
+
+        conn.client_audio_params = {
+            "format": audio_format,
+            "sample_rate": input_sample_rate,
+            "channels": channels,
+            "frame_duration": frame_duration,
+        }
+        conn.audio_format = audio_format
+        conn.input_sample_rate = input_sample_rate
+        conn.logger.bind(tag=TAG).info(
+            f"Negotiated audio uplink={input_sample_rate}Hz "
+            f"downlink={conn.output_sample_rate}Hz frame={frame_duration}ms"
+        )
     features = msg_json.get("features")
     if features:
         conn.logger.bind(tag=TAG).debug(f"Client features: {features}")

@@ -16,17 +16,44 @@ services:
       LC_ALL: C.UTF-8
       LANGUAGE: en_US:en
       SEARCH_PROXY: ${SEARCH_PROXY:-}
+      APP_ENV: production
+      TRUST_PROXY_HEADERS: "true"
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:-device.oriagent.com}
+      PUBLIC_WEBSOCKET_URL: ${PUBLIC_WEBSOCKET_URL:-}
+      DEVICE_MONITOR_API: http://device-monitor:8090
+      TRANSPORT_MODE: ${TRANSPORT_MODE:-mqtt_udp_hk}
+      FIRMWARE_TRANSPORT_POLICY: ${FIRMWARE_TRANSPORT_POLICY:-mqtt_only}
+      MQTT_SIGNALING_CONTRACT: hk_legacy
+      MQTT_HOST: emqx
+      MQTT_PORT: "1883"
+      MQTT_USERNAME: ${MQTT_BACKEND_USER:-oriagent-monitor}
+      MQTT_PASSWORD: ${MQTT_BACKEND_PASS:?Set MQTT_BACKEND_PASS in .env}
+      PUBLIC_UDP_HOST: ${PUBLIC_UDP_HOST:?Set PUBLIC_UDP_HOST to the public IP/domain reachable by firmware}
+      UDP_PORT: ${VOICE_UDP_PORT:-8883}
     volumes:
       - ./data:/opt/xiaozhi-esp32-server/data
       - ../main/xiaozhi-server/models:/opt/xiaozhi-esp32-server/models
     expose:
-      - "8000"
       - "8003"
+    ports:
+      - "${VOICE_UDP_PORT:-8883}:${VOICE_UDP_PORT:-8883}/udp"
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/xiaozhi/ota/', timeout=3).read()" ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       xiaozhi-db:
         condition: service_healthy
       xiaozhi-redis:
         condition: service_healthy
+      emqx:
+        condition: service_healthy
+      device-monitor-provision:
+        condition: service_completed_successfully
+      device-monitor:
+        condition: service_started
     mem_limit: ${SERVER_MEMORY_LIMIT:-2500m}
     cpus: ${SERVER_CPU_LIMIT:-1.2}
     networks:
@@ -160,6 +187,27 @@ services:
         aliases:
           - emqx
 
+  # Idempotent one-shot provisioning for EMQX authn/authz and backend ACL.
+  device-monitor-provision:
+    image: ${MONITOR_IMAGE_NAME:-oriagent-device-monitor:local}
+    build:
+      context: ../main/device-monitor
+      dockerfile: Dockerfile
+    restart: "no"
+    command: [ "python", "provision_auth.py" ]
+    environment:
+      EMQX_API_BASE: http://emqx:18083/api/v5
+      EMQX_DASHBOARD_USER: ${EMQX_DASHBOARD_USER:-admin}
+      EMQX_DASHBOARD_PASSWORD: ${EMQX_DASHBOARD_PASSWORD:?Set EMQX_DASHBOARD_PASSWORD in .env}
+      MQTT_BACKEND_USER: ${MQTT_BACKEND_USER:-oriagent-monitor}
+      MQTT_BACKEND_PASS: ${MQTT_BACKEND_PASS:?Set MQTT_BACKEND_PASS in .env}
+      ENABLE_HK_LEGACY_BRIDGE: ${ENABLE_HK_LEGACY_BRIDGE:-true}
+    depends_on:
+      emqx:
+        condition: service_healthy
+    networks:
+      - backend
+
   # Consumer mặt phẳng quản lý: nhận presence/telemetry/ack từ EMQX, mirror sang
   # Redis (state chung cho web/app), expose HTTP API. Độc lập luồng audio xiaozhi.
   device-monitor:
@@ -177,17 +225,20 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       MQTT_BACKEND_USER: ${MQTT_BACKEND_USER:-oriagent-monitor}
       MQTT_BACKEND_PASS: ${MQTT_BACKEND_PASS:?Set MQTT_BACKEND_PASS in .env}
+      ENABLE_HK_LEGACY_BRIDGE: ${ENABLE_HK_LEGACY_BRIDGE:-true}
       MONITOR_HTTP_PORT: "8090"
       # Admin EMQX (để /activate cấp credential cho thiết bị)
       EMQX_API_BASE: http://emqx:18083/api/v5
       EMQX_DASHBOARD_USER: ${EMQX_DASHBOARD_USER:-admin}
       EMQX_DASHBOARD_PASSWORD: ${EMQX_DASHBOARD_PASSWORD:?Set EMQX_DASHBOARD_PASSWORD in .env}
       # Endpoint MQTT public trả cho thiết bị khi activate
-      MQTT_PUBLIC_ENDPOINT: ${MQTT_PUBLIC_ENDPOINT:-127.0.0.1:1883}
+      MQTT_PUBLIC_ENDPOINT: ${MQTT_PUBLIC_ENDPOINT:?Set MQTT_PUBLIC_ENDPOINT to the public broker host:port}
     # Lưu ý: EMQX phải được provision auth trước (provision_auth.py) để backend user tồn tại.
     ports:
       - "${MONITOR_HTTP_BIND:-127.0.0.1}:${MONITOR_HTTP_PORT:-8090}:8090"
     depends_on:
+      device-monitor-provision:
+        condition: service_completed_successfully
       emqx:
         condition: service_healthy
       xiaozhi-redis:
@@ -203,12 +254,13 @@ services:
     image: nginx:${EDGE_NGINX_TAG:-1.27-alpine}
     restart: always
     depends_on:
-      - xiaozhi-server
-      - xiaozhi-web
+      xiaozhi-server:
+        condition: service_healthy
+      xiaozhi-web:
+        condition: service_started
     environment:
       CLIENT_MAX_BODY_SIZE: ${CLIENT_MAX_BODY_SIZE:-100m}
       PROXY_READ_TIMEOUT: ${PROXY_READ_TIMEOUT:-300s}
-      WS_PROXY_READ_TIMEOUT: ${WS_PROXY_READ_TIMEOUT:-3600s}
       VIRTUAL_HOST: ${PUBLIC_DOMAIN:-device.oriagent.com}
       LETSENCRYPT_HOST: ${PUBLIC_DOMAIN:-device.oriagent.com}
       LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:-gamo100@proton.me}
@@ -222,12 +274,12 @@ services:
       - /bin/sh
       - -c
       - |
-        envsubst '$$CLIENT_MAX_BODY_SIZE $$PROXY_READ_TIMEOUT $$WS_PROXY_READ_TIMEOUT' \
+        envsubst '$$CLIENT_MAX_BODY_SIZE $$PROXY_READ_TIMEOUT' \
           < /etc/nginx/templates/default.conf.template \
           > /etc/nginx/conf.d/default.conf && \
         nginx -g 'daemon off;'
     healthcheck:
-      test: [ "CMD-SHELL", "wget -q -O- http://127.0.0.1/healthz | grep -q ok" ]
+      test: [ "CMD-SHELL", "wget -q -O- http://127.0.0.1/healthz | grep -q ok && wget -q -O /dev/null http://127.0.0.1/xiaozhi/ota/" ]
       interval: 15s
       timeout: 5s
       retries: 5

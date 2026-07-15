@@ -8,6 +8,7 @@
 # Phase 1 transport mode is resolved by env:
 #   TRANSPORT_MODE=websocket_legacy
 #   TRANSPORT_MODE=mqtt_udp_hybrid
+#   TRANSPORT_MODE=mqtt_udp_hk      # HK topics + UDP AES-CTR, no WS listener
 #   TRANSPORT_MODE=livekit_bridge   # planned only, falls back to websocket_legacy
 # If TRANSPORT_MODE is unset, the server falls back to ENABLE_HYBRID_GATEWAY for backward compatibility.
 server:

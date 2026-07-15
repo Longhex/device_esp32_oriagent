@@ -1,19 +1,34 @@
 import json
 import time
-import base64
-import hashlib
-import hmac
 import os
 import re
 import glob
+import ipaddress
 from typing import Dict, List, Tuple
-from aiohttp import web
+from urllib.parse import urlparse
+from aiohttp import ClientSession, ClientTimeout, web
 
 from core.auth import AuthManager
-from core.utils.util import get_local_ip, get_vision_url
+from core.utils.util import get_local_ip, get_vision_url, sanitize_headers
 from core.api.base_handler import BaseHandler
 
 TAG = __name__
+
+
+def _is_truthy(value: str) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_private_hostname(hostname: str) -> bool:
+    if not hostname:
+        return True
+    if hostname.lower() in {"localhost", "localhost.localdomain"}:
+        return True
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        return False
+    return address.is_private or address.is_loopback or address.is_link_local
 
 
 def _safe_basename(filename: str) -> str:
@@ -102,26 +117,6 @@ class OTAHandler(BaseHandler):
             self.logger.bind(tag=TAG).error(f"Failed to refresh firmware cache: {e}")
             # keep previous cache if any
 
-    def generate_password_signature(self, content: str, secret_key: str) -> str:
-        """生成MQTT密码签名
-
-        Args:
-            content: 签名内容 (clientId + '|' + username)
-            secret_key: 密钥
-
-        Returns:
-            str: Base64编码的HMAC-SHA256签名
-        """
-        try:
-            hmac_obj = hmac.new(
-                secret_key.encode("utf-8"), content.encode("utf-8"), hashlib.sha256
-            )
-            signature = hmac_obj.digest()
-            return base64.b64encode(signature).decode("utf-8")
-        except Exception as e:
-            self.logger.bind(tag=TAG).error(f"Failed to generate MQTT password signature: {e}")
-            return ""
-
     def _get_websocket_url(self, local_ip: str, port: int, request: web.Request = None) -> str:
         """获取websocket地址，支持通过请求头动态识别
 
@@ -134,25 +129,86 @@ class OTAHandler(BaseHandler):
             str: websocket地址
         """
         server_config = self.config["server"]
-        websocket_config = server_config.get("websocket", "")
+        public_url = os.environ.get("PUBLIC_WEBSOCKET_URL", "").strip()
+        public_domain = os.environ.get("PUBLIC_DOMAIN", "").strip()
+        configured_url = str(server_config.get("websocket", "") or "").strip()
 
-        # 如果手动配置了WebSocket地址，且不是默认占位符，则优先使用
-        if websocket_config and "你的" not in websocket_config:
-            return websocket_config
+        if public_url:
+            candidate = public_url
+        elif public_domain:
+            candidate = f"wss://{public_domain}/xiaozhi/v1/"
+        elif configured_url and "你的" not in configured_url:
+            candidate = configured_url
+        elif request is not None:
+            trust_proxy = _is_truthy(os.environ.get("TRUST_PROXY_HEADERS", "false"))
+            forwarded_proto = request.headers.get("X-Forwarded-Proto", "") if trust_proxy else ""
+            forwarded_host = request.headers.get("X-Forwarded-Host", "") if trust_proxy else ""
+            host = forwarded_host or request.headers.get("Host", "") or request.host
+            scheme = "wss" if forwarded_proto == "https" or request.scheme == "https" else "ws"
+            candidate = f"{scheme}://{host}/xiaozhi/v1/"
+        else:
+            candidate = f"ws://{local_ip}:{port}/xiaozhi/v1/"
 
-        # 智能识别逻辑：优先使用当前请求的Host
-        if request is not None:
-            host = request.host
-            # 判断是否是HTTPS/SSL访问
-            # aiohttp 默认 scheme 可能受 proxy 影响，这里优先识别 wss
-            scheme = "wss" if request.scheme == "https" or request.headers.get("X-Forwarded-Proto") == "https" else "ws"
-            
-            # 如果是 localhost 访问且 host 中没有端口号，可能需要根据配置补充端口 (通常 80/443 可以省略)
-            # 但为了通用性，直接使用 Request 的 Host 是最精准的
-            return f"{scheme}://{host}/xiaozhi/v1/"
+        parsed = urlparse(candidate)
+        if parsed.scheme not in {"ws", "wss"} or not parsed.netloc:
+            raise ValueError(f"Invalid public WebSocket URL: {candidate}")
 
-        # 兜底逻辑：使用本地IP
-        return f"ws://{local_ip}:{port}/xiaozhi/v1/"
+        app_env = os.environ.get("APP_ENV", "development").strip().lower()
+        if app_env == "production":
+            if parsed.scheme != "wss":
+                raise ValueError("Production WebSocket URL must use wss://")
+            if _is_private_hostname(parsed.hostname):
+                raise ValueError("Production WebSocket URL must not use a private host")
+
+        if parsed.path.rstrip("/") != "/xiaozhi/v1":
+            raise ValueError("WebSocket URL path must be /xiaozhi/v1/")
+        return candidate.rstrip("/") + "/"
+
+    def _get_public_http_origin(self, request: web.Request) -> str:
+        trust_proxy = _is_truthy(os.environ.get("TRUST_PROXY_HEADERS", "false"))
+        forwarded_proto = request.headers.get("X-Forwarded-Proto", "") if trust_proxy else ""
+        forwarded_host = request.headers.get("X-Forwarded-Host", "") if trust_proxy else ""
+        scheme = forwarded_proto or request.scheme
+        host = forwarded_host or request.headers.get("Host", "") or request.host
+        if scheme not in {"http", "https"}:
+            raise ValueError(f"Invalid public HTTP scheme: {scheme}")
+        if os.environ.get("APP_ENV", "development").strip().lower() == "production" and scheme != "https":
+            raise ValueError("Production OTA download URL must use https://")
+        return f"{scheme}://{host}"
+
+    async def _get_management_mqtt_config(self, serial_number: str, mac: str):
+        """Provision/fetch management MQTT without affecting voice OTA."""
+        api_base = os.environ.get("DEVICE_MONITOR_API", "").strip().rstrip("/")
+        if not api_base or not serial_number:
+            return None
+        try:
+            async with ClientSession(timeout=ClientTimeout(total=5)) as session:
+                async with session.post(
+                    f"{api_base}/activate",
+                    json={"serial": serial_number, "mac": mac},
+                ) as response:
+                    if response.status != 200:
+                        self.logger.bind(tag=TAG).warning(
+                            "Management MQTT provisioning skipped "
+                            f"serial={serial_number} status={response.status}"
+                        )
+                        return None
+                    payload = await response.json()
+                    mqtt_config = payload.get("mqtt") if isinstance(payload, dict) else None
+                    if not isinstance(mqtt_config, dict):
+                        return None
+                    required = {"endpoint", "client_id", "username", "password"}
+                    if not required.issubset(mqtt_config):
+                        self.logger.bind(tag=TAG).warning(
+                            f"Incomplete management MQTT config serial={serial_number}"
+                        )
+                        return None
+                    return {key: mqtt_config[key] for key in required}
+        except Exception as exc:
+            self.logger.bind(tag=TAG).warning(
+                f"Management MQTT provisioning unavailable serial={serial_number}: {exc}"
+            )
+            return None
 
     async def handle_post(self, request):
         """处理 OTA POST 请求
@@ -166,7 +222,8 @@ class OTAHandler(BaseHandler):
         try:
             data = await request.text()
             self.logger.bind(tag=TAG).debug(f"OTA request method: {request.method}")
-            self.logger.bind(tag=TAG).debug(f"OTA request headers: {request.headers}")
+            safe_headers = sanitize_headers(dict(request.headers))
+            self.logger.bind(tag=TAG).debug(f"OTA request headers: {safe_headers}")
             self.logger.bind(tag=TAG).debug(f"OTA request data: {data}")
 
             device_id = request.headers.get("device-id", "")
@@ -180,6 +237,8 @@ class OTAHandler(BaseHandler):
                 self.logger.bind(tag=TAG).info(f"OTA request ClientID: {client_id}")
             else:
                 raise Exception("OTA request ClientID is empty")
+
+            serial_number = request.headers.get("serial-number", "").strip()
 
             data_json = {}
             try:
@@ -245,56 +304,31 @@ class OTAHandler(BaseHandler):
                 },
             }
 
-            # existing mqtt/websocket logic (unchanged)
-            mqtt_gateway_endpoint = server_config.get("mqtt_gateway")
+            mqtt_config = await self._get_management_mqtt_config(
+                serial_number, device_id
+            )
+            if mqtt_config:
+                return_json["mqtt"] = mqtt_config
+                self.logger.bind(tag=TAG).info(
+                    f"Sending management MQTT config serial={serial_number}"
+                )
 
-            if mqtt_gateway_endpoint:  # 如果配置了非空字符串
-                # 尝试从请求数据中获取设备型号（已解析 above）
-                try:
-                    group_id = f"GID_{device_model}".replace(":", "_").replace(" ", "_")
-                except Exception as e:
-                    self.logger.bind(tag=TAG).error(f"Failed to get device model: {e}")
-                    group_id = "GID_default"
-
-                mac_address_safe = device_id.replace(":", "_")
-                mqtt_client_id = f"{group_id}@@@{mac_address_safe}@@@{mac_address_safe}"
-
-                # 构建用户数据
-                user_data = {"ip": "unknown"}
-                try:
-                    user_data_json = json.dumps(user_data)
-                    username = base64.b64encode(user_data_json.encode("utf-8")).decode(
-                        "utf-8"
+            transport_mode = os.environ.get(
+                "TRANSPORT_MODE", "websocket_legacy"
+            ).strip().lower()
+            if transport_mode == "mqtt_udp_hk":
+                if not mqtt_config:
+                    raise ValueError(
+                        "MQTT-only voice requires a declared Serial-Number and successful provisioning"
                     )
-                except Exception as e:
-                    self.logger.bind(tag=TAG).error(f"Failed to generate username: {e}")
-                    username = ""
-
-                # 生成密码
-                password = ""
-                signature_key = server_config.get("mqtt_signature_key", "")
-                if signature_key:
-                    password = self.generate_password_signature(
-                        mqtt_client_id + "|" + username, signature_key
-                    )
-                    if not password:
-                        password = ""  # 签名失败则留空，由设备决定是否允许无密码
-                else:
-                    self.logger.bind(tag=TAG).warning("Missing MQTT signature key, password left empty")
-
-                # 构建MQTT配置（直接使用 mqtt_gateway 字符串）
-                return_json["mqtt"] = {
-                    "endpoint": mqtt_gateway_endpoint,
-                    "client_id": mqtt_client_id,
-                    "username": username,
-                    "password": password,
-                    "publish_topic": "device-server",
-                    "subscribe_topic": f"devices/p2p/{mac_address_safe}",
+                return_json["transport"] = {
+                    "type": "mqtt_udp",
+                    "version": 3,
                 }
-                self.logger.bind(tag=TAG).info(f"Sending MQTT gateway config for device {device_id}")
-
-            else:  # 未配置 mqtt_gateway，下发 WebSocket
-                # 如果开启了认证，则进行认证校验
+                self.logger.bind(tag=TAG).info(
+                    f"Sending MQTT-only voice config serial={serial_number}"
+                )
+            else:
                 token = ""
                 if self.auth_enable:
                     if self.allowed_devices:
@@ -302,16 +336,14 @@ class OTAHandler(BaseHandler):
                             token = self.auth.generate_token(client_id, device_id)
                     else:
                         token = self.auth.generate_token(client_id, device_id)
-                # NOTE: pass request here for smart detection
                 return_json["websocket"] = {
                     "url": self._get_websocket_url(local_ip, websocket_port, request),
                     "token": token,
+                    "version": int(server_config.get("websocket_protocol_version", 1)),
                 }
                 self.logger.bind(tag=TAG).info(
-                    f"No MQTT gateway configured, sending WebSocket config for device {device_id}"
-                )
-                self.logger.bind(tag=TAG).info(
-                    f"Sent WebSocket URL is: {return_json['websocket']['url']}"
+                    f"Sending WebSocket voice config device={device_id} "
+                    f"url={return_json['websocket']['url']}"
                 )
 
             # Now check firmware files for updates
@@ -332,9 +364,8 @@ class OTAHandler(BaseHandler):
                     if _is_higher_version(ver, device_version):
                         # build download url (only allow download via our download endpoint)
                         chosen_version = ver
-                        scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
-                        host = request.headers.get("Host", request.host)
-                        chosen_url = f"{scheme}://{host}/xiaozhi/ota/download/{fname}"
+                        public_origin = self._get_public_http_origin(request)
+                        chosen_url = f"{public_origin}/xiaozhi/ota/download/{fname}"
                         break
 
                 if chosen_url:
@@ -369,6 +400,12 @@ class OTAHandler(BaseHandler):
     async def handle_get(self, request):
         """处理 OTA GET 请求"""
         try:
+            if os.environ.get("TRANSPORT_MODE", "").strip().lower() == "mqtt_udp_hk":
+                response = web.Response(
+                    text="OTA interface is running normally. Device voice transport is MQTT + UDP AES-CTR.",
+                    content_type="text/plain",
+                )
+                return response
             server_config = self.config["server"]
             local_ip = get_local_ip()
             # use websocket port for websocket URL

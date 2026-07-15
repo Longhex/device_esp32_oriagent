@@ -81,6 +81,12 @@ async def get_config_from_api_async(config, default_config=None):
             "port": local_server_config.get("port", ""),
             "http_port": local_server_config.get("http_port", ""),
             "websocket": local_server_config.get("websocket", ""),
+            "websocket_protocol_version": local_server_config.get(
+                "websocket_protocol_version", 1
+            ),
+            "supported_websocket_protocol_versions": local_server_config.get(
+                "supported_websocket_protocol_versions", [1]
+            ),
             "vision_explain": local_server_config.get("vision_explain", ""),
             "auth_key": local_server_config.get("auth_key", ""),
         }

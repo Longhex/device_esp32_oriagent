@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import queue
+import re
 import uuid
 import threading
 import time
@@ -17,6 +18,26 @@ except ImportError:
     udp_manager = None
 
 TAG = "mqtt_server"
+HK_SIGNALING_CONTRACT = "hk_legacy"
+HK_DEVICE_TOPIC_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
+
+
+def is_hk_signaling_contract():
+    return os.environ.get("MQTT_SIGNALING_CONTRACT", "canonical").strip().lower() == HK_SIGNALING_CONTRACT
+
+
+def build_hk_server_hello(base_hello, session_id, udp_config):
+    """Convert the shared AI hello into the contract parsed by HK firmware."""
+    try:
+        message = json.loads(base_hello) if isinstance(base_hello, str) else dict(base_hello)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return base_hello
+    if message.get("type") != "hello":
+        return base_hello
+    message["transport"] = "udp"
+    message["session_id"] = session_id
+    message["udp"] = dict(udp_config)
+    return json.dumps(message, separators=(",", ":"))
 
 
 def is_test_inject_text_enabled() -> bool:
@@ -47,7 +68,15 @@ def _summarize_state_payload(payload: str):
 
 class VirtualWebsocket:
     """Mocks the websockets.ServerConnection to minimize refactoring in ConnectionHandler"""
-    def __init__(self, device_id, session_id, mqtt_client, loop, logger=None):
+    def __init__(
+        self,
+        device_id,
+        session_id,
+        mqtt_client,
+        loop,
+        logger=None,
+        hk_udp_config=None,
+    ):
         self.device_id = device_id
         self.session_id = session_id
         self.mqtt_client = mqtt_client
@@ -64,6 +93,7 @@ class VirtualWebsocket:
         self._sentinel_enqueued = False
         self._message_queue = asyncio.Queue()
         self.connection_handler = None
+        self.hk_udp_config = hk_udp_config
         self.remote_address = (device_id, 0)
 
         class MockRequest:
@@ -89,6 +119,10 @@ class VirtualWebsocket:
                     self.logger.bind(tag=TAG).debug(f"UDP Session {self.session_id} not found for audio.")
             return
 
+        if self.hk_udp_config:
+            message = build_hk_server_hello(
+                message, self.session_id, self.hk_udp_config
+            )
         topic = f"{self.device_id}/MONITOR"
         try:
             self.mqtt_client.publish(topic, message)
@@ -113,7 +147,7 @@ class VirtualWebsocket:
 
         self.loop.call_soon_threadsafe(_enqueue)
 
-    async def close(self, reason="unknown"):
+    async def close(self, code=None, reason="unknown"):
         if self.close_requested:
             return
 
@@ -154,12 +188,21 @@ class MqttServer:
         self.session_meta = {}
         self.completed_cleanups = set()
         self.last_hello_by_device = {}
+        self.hk_signaling = is_hk_signaling_contract()
 
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             self.logger.bind(tag=TAG).info("Connected to MQTT Broker!")
-            self.client.subscribe("devices/+/signaling")
-            self.client.subscribe("devices/+/state")
+            if self.hk_signaling:
+                # Current HK firmware publishes voice JSON to the bare serial
+                # topic and listens on {serial}/MONITOR.
+                self.client.subscribe("+")
+                self.logger.bind(tag=TAG).info(
+                    "HK MQTT signaling enabled: subscribed to bare serial topics"
+                )
+            else:
+                self.client.subscribe("devices/+/signaling")
+                self.client.subscribe("devices/+/state")
         else:
             self.logger.bind(tag=TAG).error(f"Failed to connect to MQTT, return code {rc}")
 
@@ -167,6 +210,36 @@ class MqttServer:
         try:
             payload = msg.payload.decode('utf-8')
             topic = msg.topic
+
+            if self.hk_signaling and "/" not in topic:
+                if not HK_DEVICE_TOPIC_RE.fullmatch(topic) or topic in {
+                    "HAKAT_AI_MONITOR_ALL",
+                    "HAKAT_AI_REMOTE_ALL",
+                    "DEVICE_OFFLINE",
+                }:
+                    return
+                try:
+                    data = json.loads(payload)
+                except json.JSONDecodeError:
+                    self.logger.bind(tag=TAG).warning(
+                        f"Ignoring invalid HK signaling JSON topic={topic}"
+                    )
+                    return
+                if not isinstance(data, dict):
+                    return
+                if data.get("type") == "hello":
+                    self.loop.call_soon_threadsafe(
+                        asyncio.create_task,
+                        self.handle_hk_hello(topic, payload, data),
+                    )
+                    return
+                session = self.active_sessions.get(topic)
+                if session:
+                    meta = self.session_meta.get(session.session_id)
+                    if meta:
+                        meta["last_activity"] = time.time()
+                    session.put_message_threadsafe(payload)
+                return
             
             parts = topic.split('/')
             if len(parts) >= 3 and parts[0] == "devices":
@@ -228,6 +301,91 @@ class MqttServer:
                         session.put_message_threadsafe(payload)
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"Error handling MQTT message: {e}")
+
+    async def handle_hk_hello(self, device_id, payload, hello_data):
+        """Open the voice session expected by HK MqttProtocol::OpenAudioChannel."""
+        try:
+            if hello_data.get("transport") != "udp":
+                self.logger.bind(tag=TAG).warning(
+                    f"Rejected HK hello device={device_id}: transport must be udp"
+                )
+                return
+            if udp_manager is None:
+                self.logger.bind(tag=TAG).error("HK hello rejected: UDP manager unavailable")
+                return
+
+            old_ws = self.active_sessions.get(device_id)
+            if old_ws:
+                await self.cleanup_session(
+                    device_id, old_ws.session_id, reason="replaced_by_new_hello"
+                )
+
+            session_id = uuid.uuid4().hex[:16].upper()
+            shared_asr_queue = queue.Queue()
+            output_audio = self.config.get("xiaozhi", {}).get("audio_params", {})
+            output_sample_rate = int(output_audio.get("sample_rate", 24000))
+            frame_duration = int(output_audio.get("frame_duration", 60))
+            udp_session = udp_manager.create_hk_session(
+                device_id,
+                session_id,
+                shared_asr_queue,
+                output_sample_rate=output_sample_rate,
+                frame_duration=frame_duration,
+            )
+            public_udp_host = os.environ["PUBLIC_UDP_HOST"].strip()
+            udp_config = udp_session.hello_udp_config(
+                public_udp_host, udp_manager.port
+            )
+
+            virtual_ws = VirtualWebsocket(
+                device_id,
+                session_id,
+                self.client,
+                self.loop,
+                self.logger,
+                hk_udp_config=udp_config,
+            )
+            self.active_sessions[device_id] = virtual_ws
+            self.session_meta[session_id] = {
+                "device_id": device_id,
+                "session_id": session_id,
+                "created_at": time.time(),
+                "last_activity": time.time(),
+                "cleanup_started": False,
+                "contract": HK_SIGNALING_CONTRACT,
+            }
+
+            from core.connection import ConnectionHandler
+
+            handler = ConnectionHandler(
+                self.config,
+                self.ws_server._vad,
+                self.ws_server._asr,
+                self.ws_server._llm,
+                self.ws_server._memory,
+                self.ws_server._intent,
+                self.ws_server,
+            )
+            handler.session_id = session_id
+            handler.asr_audio_queue = shared_asr_queue
+            virtual_ws.connection_handler = handler
+            asyncio.create_task(
+                self.run_connection_handler(
+                    handler, virtual_ws, device_id, session_id
+                )
+            )
+            # Queue the device hello only after the virtual connection exists;
+            # helloHandle will reply through VirtualWebsocket, which injects the
+            # UDP key/nonce and publishes to {serial}/MONITOR.
+            virtual_ws.put_message_threadsafe(payload)
+            self.logger.bind(tag=TAG).info(
+                f"[HK-MQTT] hello accepted device={device_id} session={session_id} "
+                f"udp={public_udp_host}:{udp_manager.port}"
+            )
+        except Exception as exc:
+            self.logger.bind(tag=TAG).error(
+                f"HK hello failed device={device_id}: {exc}"
+            )
 
     async def handle_signaling(self, payload):
         try:
@@ -310,7 +468,7 @@ class MqttServer:
                 accept_msg = {
                     "type": "call_accept",
                     "session_id": session_id,
-                    "server_ip": get_local_ip(), # Or public IP from config
+                    "server_ip": os.environ.get("PUBLIC_UDP_HOST", "").strip() or get_local_ip(),
                     "udp_port": getattr(udp_manager, 'port', 5000) if udp_manager else 5000
                 }
                 self.client.publish(f"devices/{device_id}/command", json.dumps(accept_msg))

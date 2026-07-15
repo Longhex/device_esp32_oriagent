@@ -121,6 +121,33 @@ class WebSocketServer:
         headers = dict(websocket.request.headers)
         device_id = headers.get("device-id", "unknown")
         client_id = headers.get("client-id", "unknown")
+
+        raw_protocol_version = headers.get("protocol-version", "1")
+        try:
+            protocol_version = int(raw_protocol_version)
+        except (TypeError, ValueError):
+            protocol_version = -1
+        supported_versions = self.config.get("server", {}).get(
+            "supported_websocket_protocol_versions", [1]
+        )
+        if not isinstance(supported_versions, (list, tuple, set)):
+            supported_versions = [supported_versions]
+        supported_versions = [int(version) for version in supported_versions]
+        if protocol_version not in supported_versions:
+            self.logger.bind(tag=TAG).warning(
+                f"Unsupported WebSocket protocol version device={device_id} version={raw_protocol_version}"
+            )
+            await websocket.send(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "code": "unsupported_protocol_version",
+                        "supported": supported_versions,
+                    }
+                )
+            )
+            await websocket.close(code=1002, reason="Unsupported protocol version")
+            return
         
         try:
             await self._handle_auth(websocket)

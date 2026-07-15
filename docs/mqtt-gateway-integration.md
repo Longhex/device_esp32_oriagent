@@ -1,5 +1,7 @@
 # MQTT 网关部署教程
 
+> **Cảnh báo cho triển khai HK/Oriagent:** tài liệu upstream này chỉ mô tả gateway MQTT+UDP cũ và được giữ lại để tham khảo. Production hiện khóa `FIRMWARE_TRANSPORT_POLICY=websocket_only`; OTA không còn trả contract `device-server/devices/p2p`. Contract đang áp dụng nằm tại `docs/GIAO_TIEP_SERVER_FIRMWARE_ESP32.md`. Không làm theo tài liệu này để bật hybrid cho HK firmware hiện tại.
+
 `xiaozhi-esp32-server`项目，可结合虾哥开源的[xiaozhi-mqtt-gateway](https://github.com/78/xiaozhi-mqtt-gateway) 项目进行简单改造，即可实现小智硬件MQTT+UDP连接。
 本教程分为三部分，你可以根据你是全模块部署还是单模块部署，选择对应的部分接入MQTT网关：
 - 第一部分：部署MQTT网关

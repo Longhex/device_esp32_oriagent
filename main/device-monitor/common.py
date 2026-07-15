@@ -16,11 +16,21 @@ MQTT_PUBLIC_ENDPOINT = os.getenv("MQTT_PUBLIC_ENDPOINT", f"{EMQX_HOST}:{EMQX_MQT
 # REST API quản trị (dùng để provision authn/authz)
 EMQX_API_BASE = os.getenv("EMQX_API_BASE", "http://127.0.0.1:18083/api/v5")
 EMQX_DASHBOARD_USER = os.getenv("EMQX_DASHBOARD_USER", "admin")
-EMQX_DASHBOARD_PASSWORD = os.getenv("EMQX_DASHBOARD_PASSWORD", "oriagent_emqx_admin_2024")
+EMQX_DASHBOARD_PASSWORD = os.getenv("EMQX_DASHBOARD_PASSWORD", "")
 
 # --- Tài khoản backend (consumer) ---
 BACKEND_USERNAME = os.getenv("MQTT_BACKEND_USER", "oriagent-monitor")
-BACKEND_PASSWORD = os.getenv("MQTT_BACKEND_PASS", "oriagent_monitor_pass_2024")
+BACKEND_PASSWORD = os.getenv("MQTT_BACKEND_PASS", "")
+
+
+def validate_runtime_secrets(require_dashboard=False):
+    missing = []
+    if not BACKEND_PASSWORD:
+        missing.append("MQTT_BACKEND_PASS")
+    if require_dashboard and not EMQX_DASHBOARD_PASSWORD:
+        missing.append("EMQX_DASHBOARD_PASSWORD")
+    if missing:
+        raise RuntimeError("Missing required secret environment variables: " + ", ".join(missing))
 
 # --- Lưu trữ trạng thái ---
 # REDIS_HOST rỗng = TẮT Redis (opt-in): tránh đấu nhầm redis lạ khi chạy tay.
@@ -29,12 +39,19 @@ REDIS_HOST = os.getenv("REDIS_HOST", "").strip()
 REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "") or None
 
+# Compatibility bridge for the current HK firmware. Keep this feature-flagged
+# so the canonical devices/{serial}/... contract remains the long-term API.
+ENABLE_HK_LEGACY_BRIDGE = os.getenv(
+    "ENABLE_HK_LEGACY_BRIDGE", "false"
+).strip().lower() in {"1", "true", "yes", "on"}
+
 
 # --- Quy ước topic ---
 # {client} = ĐỊNH DANH THIẾT BỊ = Serial-Number (vd "HKHT2606010011"), khai báo
 # trên server trước khi kích hoạt. Dùng verbatim làm topic + MQTT username để thống
 # nhất 1 khóa xuyên suốt DB <-> MQTT <-> web. Xem memory serial-number-activation.
 TOPIC_PREFIX = "devices"
+LEGACY_MONITOR_TOPIC = "HAKAT_AI_MONITOR_ALL"
 
 
 def normalize_client(value: str) -> str:
@@ -59,6 +76,10 @@ def topic_command(client: str) -> str:
 
 def topic_command_ack(client: str) -> str:
     return f"{TOPIC_PREFIX}/{client}/command/ack"
+
+
+def legacy_command_topic(client: str) -> str:
+    return f"{normalize_client(client)}/MONITOR"
 
 
 # Topic wildcard cho backend subscribe toàn bộ thiết bị

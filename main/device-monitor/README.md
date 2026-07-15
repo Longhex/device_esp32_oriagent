@@ -29,8 +29,8 @@ trên server trước khi kích hoạt; dùng verbatim làm topic + MQTT usernam
 
 - Authentication: `password_based:built_in_database` (username/password, sha256).
 - Authorization: source `built_in_database`, `no_match=deny`, **đã xóa source `file` mặc định** (vì nó có luật `{allow, all}` làm vô hiệu ACL).
-- Backend (`oriagent-monitor`): full `devices/#`.
-- Mỗi thiết bị: chỉ `devices/{client}/#`.
+- Backend (`oriagent-monitor`): canonical `devices/#`; khi bật HK bridge còn subscribe bare `+` và publish `+/MONITOR` cho voice signaling.
+- Mỗi thiết bị: canonical `devices/{client}/#`; HK bridge chỉ bổ sung publish `{client}`/`HAKAT_AI_MONITOR_ALL` và subscribe `{client}/MONITOR`.
 
 `provision_auth.py` là **idempotent** — chạy lại an toàn. Đây là nguyên mẫu cho việc
 manager-api sẽ cấp credential khi đăng ký thiết bị (phát qua OTA).

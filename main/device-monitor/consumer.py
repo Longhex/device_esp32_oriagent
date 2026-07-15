@@ -32,6 +32,7 @@ from serial_store import SerialStore
 from emqx_admin import EmqxAdmin, EmqxError
 
 HTTP_PORT = int(os.getenv("MONITOR_HTTP_PORT", "8090"))
+COMMAND_TIMEOUT_SECONDS = int(os.getenv("MONITOR_COMMAND_TIMEOUT", "30"))
 TAG = "[consumer]"
 
 
@@ -44,12 +45,78 @@ _log = lambda m: print(m, flush=True)
 store = DeviceStore(logger=_log)
 serials = SerialStore(now_fn=_now, logger=_log)
 _client_ref = {"mqtt": None}
+_pending_commands = {}
+_pending_lock = threading.Lock()
 
 
-def activate_serial(serial, mac=None):
+def _legacy_command_payload(action, params=None):
+    """Translate the canonical management command into current HK firmware JSON."""
+    params = params or {}
+    aliases = {
+        "ota": "fota",
+        "mic_gain": "set_mic",
+    }
+    command = aliases.get(action, action)
+    supported = {
+        "music_search", "music_control", "volume", "set_mic", "chat",
+        "set_server", "reboot", "set_city", "set_profile", "set_wake",
+        "set_wakegain", "wakeup", "fota", "get_state",
+    }
+    if command not in supported:
+        raise ValueError(f"unsupported_by_current_firmware:{action}")
+
+    payload = {"cmd": command}
+    if command == "fota":
+        payload["url"] = params.get("url", "")
+        if not payload["url"]:
+            raise ValueError("missing_required_param:url")
+    elif command in {"volume", "set_mic", "set_server", "set_city", "set_wake", "set_wakegain"}:
+        if "value" not in params:
+            raise ValueError("missing_required_param:value")
+        payload["value"] = params["value"]
+    elif command == "set_profile":
+        payload["profile"] = params.get("profile", "")
+        if not payload["profile"]:
+            raise ValueError("missing_required_param:profile")
+    elif command == "chat":
+        payload["msg"] = params.get("msg", "")
+        if not payload["msg"]:
+            raise ValueError("missing_required_param:msg")
+    elif command == "music_control":
+        payload["action"] = params.get("action", "")
+        if not payload["action"]:
+            raise ValueError("missing_required_param:action")
+    elif command == "music_search":
+        payload.update({
+            "song": params.get("song", ""),
+            "artist": params.get("artist", ""),
+            "source": params.get("source", ""),
+        })
+    return payload
+
+
+def _expire_pending_commands(now=None):
+    now = now or _now()
+    expired = []
+    with _pending_lock:
+        for key, pending in list(_pending_commands.items()):
+            if now - pending["sent_at"] >= COMMAND_TIMEOUT_SECONDS:
+                expired.append((key, _pending_commands.pop(key)))
+    for (serial, command), pending in expired:
+        store.update(serial, {
+            "last_ack": {
+                "id": pending["id"],
+                "cmd": command,
+                "status": "timeout",
+            },
+            "last_ack_ts": now,
+        })
+
+
+def activate_serial(serial, mac=None, rotate=False):
     """Kích hoạt serial đã khai báo: sinh password, cấp credential EMQX, trả MQTT config.
     Trả (config_dict, error_str)."""
-    rec, err = serials.activate(serial, mac=mac)
+    rec, err = serials.activate(serial, mac=mac, rotate=rotate)
     if err:
         return None, err
     try:
@@ -78,9 +145,12 @@ def activate_serial(serial, mac=None):
 # ---------------- MQTT ----------------
 def on_connect(client, userdata, flags, reason_code, properties):
     print(f"{TAG} connected rc={reason_code}", flush=True)
-    client.subscribe([(common.SUB_ALL_STATUS, 1),
-                      (common.SUB_ALL_TELEMETRY, 1),
-                      (common.SUB_ALL_ACK, 1)])
+    subscriptions = [(common.SUB_ALL_STATUS, 1),
+                     (common.SUB_ALL_TELEMETRY, 1),
+                     (common.SUB_ALL_ACK, 1)]
+    if common.ENABLE_HK_LEGACY_BRIDGE:
+        subscriptions.append((common.LEGACY_MONITOR_TOPIC, 1))
+    client.subscribe(subscriptions)
 
 
 def _client_from_topic(topic):
@@ -90,20 +160,64 @@ def _client_from_topic(topic):
 
 
 def on_message(client, userdata, msg):
-    client_id = _client_from_topic(msg.topic)
-    if not client_id:
-        return
     try:
         payload = json.loads(msg.payload.decode())
     except Exception:
         payload = {"raw": msg.payload.decode(errors="replace")}
 
+    if msg.topic == common.LEGACY_MONITOR_TOPIC and common.ENABLE_HK_LEGACY_BRIDGE:
+        state_payload = payload.get("state")
+        if not isinstance(state_payload, dict):
+            state_payload = {}
+        client_id = str(
+            payload.get("serial_number")
+            or state_payload.get("serial_number")
+            or ""
+        ).strip()
+        if not client_id:
+            rec = serials.find_by_mac(payload.get("mac"))
+            client_id = rec.get("serial", "") if rec else ""
+        if not client_id:
+            print(f"{TAG} drop legacy payload without serial mapping", flush=True)
+            return
+
+        now = _now()
+        if payload.get("type") == "response" and payload.get("cmd"):
+            command = str(payload["cmd"])
+            with _pending_lock:
+                pending = _pending_commands.pop((client_id, command), None)
+            ack = dict(payload)
+            if pending:
+                ack["id"] = pending["id"]
+            store.update(client_id, {
+                "online": True,
+                "protocol": "hakat_legacy",
+                "last_seen": now,
+                "last_ack": ack,
+                "last_ack_ts": now,
+            })
+            print(f"{TAG} legacy ack {client_id} cmd={command}", flush=True)
+        else:
+            store.update(client_id, {
+                "online": True,
+                "protocol": "hakat_legacy",
+                "last_seen": now,
+                "telemetry": payload,
+                "last_telemetry_ts": now,
+            })
+            print(f"{TAG} legacy state {client_id}", flush=True)
+        return
+
+    client_id = _client_from_topic(msg.topic)
+    if not client_id:
+        return
+
     if msg.topic.endswith("/status"):
         online = bool(payload.get("online"))
-        store.update(client_id, {"online": online, "last_status_ts": _now(), "status_payload": payload})
+        store.update(client_id, {"online": online, "protocol": "canonical", "last_status_ts": _now(), "status_payload": payload})
         print(f"{TAG} presence {client_id} -> {'ONLINE' if online else 'OFFLINE'}", flush=True)
     elif msg.topic.endswith("/telemetry"):
-        store.update(client_id, {"telemetry": payload, "last_telemetry_ts": _now()})
+        store.update(client_id, {"protocol": "canonical", "telemetry": payload, "last_telemetry_ts": _now()})
         print(f"{TAG} telemetry {client_id} -> {payload}", flush=True)
     elif msg.topic.endswith("/command/ack"):
         store.update(client_id, {"last_ack": payload, "last_ack_ts": _now()})
@@ -126,10 +240,38 @@ def deactivate_serial(serial):
 
 
 def send_command(client_id, action, params=None):
+    _expire_pending_commands()
     cmd_id = f"cmd-{_now()}-{int(time.time()*1000) % 1000}"
-    payload = {"id": cmd_id, "action": action, "params": params or {}}
-    _client_ref["mqtt"].publish(common.topic_command(client_id), json.dumps(payload), qos=1)
-    print(f"{TAG} -> command {client_id}: {payload}", flush=True)
+    entry = store.get(client_id) or {}
+    use_legacy = (
+        common.ENABLE_HK_LEGACY_BRIDGE
+        and entry.get("protocol") == "hakat_legacy"
+    )
+    if use_legacy:
+        payload = _legacy_command_payload(action, params)
+        topic = common.legacy_command_topic(client_id)
+        with _pending_lock:
+            pending_key = (client_id, payload["cmd"])
+            if pending_key in _pending_commands:
+                raise ValueError(f"command_already_pending:{payload['cmd']}")
+            _pending_commands[pending_key] = {
+                "id": cmd_id,
+                "sent_at": _now(),
+            }
+    else:
+        payload = {"id": cmd_id, "action": action, "params": params or {}}
+        topic = common.topic_command(client_id)
+
+    mqtt_client = _client_ref["mqtt"]
+    if mqtt_client is None:
+        raise RuntimeError("mqtt_not_connected")
+    result = mqtt_client.publish(topic, json.dumps(payload, ensure_ascii=False), qos=1)
+    if getattr(result, "rc", 0) != mqtt.MQTT_ERR_SUCCESS:
+        if use_legacy:
+            with _pending_lock:
+                _pending_commands.pop((client_id, payload["cmd"]), None)
+        raise RuntimeError(f"mqtt_publish_failed:{getattr(result, 'rc', 'unknown')}")
+    print(f"{TAG} -> command {client_id} topic={topic} cmd={action}", flush=True)
     return cmd_id
 
 
@@ -200,7 +342,9 @@ class Handler(BaseHTTPRequestHandler):
             serial = (body.get("serial") or "").strip()
             if not serial:
                 return self._send(400, {"error": "serial required"})
-            config, err = activate_serial(serial, mac=body.get("mac"))
+            config, err = activate_serial(
+                serial, mac=body.get("mac"), rotate=bool(body.get("rotate", False))
+            )
             if err:
                 # serial chưa khai báo -> 403; lỗi EMQX -> 502
                 code = 403 if "khai báo" in err else 502
@@ -209,7 +353,15 @@ class Handler(BaseHTTPRequestHandler):
 
         # POST /devices/<client>/command  {action, params}
         if len(parts) == 3 and parts[0] == "devices" and parts[2] == "command":
-            cmd_id = send_command(parts[1], body.get("action", "noop"), body.get("params"))
+            action = body.get("action", "noop")
+            try:
+                cmd_id = send_command(parts[1], action, body.get("params"))
+            except ValueError as exc:
+                message = str(exc)
+                code = 409 if message.startswith("command_already_pending") else 422
+                return self._send(code, {"error": message, "action": action})
+            except RuntimeError as exc:
+                return self._send(503, {"error": str(exc), "action": action})
             return self._send(202, {"command_id": cmd_id})
 
         return self._send(404, {"error": "unknown path"})
@@ -230,7 +382,14 @@ def start_http():
     srv.serve_forever()
 
 
+def pending_timeout_loop():
+    while True:
+        time.sleep(1)
+        _expire_pending_commands()
+
+
 def main():
+    common.validate_runtime_secrets()
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="oriagent-monitor-consumer")
     client.username_pw_set(common.BACKEND_USERNAME, common.BACKEND_PASSWORD)
     client.on_connect = on_connect
@@ -239,6 +398,7 @@ def main():
 
     client.connect(common.EMQX_HOST, common.EMQX_MQTT_PORT, keepalive=30)
     threading.Thread(target=start_http, daemon=True).start()
+    threading.Thread(target=pending_timeout_loop, daemon=True).start()
     client.loop_forever()
 
 

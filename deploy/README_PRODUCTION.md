@@ -55,17 +55,19 @@ docker compose --profile ssl -f docker-compose.prod.yml up -d --build
 Production endpoints:
 
 - Admin UI: `https://device.oriagent.com/`
-- WebSocket: `wss://device.oriagent.com/xiaozhi/v1/`
+- Device signaling: MQTT `device.oriagent.com:1883`
+- Device voice media: UDP AES-CTR `device.oriagent.com:8883/udp`
+- WebSocket voice: disabled; `/xiaozhi/v1/` returns `410`
 - OTA: `https://device.oriagent.com/xiaozhi/ota/`
 - Vision API: `https://device.oriagent.com/mcp/vision/explain`
 
 ## EMQX — broker quản lý/giám sát thiết bị
 
-`docker-compose.prod.yml` thêm service `emqx` làm **mặt phẳng quản lý/giám sát độc lập** với luồng audio xiaozhi. Đây KHÔNG phải `xiaozhi-mqtt-gateway` (kênh truyền audio MQTT+UDP) — hai thứ tách biệt.
+`docker-compose.prod.yml` dùng EMQX cho cả topic voice HK (`{serial}`/`{serial}/MONITOR`) và management. Audio không đi qua broker; Opus đi trực tiếp qua UDP AES-CTR.
 
 Cổng:
 
-- `1883` MQTT TCP, `8883` MQTT over TLS — thiết bị kết nối (mở public qua firewall/VPS).
+- `1883/tcp` MQTT, `8883/tcp` MQTT TLS và `8883/udp` voice AES-CTR — mở public qua firewall/VPS.
 - `8083`/`8084` MQTT over WebSocket/WSS — cho app/web nếu cần kết nối trực tiếp.
 - `18083` Dashboard quản trị — mặc định bind `127.0.0.1`, truy cập qua SSH tunnel:
   `ssh -L 18083:127.0.0.1:18083 user@server` rồi mở `http://localhost:18083`.
@@ -101,5 +103,5 @@ sh scripts/recommend-resources.sh
 - The outer `nginx-proxy + acme-companion` layer handles TLS and HTTP-to-HTTPS redirect.
 - The app-specific `xiaozhi-edge-router` handles path-based routing to the Python server and the web/admin container.
 - The web container still contains its own internal Nginx, so admin/API requests pass through one extra Nginx hop by design.
-- After the first clean deployment, you still need to complete the usual `server.secret`, `server.websocket`, and `server.ota` setup in the admin panel if your data directory is fresh.
+- After the first clean deployment, configure `server.secret` and `server.ota`; production MQTT-only does not consume `server.websocket`.
 - If you reuse an existing `deploy/mysql/data` directory from the old stack, keep `MYSQL_IMAGE_TAG` aligned with the version that created that data directory. The default is `latest` here because the current local stack already uses `mysql:latest`.

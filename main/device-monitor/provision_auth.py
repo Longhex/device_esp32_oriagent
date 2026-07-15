@@ -10,6 +10,7 @@ không cần liệt kê ở đây. Script này chỉ lo phần hạ tầng + bac
 
 Chạy:  python provision_auth.py [serial ...]
 """
+import os
 import sys
 
 try:
@@ -20,15 +21,14 @@ except Exception:
 import common
 from emqx_admin import EmqxAdmin, EmqxError
 
-# Serial demo để test nhanh (production: cấp lúc activate).
-DEMO_DEVICES = {
-    "HKHT2606010011": "dev01_secret_2024",
-}
-
-
 def main():
-    serials = sys.argv[1:] or list(DEMO_DEVICES.keys())
+    serials = sys.argv[1:]
     log = lambda m: print(m, flush=True)
+    try:
+        common.validate_runtime_secrets(require_dashboard=True)
+    except RuntimeError as exc:
+        print(f"CONFIG ERROR: {exc}")
+        sys.exit(1)
     try:
         emqx = EmqxAdmin(logger=log).login()
     except EmqxError as e:
@@ -44,9 +44,12 @@ def main():
     print(f"  [user] {common.BACKEND_USERNAME} (backend, full devices/#)")
 
     # Demo theo Serial-Number
+    demo_password = os.getenv("PROVISION_DEMO_PASSWORD", "")
+    if serials and not demo_password:
+        print("CONFIG ERROR: PROVISION_DEMO_PASSWORD is required when provisioning demo serials")
+        sys.exit(1)
     for serial in serials:
-        password = DEMO_DEVICES.get(serial, f"{serial}_secret")
-        emqx.provision_device(serial, password)
+        emqx.provision_device(serial, demo_password)
         print(f"  [user] {serial} (device, devices/{serial}/#)")
 
     print("PROVISION DONE")
