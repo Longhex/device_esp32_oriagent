@@ -1623,11 +1623,12 @@ class ConnectionHandler:
                     )
                     return
 
-                message = json.dumps(
-                    {"cmd": "show_image", "url": final_url}, ensure_ascii=False
-                )
+                message = {
+                    "cmd": "show_image",
+                    "url": final_url,
+                }
                 if self.websocket:
-                    await self.websocket.send(message)
+                    await self.websocket.send(json.dumps(message))
                 self.logger.bind(tag=TAG).info(f"show_image -> {final_url}")
             except Exception as e:
                 self.logger.bind(tag=TAG).warning(f"Gửi show_image thất bại: {e}")
