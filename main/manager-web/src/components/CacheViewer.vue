@@ -51,10 +51,10 @@
           <h3>{{ $t('cache.cssResources').replace('{count}', cacheData.css.length) }}</h3>
           <el-table :data="cacheData.css" stripe style="width: 100%">
             <el-table-column prop="url" label="URL" width="auto" show-overflow-tooltip />
-            <el-table-column prop="cached" label="Trạng thái" width="100">
+            <el-table-column prop="cached" :label="$t('cacheViewer.status')" width="100">
               <template slot-scope="scope">
-                <el-tag type="success" v-if="scope.row.cached">Đã cache</el-tag>
-                <el-tag type="danger" v-else>Chưa cache</el-tag>
+                <el-tag type="success" v-if="scope.row.cached">{{ $t('cacheViewer.cached') }}</el-tag>
+                <el-tag type="danger" v-else>{{ $t('cacheViewer.notCached') }}</el-tag>
               </template>
             </el-table-column>
           </el-table>

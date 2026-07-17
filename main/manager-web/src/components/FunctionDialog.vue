@@ -83,7 +83,7 @@
                 @change="val => handleParamChange(currentFunction, field.key, val)" />
 
               <!-- JSON -->
-              <el-input v-else-if="field.type === 'json'" type="textarea" :rows="6" placeholder="Nhập JSON hợp lệ"
+              <el-input v-else-if="field.type === 'json'" type="textarea" :rows="6" :placeholder="$t('functionDialog.jsonPlaceholder')"
                 v-model="textCache[field.key]" @blur="flushJson(field)" />
 
               <!-- number -->

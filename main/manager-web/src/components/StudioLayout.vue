@@ -34,7 +34,7 @@
         <div class="studio-nav-group">
           <div class="studio-group-label">AgentSetting</div>
           <div class="studio-nav-item" :class="{ active: active === 'settings' }" @click="go('/params-management')">
-            <span class="studio-ic studio-ic--settings"></span><span>Thiết lập</span>
+            <span class="studio-ic studio-ic--settings"></span><span>{{ $t('studio.navSettings') }}</span>
           </div>
         </div>
       </div>

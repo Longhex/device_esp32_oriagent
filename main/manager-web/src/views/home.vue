@@ -5,7 +5,7 @@
       <div class="studio-search-wrap">
         <el-input
           v-model="search"
-          placeholder="Tìm kiếm Robot Agent"
+          :placeholder="$t('home.searchPlaceholder')"
           class="studio-search-input"
           @keyup.enter.native="handleSearch"
           @focus="showHistory = true"

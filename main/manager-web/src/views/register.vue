@@ -28,26 +28,26 @@
 
       <!-- Form center -->
       <div class="form-center">
-        <h1 class="form-title">Quản lý thiết bị</h1>
-        <p class="form-subtitle">Kết nối thiết bị ESP32 vào hệ thống AI Agent</p>
+        <h1 class="form-title">{{ $t("auth.title") }}</h1>
+        <p class="form-subtitle">{{ $t("auth.subtitle") }}</p>
 
         <!-- Google Register Button -->
         <div v-if="googleOAuthEnabled" class="google-btn" @click="handleGoogleLogin">
           <img src="@/assets/auth/icon-google.svg" alt="Google" class="google-icon" />
-          <span>Đăng nhập hoặc đăng ký bằng Google</span>
+          <span>{{ $t("auth.google") }}</span>
         </div>
 
         <!-- Divider -->
         <div v-if="googleOAuthEnabled" class="divider">
-          <span>hoặc</span>
+          <span>{{ $t("auth.or") }}</span>
         </div>
 
         <form @submit.prevent="register">
           <!-- Username / Mobile input -->
           <div v-if="!enableMobileRegister">
-            <label class="input-label">Địa chỉ Email</label>
+            <label class="input-label">{{ $t("auth.emailLabel") }}</label>
             <div class="auth-input">
-              <el-input v-model="form.username" placeholder="Email của bạn" />
+              <el-input v-model="form.username" :placeholder="$t('auth.emailPlaceholder')" />
             </div>
           </div>
 
@@ -83,23 +83,23 @@
           </template>
 
           <!-- Password -->
-          <label class="input-label">Mật khẩu</label>
+          <label class="input-label">{{ $t("auth.passwordLabel") }}</label>
           <div class="auth-input">
-            <el-input v-model="form.password" placeholder="Mật khẩu của bạn" type="password" show-password />
+            <el-input v-model="form.password" :placeholder="$t('auth.passwordPlaceholder')" type="password" show-password />
           </div>
 
           <!-- Confirm Password -->
-          <label class="input-label">Xác nhận mật khẩu</label>
+          <label class="input-label">{{ $t("auth.confirmPasswordLabel") }}</label>
           <div class="auth-input">
-            <el-input v-model="form.confirmPassword" placeholder="Nhập lại mật khẩu" type="password" show-password />
+            <el-input v-model="form.confirmPassword" :placeholder="$t('auth.confirmPasswordPlaceholder')" type="password" show-password />
           </div>
 
           <!-- Graphic Captcha for Username Register -->
           <template v-if="!enableMobileRegister">
-            <label class="input-label">Mã xác nhận</label>
+            <label class="input-label">{{ $t("auth.captchaLabel") }}</label>
             <div class="captcha-row">
               <div class="auth-input">
-                <el-input v-model="form.captcha" placeholder="Nhập mã xác nhận" />
+                <el-input v-model="form.captcha" :placeholder="$t('auth.captchaPlaceholder')" />
               </div>
               <img v-if="captchaUrl" :src="captchaUrl" alt="Captcha" class="captcha-img" @click="fetchCaptcha" />
             </div>
@@ -108,14 +108,14 @@
           <!-- Links -->
           <div class="form-links">
             <div class="register-link">
-              Đã có tài khoản?
-              <span class="link-action" @click="goToLogin">Đăng nhập</span>
+              {{ $t("auth.haveAccount") }}
+              <span class="link-action" @click="goToLogin">{{ $t("auth.loginBtn") }}</span>
             </div>
           </div>
         </form>
 
         <!-- Register button -->
-        <div class="auth-btn" @click="register">Đăng ký</div>
+        <div class="auth-btn" @click="register">{{ $t("auth.registerBtn") }}</div>
 
 
       </div>

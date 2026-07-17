@@ -134,11 +134,11 @@
           </div>
           <el-form label-width="auto" label-position="left" class="custom-form">
             <div style="display: flex; gap: 20px; margin-bottom: 0;">
-              <el-form-item :label="$t('ttsModel.voiceName') || 'Tên giọng'" style="flex: 1;">
-                <el-input v-model="voice.name" maxlength="20" show-word-limit placeholder="VD: Giọng Mai"
+              <el-form-item :label="$t('ttsModel.voiceName')" style="flex: 1;">
+                <el-input v-model="voice.name" maxlength="20" show-word-limit :placeholder="$t('ttsModel.voiceNamePlaceholder')"
                   class="custom-input-bg" />
               </el-form-item>
-              <el-form-item :label="$t('ttsModel.languageType') || 'Loại ngôn ngữ'" style="flex: 1;">
+              <el-form-item :label="$t('ttsModel.languageType')" style="flex: 1;">
                 <el-input v-model="voice.language" placeholder="auto" class="custom-input-bg" />
               </el-form-item>
             </div>

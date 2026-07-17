@@ -50,7 +50,7 @@
               <el-input
                 v-model="form.oriagentApiKey"
                 class="premium-input-field"
-                placeholder="Nhập key riêng (app-...); để trống = dùng key chung của model"
+                :placeholder="$t('roleConfig.oriagentKeyPlaceholder')"
                 show-password
               />
             </div>
@@ -141,7 +141,7 @@
                 <i
                   :class="fillerPlaying ? 'el-icon-loading' : 'el-icon-video-play'"
                   class="filler-play-btn"
-                  title="Nghe thử câu đệm bằng giọng agent"
+                  :title="$t('roleConfig.fillerPreviewTitle')"
                   @click.stop.prevent="playFiller"
                 ></i>
               </label>
@@ -156,7 +156,7 @@
 
             <template v-if="form.fillerEnabled === 1">
               <div class="filler-field">
-                <span class="filler-tag">Thời gian chờ (ms)</span>
+                <span class="filler-tag">{{ $t("roleConfig.fillerDelayLabel") }}</span>
                 <div class="filler-input-pill">
                   <el-input-number
                     v-model="form.fillerDelayMs"
@@ -170,13 +170,13 @@
               </div>
 
               <div class="filler-field">
-                <span class="filler-tag">Câu đệm (mỗi câu một dòng)</span>
+                <span class="filler-tag">{{ $t("roleConfig.fillerPhrasesLabel") }}</span>
                 <el-input
                   type="textarea"
                   v-model="form.fillerPhrases"
                   class="filler-textarea"
                   :autosize="{ minRows: 4, maxRows: 10 }"
-                  placeholder="Ừm, để mình nghĩ xíu nha&#10;Câu này hay nè, đợi mình một chút&#10;Để mình xem nào"
+                  :placeholder="$t('roleConfig.fillerPhrasesPlaceholder')"
                 />
               </div>
 
@@ -203,7 +203,7 @@
                 <div class="live-waveform-static">
                   <span class="wave-bar" v-for="n in 5" :key="n"></span>
                 </div>
-                <span class="live-status-text">Đang hoạt động</span>
+                <span class="live-status-text">{{ $t("roleConfig.liveActive") }}</span>
                 <div class="call-btn end" @click="isLiveTesting = false">
                   <img src="@/assets/dashboard/phone_stop.svg" class="btn-icon-svg" />
                 </div>
@@ -243,7 +243,7 @@
         <!-- Ô nhập tin nhắn tĩnh: chỉ hiện khi chưa gọi (khi đang gọi, ô nhập thật nằm trong live-iframe) -->
         <div class="idle-input-bar" v-if="!isLiveTesting">
           <i class="el-icon-chat-dot-round"></i>
-          <span class="idle-input-placeholder">Nhập tin nhắn...</span>
+          <span class="idle-input-placeholder">{{ $t("roleConfig.idleInputPlaceholder") }}</span>
           <div class="idle-send-btn"><i class="el-icon-top"></i></div>
         </div>
       </div>
@@ -254,7 +254,7 @@
           <span class="panel-header-title"><span class="studio-ic studio-ic--instructions panel-header-ic"></span> Instructions</span>
           <div class="panel-header-actions">
             <span class="studio-ic studio-ic--settings sp-gear-icon"></span>
-            <span class="sp-auto-btn"><span class="studio-ic studio-ic--autogen sp-auto-ic"></span> Tạo tự động</span>
+            <span class="sp-auto-btn"><span class="studio-ic studio-ic--autogen sp-auto-ic"></span> {{ $t('roleConfig.autoGenerate') }}</span>
           </div>
         </div>
         <el-input
@@ -264,7 +264,7 @@
           :rows="16"
           maxlength="4000"
           resize="none"
-          placeholder="Ví dụ: Bạn là trợ lý thân thiện, trả lời ngắn gọn, dễ hiểu..."
+          :placeholder="$t('roleConfig.systemPromptPlaceholder')"
         />
         <div class="sp-footer">
           <span class="sp-footer-item"><span class="studio-ic studio-ic--char sp-footer-ic"></span>Character: {{ (form.systemPrompt || '').length }}</span>
