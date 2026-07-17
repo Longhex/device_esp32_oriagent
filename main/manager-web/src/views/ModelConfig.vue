@@ -799,7 +799,7 @@ export default {
 }
 
 .btn-search {
-  background: linear-gradient(135deg, #555555, #a966ff);
+  background: linear-gradient(180deg, #333335 0%, #1a1a1c 100%);
   border: none;
   color: white;
   border-radius: $studio-radius-pill;
