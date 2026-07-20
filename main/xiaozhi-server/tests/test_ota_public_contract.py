@@ -7,7 +7,10 @@ from unittest.mock import patch
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from core.api.ota_handler import OTAHandler  # noqa: E402
+from core.api.ota_handler import (  # noqa: E402
+    OTAHandler,
+    build_firmware_mqtt_config,
+)
 
 
 def make_handler():
@@ -26,6 +29,37 @@ def make_request(host="device.example.com", scheme="http", headers=None):
 
 
 class OtaPublicContractTest(unittest.TestCase):
+    def test_mqtt_topics_are_derived_from_provisioned_client_id(self):
+        result = build_firmware_mqtt_config({
+            "endpoint": "broker.hkrobotics.ai",
+            "client_id": "HKHT2606010046",
+            "username": "device-user",
+            "password": "device-password",
+        })
+        self.assertEqual(
+            result["publish_topic"], "HKHT2606010046/AI_MONITOR"
+        )
+        self.assertEqual(
+            result["subscribe_topic"], "HKHT2606010046/AI_REMOTE"
+        )
+
+    def test_mqtt_topics_use_serial_when_client_id_is_generated(self):
+        result = build_firmware_mqtt_config(
+            {
+                "endpoint": "broker.hkrobotics.ai",
+                "client_id": "GID_test@@@90_70_69_19_9d_00@@@uuid",
+                "username": "device-user",
+                "password": "device-password",
+            },
+            topic_identity="HKHT2606010046",
+        )
+        self.assertEqual(
+            result["publish_topic"], "HKHT2606010046/AI_MONITOR"
+        )
+        self.assertEqual(
+            result["subscribe_topic"], "HKHT2606010046/AI_REMOTE"
+        )
+
     def test_explicit_public_url_wins(self):
         with patch.dict(
             os.environ,

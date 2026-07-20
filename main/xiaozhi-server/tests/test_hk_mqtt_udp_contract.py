@@ -6,6 +6,11 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.mqtt_server import build_hk_server_hello
+from core.mqtt_topics import (
+    hk_device_publish_topic,
+    hk_device_subscribe_topic,
+    parse_hk_uplink_topic,
+)
 from core.udp_server import (
     HkEncryptedUdpSession,
     build_hk_udp_packet,
@@ -83,6 +88,25 @@ class HkMqttUdpContractTest(unittest.TestCase):
         self.assertIn('"session_id":"A1B2C3D4E5F60708"', result)
         self.assertIn('"port":8883', result)
         self.assertNotIn('"transport":"websocket"', result)
+
+    def test_ota_advertised_topics_route_to_same_device(self):
+        device_id = "HKHT2606010046"
+        uplink = hk_device_publish_topic(device_id)
+        self.assertEqual(uplink, "HKHT2606010046/AI_MONITOR")
+        self.assertEqual(
+            hk_device_subscribe_topic(device_id),
+            "HKHT2606010046/AI_REMOTE",
+        )
+        self.assertEqual(
+            parse_hk_uplink_topic(uplink),
+            (device_id, "HKHT2606010046/AI_REMOTE"),
+        )
+
+    def test_legacy_topic_remains_compatible_during_rollout(self):
+        self.assertEqual(
+            parse_hk_uplink_topic("HKHT2606010011"),
+            ("HKHT2606010011", "HKHT2606010011/MONITOR"),
+        )
 
 
 if __name__ == "__main__":

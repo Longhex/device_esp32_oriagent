@@ -27,8 +27,10 @@ server {
     }
 
     location /xiaozhi/v1/ {
-        if ("${FIRMWARE_TRANSPORT_POLICY}" = "mqtt_only") {
-            default_type application/json;
+        default_type application/json;
+        set $firmware_transport_policy "${FIRMWARE_TRANSPORT_POLICY}";
+
+        if ($firmware_transport_policy = "mqtt_only") {
             return 410 '{"type":"error","code":"websocket_voice_disabled","transport":"mqtt_udp"}';
         }
 

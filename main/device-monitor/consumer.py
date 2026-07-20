@@ -132,6 +132,8 @@ def activate_serial(serial, mac=None, rotate=False):
             "client_id": serial,
             "username": serial,
             "password": rec["password"],
+            "publish_topic": common.hk_device_publish_topic(serial),
+            "subscribe_topic": common.hk_device_subscribe_topic(serial),
             "topics": {
                 "status": common.topic_status(serial),
                 "telemetry": common.topic_telemetry(serial),
@@ -150,6 +152,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
                      (common.SUB_ALL_ACK, 1)]
     if common.ENABLE_HK_LEGACY_BRIDGE:
         subscriptions.append((common.LEGACY_MONITOR_TOPIC, 1))
+        subscriptions.append((common.SUB_ALL_HK_UPLINK, 1))
     client.subscribe(subscriptions)
 
 
@@ -157,6 +160,38 @@ def _client_from_topic(topic):
     # devices/<client>/<...>
     parts = topic.split("/")
     return parts[1] if len(parts) >= 2 else None
+
+
+def _handle_hk_monitor_payload(payload, client_id, protocol):
+    if not client_id:
+        print(f"{TAG} drop HK payload without serial mapping", flush=True)
+        return
+
+    now = _now()
+    if payload.get("type") == "response" and payload.get("cmd"):
+        command = str(payload["cmd"])
+        with _pending_lock:
+            pending = _pending_commands.pop((client_id, command), None)
+        ack = dict(payload)
+        if pending:
+            ack["id"] = pending["id"]
+        store.update(client_id, {
+            "online": True,
+            "protocol": protocol,
+            "last_seen": now,
+            "last_ack": ack,
+            "last_ack_ts": now,
+        })
+        print(f"{TAG} HK ack {client_id} cmd={command}", flush=True)
+    else:
+        store.update(client_id, {
+            "online": True,
+            "protocol": protocol,
+            "last_seen": now,
+            "telemetry": payload,
+            "last_telemetry_ts": now,
+        })
+        print(f"{TAG} HK state {client_id}", flush=True)
 
 
 def on_message(client, userdata, msg):
@@ -177,35 +212,16 @@ def on_message(client, userdata, msg):
         if not client_id:
             rec = serials.find_by_mac(payload.get("mac"))
             client_id = rec.get("serial", "") if rec else ""
-        if not client_id:
-            print(f"{TAG} drop legacy payload without serial mapping", flush=True)
-            return
+        _handle_hk_monitor_payload(payload, client_id, "hakat_legacy")
+        return
 
-        now = _now()
-        if payload.get("type") == "response" and payload.get("cmd"):
-            command = str(payload["cmd"])
-            with _pending_lock:
-                pending = _pending_commands.pop((client_id, command), None)
-            ack = dict(payload)
-            if pending:
-                ack["id"] = pending["id"]
-            store.update(client_id, {
-                "online": True,
-                "protocol": "hakat_legacy",
-                "last_seen": now,
-                "last_ack": ack,
-                "last_ack_ts": now,
-            })
-            print(f"{TAG} legacy ack {client_id} cmd={command}", flush=True)
-        else:
-            store.update(client_id, {
-                "online": True,
-                "protocol": "hakat_legacy",
-                "last_seen": now,
-                "telemetry": payload,
-                "last_telemetry_ts": now,
-            })
-            print(f"{TAG} legacy state {client_id}", flush=True)
+    if (
+        common.ENABLE_HK_LEGACY_BRIDGE
+        and msg.topic.endswith(f"/{common.HK_MQTT_UPLINK_SUFFIX}")
+    ):
+        parts = msg.topic.split("/")
+        client_id = parts[0] if len(parts) == 2 else ""
+        _handle_hk_monitor_payload(payload, client_id, "hakat_topics_v2")
         return
 
     client_id = _client_from_topic(msg.topic)
@@ -243,13 +259,16 @@ def send_command(client_id, action, params=None):
     _expire_pending_commands()
     cmd_id = f"cmd-{_now()}-{int(time.time()*1000) % 1000}"
     entry = store.get(client_id) or {}
-    use_legacy = (
+    use_hk_bridge = (
         common.ENABLE_HK_LEGACY_BRIDGE
-        and entry.get("protocol") == "hakat_legacy"
+        and entry.get("protocol") in {"hakat_legacy", "hakat_topics_v2"}
     )
-    if use_legacy:
+    if use_hk_bridge:
         payload = _legacy_command_payload(action, params)
-        topic = common.legacy_command_topic(client_id)
+        if entry.get("protocol") == "hakat_topics_v2":
+            topic = common.hk_device_subscribe_topic(client_id)
+        else:
+            topic = common.legacy_command_topic(client_id)
         with _pending_lock:
             pending_key = (client_id, payload["cmd"])
             if pending_key in _pending_commands:
@@ -267,7 +286,7 @@ def send_command(client_id, action, params=None):
         raise RuntimeError("mqtt_not_connected")
     result = mqtt_client.publish(topic, json.dumps(payload, ensure_ascii=False), qos=1)
     if getattr(result, "rc", 0) != mqtt.MQTT_ERR_SUCCESS:
-        if use_legacy:
+        if use_hk_bridge:
             with _pending_lock:
                 _pending_commands.pop((client_id, payload["cmd"]), None)
         raise RuntimeError(f"mqtt_publish_failed:{getattr(result, 'rc', 'unknown')}")

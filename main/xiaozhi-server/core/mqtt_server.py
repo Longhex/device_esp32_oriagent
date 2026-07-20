@@ -2,13 +2,13 @@ import asyncio
 import json
 import os
 import queue
-import re
 import uuid
 import threading
 import time
 import paho.mqtt.client as mqtt
 from config.logger import setup_logging, bind_log_context
 from core.auth import AuthenticationError
+from core.mqtt_topics import hk_uplink_subscription, parse_hk_uplink_topic
 from core.utils.util import get_local_ip
 
 # Try to import our new UDP manager
@@ -19,7 +19,6 @@ except ImportError:
 
 TAG = "mqtt_server"
 HK_SIGNALING_CONTRACT = "hk_legacy"
-HK_DEVICE_TOPIC_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
 
 
 def is_hk_signaling_contract():
@@ -76,6 +75,7 @@ class VirtualWebsocket:
         loop,
         logger=None,
         hk_udp_config=None,
+        mqtt_downlink_topic=None,
     ):
         self.device_id = device_id
         self.session_id = session_id
@@ -94,6 +94,7 @@ class VirtualWebsocket:
         self._message_queue = asyncio.Queue()
         self.connection_handler = None
         self.hk_udp_config = hk_udp_config
+        self.mqtt_downlink_topic = mqtt_downlink_topic
         self.remote_address = (device_id, 0)
 
         class MockRequest:
@@ -123,7 +124,7 @@ class VirtualWebsocket:
             message = build_hk_server_hello(
                 message, self.session_id, self.hk_udp_config
             )
-        topic = f"{self.device_id}/MONITOR"
+        topic = self.mqtt_downlink_topic or f"{self.device_id}/MONITOR"
         try:
             self.mqtt_client.publish(topic, message)
             self.logger.bind(tag=TAG).debug(f"Published to {topic}: {message[:200]}")
@@ -194,11 +195,12 @@ class MqttServer:
         if rc == 0:
             self.logger.bind(tag=TAG).info("Connected to MQTT Broker!")
             if self.hk_signaling:
-                # Current HK firmware publishes voice JSON to the bare serial
-                # topic and listens on {serial}/MONITOR.
+                # Compatibility window: accept the old bare-serial uplink and
+                # the OTA-advertised {serial}/AI_MONITOR uplink.
                 self.client.subscribe("+")
+                self.client.subscribe(hk_uplink_subscription())
                 self.logger.bind(tag=TAG).info(
-                    "HK MQTT signaling enabled: subscribed to bare serial topics"
+                    "HK MQTT signaling enabled: subscribed to legacy and OTA-advertised topics"
                 )
             else:
                 self.client.subscribe("devices/+/signaling")
@@ -211,35 +213,49 @@ class MqttServer:
             payload = msg.payload.decode('utf-8')
             topic = msg.topic
 
-            if self.hk_signaling and "/" not in topic:
-                if not HK_DEVICE_TOPIC_RE.fullmatch(topic) or topic in {
+            if self.hk_signaling:
+                if topic in {
                     "HAKAT_AI_MONITOR_ALL",
                     "HAKAT_AI_REMOTE_ALL",
                     "DEVICE_OFFLINE",
                 }:
                     return
                 try:
-                    data = json.loads(payload)
-                except json.JSONDecodeError:
+                    device_id, downlink_topic = parse_hk_uplink_topic(topic)
+                except ValueError:
+                    device_id = None
+
+                if device_id is not None:
+                    try:
+                        data = json.loads(payload)
+                    except json.JSONDecodeError:
+                        self.logger.bind(tag=TAG).warning(
+                            f"Ignoring invalid HK signaling JSON topic={topic}"
+                        )
+                        return
+                    if not isinstance(data, dict):
+                        return
+                    if data.get("type") == "hello":
+                        self.loop.call_soon_threadsafe(
+                            asyncio.create_task,
+                            self.handle_hk_hello(
+                                device_id, payload, data, downlink_topic
+                            ),
+                        )
+                        return
+                    session = self.active_sessions.get(device_id)
+                    if session:
+                        meta = self.session_meta.get(session.session_id)
+                        if meta:
+                            meta["last_activity"] = time.time()
+                        session.put_message_threadsafe(payload)
+                    return
+
+                if "/" not in topic:
                     self.logger.bind(tag=TAG).warning(
-                        f"Ignoring invalid HK signaling JSON topic={topic}"
+                        f"Ignoring invalid HK signaling topic={topic}"
                     )
                     return
-                if not isinstance(data, dict):
-                    return
-                if data.get("type") == "hello":
-                    self.loop.call_soon_threadsafe(
-                        asyncio.create_task,
-                        self.handle_hk_hello(topic, payload, data),
-                    )
-                    return
-                session = self.active_sessions.get(topic)
-                if session:
-                    meta = self.session_meta.get(session.session_id)
-                    if meta:
-                        meta["last_activity"] = time.time()
-                    session.put_message_threadsafe(payload)
-                return
             
             parts = topic.split('/')
             if len(parts) >= 3 and parts[0] == "devices":
@@ -302,7 +318,9 @@ class MqttServer:
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"Error handling MQTT message: {e}")
 
-    async def handle_hk_hello(self, device_id, payload, hello_data):
+    async def handle_hk_hello(
+        self, device_id, payload, hello_data, downlink_topic=None
+    ):
         """Open the voice session expected by HK MqttProtocol::OpenAudioChannel."""
         try:
             if hello_data.get("transport") != "udp":
@@ -344,6 +362,7 @@ class MqttServer:
                 self.loop,
                 self.logger,
                 hk_udp_config=udp_config,
+                mqtt_downlink_topic=downlink_topic,
             )
             self.active_sessions[device_id] = virtual_ws
             self.session_meta[session_id] = {
@@ -376,7 +395,7 @@ class MqttServer:
             )
             # Queue the device hello only after the virtual connection exists;
             # helloHandle will reply through VirtualWebsocket, which injects the
-            # UDP key/nonce and publishes to {serial}/MONITOR.
+            # UDP key/nonce and publishes to the matching old/new downlink.
             virtual_ws.put_message_threadsafe(payload)
             self.logger.bind(tag=TAG).info(
                 f"[HK-MQTT] hello accepted device={device_id} session={session_id} "

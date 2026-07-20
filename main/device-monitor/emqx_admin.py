@@ -119,6 +119,16 @@ class EmqxAdmin:
                     "action": "subscribe",
                     "topic": common.legacy_command_topic(username),
                 },
+                {
+                    "permission": "allow",
+                    "action": "publish",
+                    "topic": common.hk_device_publish_topic(username),
+                },
+                {
+                    "permission": "allow",
+                    "action": "subscribe",
+                    "topic": common.hk_device_subscribe_topic(username),
+                },
             ])
         self._request("DELETE",
                       f"/authorization/sources/built_in_database/rules/users/{username}", silent=True)
@@ -146,6 +156,16 @@ class EmqxAdmin:
                     "permission": "allow",
                     "action": "publish",
                     "topic": "+/MONITOR",
+                },
+                {
+                    "permission": "allow",
+                    "action": "subscribe",
+                    "topic": common.SUB_ALL_HK_UPLINK,
+                },
+                {
+                    "permission": "allow",
+                    "action": "publish",
+                    "topic": f"+/{common.HK_MQTT_DOWNLINK_SUFFIX}",
                 },
             ])
         self._request("DELETE",

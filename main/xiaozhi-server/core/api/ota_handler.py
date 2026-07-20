@@ -9,10 +9,36 @@ from urllib.parse import urlparse
 from aiohttp import ClientSession, ClientTimeout, web
 
 from core.auth import AuthManager
+from core.mqtt_topics import (
+    hk_device_publish_topic,
+    hk_device_subscribe_topic,
+)
 from core.utils.util import get_local_ip, get_vision_url, sanitize_headers
 from core.api.base_handler import BaseHandler
 
 TAG = __name__
+
+
+def build_firmware_mqtt_config(
+    mqtt_config: dict, topic_identity: str = ""
+) -> dict:
+    """Return the OTA MQTT contract using the device serial for topic names.
+
+    Some MQTT providers use a generated client_id (for example ``GID_...``)
+    while the HK topic contract is keyed by the device Serial-Number.  The
+    caller therefore passes the serial from the OTA request when available.
+    """
+    required = ("endpoint", "client_id", "username", "password")
+    if not isinstance(mqtt_config, dict) or not all(
+        key in mqtt_config for key in required
+    ):
+        raise ValueError("Incomplete management MQTT config")
+
+    result = {key: mqtt_config[key] for key in required}
+    topic_identity = str(topic_identity or result["client_id"]).strip()
+    result["publish_topic"] = hk_device_publish_topic(topic_identity)
+    result["subscribe_topic"] = hk_device_subscribe_topic(topic_identity)
+    return result
 
 
 def _is_truthy(value: str) -> bool:
@@ -197,13 +223,15 @@ class OTAHandler(BaseHandler):
                     mqtt_config = payload.get("mqtt") if isinstance(payload, dict) else None
                     if not isinstance(mqtt_config, dict):
                         return None
-                    required = {"endpoint", "client_id", "username", "password"}
-                    if not required.issubset(mqtt_config):
+                    try:
+                        return build_firmware_mqtt_config(
+                            mqtt_config, topic_identity=serial_number
+                        )
+                    except ValueError:
                         self.logger.bind(tag=TAG).warning(
                             f"Incomplete management MQTT config serial={serial_number}"
                         )
                         return None
-                    return {key: mqtt_config[key] for key in required}
         except Exception as exc:
             self.logger.bind(tag=TAG).warning(
                 f"Management MQTT provisioning unavailable serial={serial_number}: {exc}"

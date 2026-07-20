@@ -45,6 +45,23 @@ ENABLE_HK_LEGACY_BRIDGE = os.getenv(
     "ENABLE_HK_LEGACY_BRIDGE", "false"
 ).strip().lower() in {"1", "true", "yes", "on"}
 
+# Topic contract returned to HK firmware by OTA.  Keep the suffixes configurable
+# so every backend service can use the same rollout contract without embedding a
+# particular device serial in source code.
+def _topic_suffix(env_name, default):
+    suffix = os.getenv(env_name, default).strip().strip("/")
+    if not suffix or any(char in suffix for char in "/+#"):
+        raise ValueError(f"Invalid MQTT topic suffix configured in {env_name}")
+    return suffix
+
+
+HK_MQTT_UPLINK_SUFFIX = _topic_suffix(
+    "HK_MQTT_UPLINK_SUFFIX", "AI_MONITOR"
+)
+HK_MQTT_DOWNLINK_SUFFIX = _topic_suffix(
+    "HK_MQTT_DOWNLINK_SUFFIX", "AI_REMOTE"
+)
+
 
 # --- Quy ước topic ---
 # {client} = ĐỊNH DANH THIẾT BỊ = Serial-Number (vd "HKHT2606010011"), khai báo
@@ -82,7 +99,18 @@ def legacy_command_topic(client: str) -> str:
     return f"{normalize_client(client)}/MONITOR"
 
 
+def hk_device_publish_topic(client: str) -> str:
+    """Topic firmware publishes signaling/state/ACK messages to."""
+    return f"{normalize_client(client)}/{HK_MQTT_UPLINK_SUFFIX}"
+
+
+def hk_device_subscribe_topic(client: str) -> str:
+    """Topic firmware subscribes for signaling responses and commands."""
+    return f"{normalize_client(client)}/{HK_MQTT_DOWNLINK_SUFFIX}"
+
+
 # Topic wildcard cho backend subscribe toàn bộ thiết bị
 SUB_ALL_STATUS = f"{TOPIC_PREFIX}/+/status"
 SUB_ALL_TELEMETRY = f"{TOPIC_PREFIX}/+/telemetry"
 SUB_ALL_ACK = f"{TOPIC_PREFIX}/+/command/ack"
+SUB_ALL_HK_UPLINK = f"+/{HK_MQTT_UPLINK_SUFFIX}"
