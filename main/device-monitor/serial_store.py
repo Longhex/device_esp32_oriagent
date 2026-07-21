@@ -12,6 +12,7 @@ Lưu ý bảo mật: lưu password (plaintext) để có thể trả lại khi r
 Production nên cân nhắc chỉ lưu hash hoặc không lưu (EMQX đã giữ bản hash).
 """
 import json
+import re
 import secrets
 import threading
 
@@ -20,6 +21,18 @@ KEY_INDEX = "device-monitor:serials"
 
 STATUS_DECLARED = "declared"
 STATUS_ACTIVATED = "activated"
+
+MAC_IDENTITY_RE = re.compile(
+    r"^(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$"
+)
+
+
+def normalize_serial_identity(value):
+    """Canonicalize MAC fallback identities and preserve real serials."""
+    identity = str(value or "").strip()
+    if MAC_IDENTITY_RE.fullmatch(identity):
+        return identity.replace("-", ":").upper()
+    return identity
 
 
 def gen_password(nbytes=18):
@@ -57,6 +70,7 @@ class SerialStore:
     # ---------- public ----------
     def declare(self, serial, batch=None):
         """Khai báo serial. Idempotent: nếu đã có thì trả bản hiện tại."""
+        serial = normalize_serial_identity(serial)
         with self._lock:
             existing = self._load(serial)
             if existing:
@@ -75,6 +89,7 @@ class SerialStore:
 
     def activate(self, serial, mac=None, rotate=False):
         """Activate idempotently; rotate only when explicitly requested."""
+        serial = normalize_serial_identity(serial)
         with self._lock:
             rec = self._load(serial)
             if not rec:
@@ -88,6 +103,7 @@ class SerialStore:
             return rec, None
 
     def get(self, serial):
+        serial = normalize_serial_identity(serial)
         with self._lock:
             return self._load(serial)
 
@@ -112,6 +128,7 @@ class SerialStore:
         return None
 
     def remove(self, serial):
+        serial = normalize_serial_identity(serial)
         with self._lock:
             if self._redis is not None:
                 self._redis.delete(KEY_PREFIX + serial)

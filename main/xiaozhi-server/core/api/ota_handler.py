@@ -25,16 +25,31 @@ from core.api.base_handler import BaseHandler
 TAG = __name__
 
 
+MAC_IDENTITY_RE = re.compile(
+    r"^(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$"
+)
+
+
+def normalize_ota_identity(value: str) -> str:
+    """Canonicalize MAC-shaped identities without changing real serials."""
+    identity = str(value or "").strip()
+    if MAC_IDENTITY_RE.fullmatch(identity):
+        return identity.replace("-", ":").upper()
+    return identity
+
+
 def resolve_ota_serial_number(headers, device_id: str) -> tuple[str, bool]:
     """Resolve the OTA identity, falling back to the device MAC when needed.
 
     Returns ``(identity, used_mac_fallback)``.  ``aiohttp`` request headers are
     case-insensitive, so the lower-case lookup also accepts ``Serial-Number``.
     """
-    serial_number = str(headers.get("serial-number", "") or "").strip()
+    serial_number = normalize_ota_identity(
+        headers.get("serial-number", "")
+    )
     if serial_number:
         return serial_number, False
-    return str(device_id or "").strip(), True
+    return normalize_ota_identity(device_id), True
 
 
 def build_firmware_mqtt_config(

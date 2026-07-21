@@ -79,6 +79,30 @@ class OtaPublicContractTest(unittest.TestCase):
         self.assertEqual(serial, "28:84:85:89:59:6C")
         self.assertTrue(used_mac_fallback)
 
+    def test_mac_serial_header_is_canonicalized_before_provisioning(self):
+        serial, used_mac_fallback = resolve_ota_serial_number(
+            {"serial-number": "28:84:85:89:59:6c"},
+            "28:84:85:89:59:6C",
+        )
+        self.assertEqual(serial, "28:84:85:89:59:6C")
+        self.assertFalse(used_mac_fallback)
+
+    def test_hyphenated_mac_serial_header_is_canonicalized(self):
+        serial, used_mac_fallback = resolve_ota_serial_number(
+            {"serial-number": "28-84-85-89-59-6c"},
+            "28:84:85:89:59:6C",
+        )
+        self.assertEqual(serial, "28:84:85:89:59:6C")
+        self.assertFalse(used_mac_fallback)
+
+    def test_real_serial_preserves_its_case(self):
+        serial, used_mac_fallback = resolve_ota_serial_number(
+            {"serial-number": "HkHt2606010046"},
+            "28:84:85:89:59:6C",
+        )
+        self.assertEqual(serial, "HkHt2606010046")
+        self.assertFalse(used_mac_fallback)
+
     def test_mqtt_topics_are_derived_from_provisioned_client_id(self):
         result = build_firmware_mqtt_config({
             "endpoint": "broker.hkrobotics.ai",
