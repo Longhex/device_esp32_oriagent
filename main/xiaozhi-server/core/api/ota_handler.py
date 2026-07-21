@@ -4,6 +4,7 @@ import os
 import re
 import glob
 import ipaddress
+import uuid
 from typing import Dict, List, Tuple
 from urllib.parse import urlparse
 from aiohttp import ClientSession, ClientTimeout, web
@@ -13,7 +14,12 @@ from core.mqtt_topics import (
     hk_device_publish_topic,
     hk_device_subscribe_topic,
 )
-from core.utils.util import get_local_ip, get_vision_url, sanitize_headers
+from core.utils.util import (
+    get_local_ip,
+    get_vision_url,
+    protocol_payload_json_for_log,
+    sanitize_headers,
+)
 from core.api.base_handler import BaseHandler
 
 TAG = __name__
@@ -214,24 +220,44 @@ class OTAHandler(BaseHandler):
             raise ValueError("Production OTA download URL must use https://")
         return f"{scheme}://{host}"
 
-    async def _get_management_mqtt_config(self, serial_number: str, mac: str):
+    async def _get_management_mqtt_config(
+        self, serial_number: str, mac: str, request_id: str = "-"
+    ):
         """Provision/fetch management MQTT without affecting voice OTA."""
         api_base = os.environ.get("DEVICE_MONITOR_API", "").strip().rstrip("/")
         if not api_base or not serial_number:
             return None
+        log_prefix = f"[OTA-HANDSHAKE][request_id={request_id}]"
+        self.logger.bind(tag=TAG).info(
+            f"{log_prefix} PROVISION_REQUEST "
+            f"target={api_base}/activate payload="
+            f"{protocol_payload_json_for_log({'serial': serial_number, 'mac': mac})}"
+        )
         try:
             async with ClientSession(timeout=ClientTimeout(total=5)) as session:
                 async with session.post(
                     f"{api_base}/activate",
                     json={"serial": serial_number, "mac": mac},
                 ) as response:
+                    try:
+                        payload = await response.json()
+                    except Exception:
+                        payload = None
+                    response_summary = (
+                        protocol_payload_json_for_log(payload)
+                        if payload is not None
+                        else "<non-json-response>"
+                    )
+                    self.logger.bind(tag=TAG).info(
+                        f"{log_prefix} PROVISION_RESPONSE status={response.status} "
+                        f"payload={response_summary}"
+                    )
                     if response.status != 200:
                         self.logger.bind(tag=TAG).warning(
-                            "Management MQTT provisioning skipped "
+                            f"{log_prefix} Management MQTT provisioning skipped "
                             f"serial={serial_number} status={response.status}"
                         )
                         return None
-                    payload = await response.json()
                     mqtt_config = payload.get("mqtt") if isinstance(payload, dict) else None
                     if not isinstance(mqtt_config, dict):
                         return None
@@ -241,12 +267,14 @@ class OTAHandler(BaseHandler):
                         )
                     except ValueError:
                         self.logger.bind(tag=TAG).warning(
-                            f"Incomplete management MQTT config serial={serial_number}"
+                            f"{log_prefix} Incomplete management MQTT config "
+                            f"serial={serial_number}"
                         )
                         return None
         except Exception as exc:
             self.logger.bind(tag=TAG).warning(
-                f"Management MQTT provisioning unavailable serial={serial_number}: {exc}"
+                f"{log_prefix} Management MQTT provisioning unavailable "
+                f"serial={serial_number}: {exc}"
             )
             return None
 
@@ -259,22 +287,51 @@ class OTAHandler(BaseHandler):
         - check data/bin for newer firmware for that model
         - if found a newer firmware, set firmware.url to the download endpoint
         """
+        request_id = (
+            str(request.headers.get("X-Request-Id", "") or "").strip()[:64]
+            or uuid.uuid4().hex[:12]
+        )
+        log_prefix = f"[OTA-HANDSHAKE][request_id={request_id}]"
+        response = None
         try:
             data = await request.text()
-            self.logger.bind(tag=TAG).debug(f"OTA request method: {request.method}")
             safe_headers = sanitize_headers(dict(request.headers))
-            self.logger.bind(tag=TAG).debug(f"OTA request headers: {safe_headers}")
-            self.logger.bind(tag=TAG).debug(f"OTA request data: {data}")
+            peer = request.remote or safe_headers.get("X-Real-IP", "-")
+            self.logger.bind(tag=TAG).info(
+                f"{log_prefix} RX_START method={request.method} "
+                f"path={request.path} peer={peer}"
+            )
+            self.logger.bind(tag=TAG).info(
+                f"{log_prefix} RX_HEADERS "
+                f"payload={protocol_payload_json_for_log(safe_headers)}"
+            )
+
+            try:
+                data_json = json.loads(data) if data else {}
+            except Exception:
+                data_json = {}
+                self.logger.bind(tag=TAG).warning(
+                    f"{log_prefix} RX_PAYLOAD invalid_json=true bytes={len(data)}"
+                )
+            else:
+                self.logger.bind(tag=TAG).info(
+                    f"{log_prefix} RX_PAYLOAD "
+                    f"payload={protocol_payload_json_for_log(data_json)}"
+                )
 
             device_id = request.headers.get("device-id", "")
             if device_id:
-                self.logger.bind(tag=TAG).info(f"OTA request Device ID: {device_id}")
+                self.logger.bind(tag=TAG).info(
+                    f"{log_prefix} DEVICE_ID value={device_id}"
+                )
             else:
                 raise Exception("OTA request Device ID is empty")
 
             client_id = request.headers.get("client-id", "")
             if client_id:
-                self.logger.bind(tag=TAG).info(f"OTA request ClientID: {client_id}")
+                self.logger.bind(tag=TAG).info(
+                    f"{log_prefix} CLIENT_ID value={client_id}"
+                )
             else:
                 raise Exception("OTA request ClientID is empty")
 
@@ -283,15 +340,9 @@ class OTAHandler(BaseHandler):
             )
             if used_mac_fallback:
                 self.logger.bind(tag=TAG).warning(
-                    "OTA request missing Serial-Number; "
+                    f"{log_prefix} OTA request missing Serial-Number; "
                     f"using Device-Id as fallback identity={serial_number}"
                 )
-
-            data_json = {}
-            try:
-                data_json = json.loads(data) if data else {}
-            except Exception:
-                data_json = {}
 
             server_config = self.config["server"]
             # Distinguish ports:
@@ -340,6 +391,11 @@ class OTAHandler(BaseHandler):
             if not device_version:
                 device_version = "0.0.0"
 
+            self.logger.bind(tag=TAG).info(
+                f"{log_prefix} IDENTITY payload="
+                f"{protocol_payload_json_for_log({'serial': serial_number, 'identity_source': 'device-id-fallback' if used_mac_fallback else 'serial-number-header', 'device_id': device_id, 'client_id': client_id, 'device_model': device_model, 'firmware_version': device_version})}"
+            )
+
             return_json = {
                 "server_time": {
                     "timestamp": int(round(time.time() * 1000)),
@@ -352,12 +408,13 @@ class OTAHandler(BaseHandler):
             }
 
             mqtt_config = await self._get_management_mqtt_config(
-                serial_number, device_id
+                serial_number, device_id, request_id=request_id
             )
             if mqtt_config:
                 return_json["mqtt"] = mqtt_config
                 self.logger.bind(tag=TAG).info(
-                    f"Sending management MQTT config serial={serial_number}"
+                    f"{log_prefix} MQTT_CONFIG_READY serial={serial_number} "
+                    f"payload={protocol_payload_json_for_log(mqtt_config)}"
                 )
 
             transport_mode = os.environ.get(
@@ -373,7 +430,8 @@ class OTAHandler(BaseHandler):
                     "version": 3,
                 }
                 self.logger.bind(tag=TAG).info(
-                    f"Sending MQTT-only voice config serial={serial_number}"
+                    f"{log_prefix} TRANSPORT_SELECTED type=mqtt_udp version=3 "
+                    f"serial={serial_number}"
                 )
             else:
                 token = ""
@@ -433,14 +491,25 @@ class OTAHandler(BaseHandler):
                 text=json.dumps(return_json, separators=(",", ":")),
                 content_type="application/json",
             )
+            self.logger.bind(tag=TAG).info(
+                f"{log_prefix} TX_RESPONSE status={response.status} "
+                f"payload={protocol_payload_json_for_log(return_json)}"
+            )
         except Exception as e:
-            self.logger.bind(tag=TAG).error(f"OTA POST processing exception: {e}")
+            self.logger.bind(tag=TAG).error(
+                f"{log_prefix} FAILED error_type={type(e).__name__} error={e}"
+            )
             return_json = {"success": False, "message": "request error."}
             response = web.Response(
                 text=json.dumps(return_json, separators=(",", ":")),
                 content_type="application/json",
             )
+            self.logger.bind(tag=TAG).info(
+                f"{log_prefix} TX_RESPONSE status={response.status} outcome=error "
+                f"payload={protocol_payload_json_for_log(return_json)}"
+            )
         finally:
+            response.headers["X-Request-Id"] = request_id
             self._add_cors_headers(response)
             return response
 

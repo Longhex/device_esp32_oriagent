@@ -9,7 +9,7 @@ import paho.mqtt.client as mqtt
 from config.logger import setup_logging, bind_log_context
 from core.auth import AuthenticationError
 from core.mqtt_topics import hk_uplink_subscription, parse_hk_uplink_topic
-from core.utils.util import get_local_ip
+from core.utils.util import get_local_ip, protocol_payload_json_for_log
 
 # Try to import our new UDP manager
 try:
@@ -127,7 +127,18 @@ class VirtualWebsocket:
         topic = self.mqtt_downlink_topic or f"{self.device_id}/MONITOR"
         try:
             self.mqtt_client.publish(topic, message)
-            self.logger.bind(tag=TAG).debug(f"Published to {topic}: {message[:200]}")
+            message_type, message_data = _summarize_state_payload(message)
+            if message_type == "hello":
+                self.logger.bind(tag=TAG).info(
+                    f"[DEVICE-CONNECT] TX_SERVER_HELLO device={self.device_id} "
+                    f"session={self.session_id} topic={topic} "
+                    f"payload={protocol_payload_json_for_log(message_data)}"
+                )
+            else:
+                self.logger.bind(tag=TAG).debug(
+                    f"Published MQTT message device={self.device_id} "
+                    f"topic={topic} type={message_type or 'non-json'}"
+                )
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"Error publishing MQTT: {e}")
 
@@ -236,6 +247,11 @@ class MqttServer:
                     if not isinstance(data, dict):
                         return
                     if data.get("type") == "hello":
+                        self.logger.bind(tag=TAG).info(
+                            f"[DEVICE-CONNECT] RX_DEVICE_HELLO device={device_id} "
+                            f"topic={topic} "
+                            f"payload={protocol_payload_json_for_log(data)}"
+                        )
                         self.loop.call_soon_threadsafe(
                             asyncio.create_task,
                             self.handle_hk_hello(

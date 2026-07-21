@@ -545,6 +545,58 @@ def sanitize_headers(headers: dict) -> dict:
     return masked_headers
 
 
+def redact_protocol_payload_for_log(value):
+    """Recursively mask credentials while preserving protocol diagnostics.
+
+    Device handshake logs intentionally include most of the OTA/MQTT payload,
+    but credentials and UDP crypto material must never be written verbatim.
+    """
+    sensitive_keys = {
+        "authorization",
+        "cookie",
+        "password",
+        "passwd",
+        "token",
+        "access_token",
+        "refresh_token",
+        "secret",
+        "client_secret",
+        "api_key",
+        "private_key",
+        "key",
+        "nonce",
+    }
+
+    if isinstance(value, dict):
+        redacted = {}
+        for key, item in value.items():
+            normalized_key = str(key).strip().lower().replace("-", "_")
+            is_sensitive = (
+                normalized_key in sensitive_keys
+                or normalized_key.endswith("_password")
+                or normalized_key.endswith("_secret")
+                or normalized_key.endswith("_token")
+            )
+            if is_sensitive:
+                redacted[key] = "<redacted:set>" if item else "<redacted:empty>"
+            else:
+                redacted[key] = redact_protocol_payload_for_log(item)
+        return redacted
+    if isinstance(value, list):
+        return [redact_protocol_payload_for_log(item) for item in value]
+    return value
+
+
+def protocol_payload_json_for_log(value) -> str:
+    """Serialize a protocol payload as compact, redacted UTF-8 JSON."""
+    return json.dumps(
+        redact_protocol_payload_for_log(value),
+        ensure_ascii=False,
+        separators=(",", ":"),
+        default=str,
+    )
+
+
 def summarize_private_config_for_log(config: dict) -> dict:
     """Keep config logs useful without dumping the full private payload."""
     if not isinstance(config, dict):

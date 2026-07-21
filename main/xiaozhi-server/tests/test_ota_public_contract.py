@@ -12,6 +12,7 @@ from core.api.ota_handler import (  # noqa: E402
     build_firmware_mqtt_config,
     resolve_ota_serial_number,
 )
+from core.utils.util import protocol_payload_json_for_log  # noqa: E402
 
 
 def make_handler():
@@ -30,6 +31,30 @@ def make_request(host="device.example.com", scheme="http", headers=None):
 
 
 class OtaPublicContractTest(unittest.TestCase):
+    def test_protocol_log_keeps_contract_fields_and_redacts_credentials(self):
+        logged = protocol_payload_json_for_log(
+            {
+                "mqtt": {
+                    "endpoint": "194.163.186.89:1883",
+                    "client_id": "HKHT2606010046",
+                    "username": "device-user",
+                    "password": "device-password",
+                    "publish_topic": "HKHT2606010046/AI_MONITOR",
+                },
+                "websocket": {"token": "secret-token"},
+                "udp": {"key": "secret-key", "nonce": "secret-nonce"},
+            }
+        )
+        self.assertIn('"endpoint":"194.163.186.89:1883"', logged)
+        self.assertIn('"client_id":"HKHT2606010046"', logged)
+        self.assertIn('"username":"device-user"', logged)
+        self.assertIn('"publish_topic":"HKHT2606010046/AI_MONITOR"', logged)
+        self.assertNotIn("device-password", logged)
+        self.assertNotIn("secret-token", logged)
+        self.assertNotIn("secret-key", logged)
+        self.assertNotIn("secret-nonce", logged)
+        self.assertEqual(logged.count("<redacted:set>"), 4)
+
     def test_ota_serial_header_wins_over_device_mac(self):
         serial, used_mac_fallback = resolve_ota_serial_number(
             {"serial-number": "HKHT2606010046"},
