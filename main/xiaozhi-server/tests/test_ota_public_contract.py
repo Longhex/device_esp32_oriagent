@@ -10,6 +10,7 @@ sys.path.insert(0, ROOT)
 from core.api.ota_handler import (  # noqa: E402
     OTAHandler,
     build_firmware_mqtt_config,
+    resolve_ota_serial_number,
 )
 
 
@@ -29,6 +30,30 @@ def make_request(host="device.example.com", scheme="http", headers=None):
 
 
 class OtaPublicContractTest(unittest.TestCase):
+    def test_ota_serial_header_wins_over_device_mac(self):
+        serial, used_mac_fallback = resolve_ota_serial_number(
+            {"serial-number": "HKHT2606010046"},
+            "28:84:85:89:59:6C",
+        )
+        self.assertEqual(serial, "HKHT2606010046")
+        self.assertFalse(used_mac_fallback)
+
+    def test_ota_serial_falls_back_to_device_mac_when_header_is_missing(self):
+        serial, used_mac_fallback = resolve_ota_serial_number(
+            {},
+            "28:84:85:89:59:6C",
+        )
+        self.assertEqual(serial, "28:84:85:89:59:6C")
+        self.assertTrue(used_mac_fallback)
+
+    def test_blank_ota_serial_header_falls_back_to_device_mac(self):
+        serial, used_mac_fallback = resolve_ota_serial_number(
+            {"serial-number": "   "},
+            "28:84:85:89:59:6C",
+        )
+        self.assertEqual(serial, "28:84:85:89:59:6C")
+        self.assertTrue(used_mac_fallback)
+
     def test_mqtt_topics_are_derived_from_provisioned_client_id(self):
         result = build_firmware_mqtt_config({
             "endpoint": "broker.hkrobotics.ai",

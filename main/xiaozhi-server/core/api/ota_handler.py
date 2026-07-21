@@ -19,6 +19,18 @@ from core.api.base_handler import BaseHandler
 TAG = __name__
 
 
+def resolve_ota_serial_number(headers, device_id: str) -> tuple[str, bool]:
+    """Resolve the OTA identity, falling back to the device MAC when needed.
+
+    Returns ``(identity, used_mac_fallback)``.  ``aiohttp`` request headers are
+    case-insensitive, so the lower-case lookup also accepts ``Serial-Number``.
+    """
+    serial_number = str(headers.get("serial-number", "") or "").strip()
+    if serial_number:
+        return serial_number, False
+    return str(device_id or "").strip(), True
+
+
 def build_firmware_mqtt_config(
     mqtt_config: dict, topic_identity: str = ""
 ) -> dict:
@@ -266,7 +278,14 @@ class OTAHandler(BaseHandler):
             else:
                 raise Exception("OTA request ClientID is empty")
 
-            serial_number = request.headers.get("serial-number", "").strip()
+            serial_number, used_mac_fallback = resolve_ota_serial_number(
+                request.headers, device_id
+            )
+            if used_mac_fallback:
+                self.logger.bind(tag=TAG).warning(
+                    "OTA request missing Serial-Number; "
+                    f"using Device-Id as fallback identity={serial_number}"
+                )
 
             data_json = {}
             try:
@@ -347,7 +366,7 @@ class OTAHandler(BaseHandler):
             if transport_mode == "mqtt_udp_hk":
                 if not mqtt_config:
                     raise ValueError(
-                        "MQTT-only voice requires a declared Serial-Number and successful provisioning"
+                        "MQTT-only voice requires successful device identity provisioning"
                     )
                 return_json["transport"] = {
                     "type": "mqtt_udp",
