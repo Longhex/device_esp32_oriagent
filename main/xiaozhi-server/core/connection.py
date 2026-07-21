@@ -54,6 +54,7 @@ from core.utils.device_conversation_store import (
 
 
 TAG = __name__
+DEFAULT_DEVICE_CONFIG_READY_TIMEOUT_SECONDS = 5.0
 
 # Module-level singleton cho ImageResizer (shared across all connections)
 _image_resizer_instance: ImageResizer | None = None
@@ -120,6 +121,16 @@ class ConnectionHandler:
         self.bind_code = None  # 绑定设备的验证码
         self.last_bind_prompt_time = 0  # 上次播放绑定提示的时间戳(秒)
         self.bind_prompt_interval = 60  # 绑定提示播放间隔(秒)
+        try:
+            configured_ready_timeout = float(
+                os.environ.get(
+                    "DEVICE_CONFIG_READY_TIMEOUT_SECONDS",
+                    DEFAULT_DEVICE_CONFIG_READY_TIMEOUT_SECONDS,
+                )
+            )
+        except (TypeError, ValueError):
+            configured_ready_timeout = DEFAULT_DEVICE_CONFIG_READY_TIMEOUT_SECONDS
+        self.device_config_ready_timeout = max(0.1, configured_ready_timeout)
 
         self.read_config_from_api = self.config.get("read_config_from_api", False)
 
@@ -461,9 +472,18 @@ class ConnectionHandler:
         """Message routing"""
         if not self.bind_completed_event.is_set():
             try:
-                await asyncio.wait_for(self.bind_completed_event.wait(), timeout=1)
+                await asyncio.wait_for(
+                    self.bind_completed_event.wait(),
+                    timeout=self.device_config_ready_timeout,
+                )
             except asyncio.TimeoutError:
-                await self._discard_message_with_bind_prompt()
+                # Device identity is still unknown. A timeout is not proof that
+                # the device needs binding, so avoid a false OTA/bind prompt.
+                self.logger.bind(tag=TAG).warning(
+                    "[HYBRID-LIFECYCLE] config_ready_timeout "
+                    f"waited={self.device_config_ready_timeout:.3f}s "
+                    f"message_type={type(message).__name__}"
+                )
                 return
 
         if self.need_bind:
@@ -810,14 +830,17 @@ class ConnectionHandler:
         except DeviceNotFoundException as e:
             self.need_bind = True
             private_config = {}
+            self.bind_completed_event.set()
         except DeviceBindException as e:
             self.need_bind = True
             self.bind_code = e.bind_code
             private_config = {}
+            self.bind_completed_event.set()
         except Exception as e:
             self.need_bind = True
             self.logger.bind(tag=TAG).error(f"Failed to fetch differential config: {e}")
             private_config = {}
+            self.bind_completed_event.set()
 
         init_llm, init_tts, init_memory, init_intent = (
             False,
