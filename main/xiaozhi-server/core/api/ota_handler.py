@@ -30,6 +30,10 @@ MAC_IDENTITY_RE = re.compile(
 )
 
 
+def is_truthy_env(value: str) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def normalize_ota_identity(value: str) -> str:
     """Canonicalize MAC-shaped identities without changing real serials."""
     identity = str(value or "").strip()
@@ -239,53 +243,97 @@ class OTAHandler(BaseHandler):
         self, serial_number: str, mac: str, request_id: str = "-"
     ):
         """Provision/fetch management MQTT without affecting voice OTA."""
-        api_base = os.environ.get("DEVICE_MONITOR_API", "").strip().rstrip("/")
+        # DEVICE_PROVISIONER_API is intentionally service-agnostic: today it
+        # points at device-monitor, and can later point at a provisioning
+        # service without changing the OTA contract.
+        api_base = (
+            os.environ.get("DEVICE_PROVISIONER_API", "").strip()
+            or os.environ.get("DEVICE_MONITOR_API", "").strip()
+        ).rstrip("/")
         if not api_base or not serial_number:
             return None
         log_prefix = f"[OTA-HANDSHAKE][request_id={request_id}]"
+        activate_payload = {"serial": serial_number, "mac": mac}
         self.logger.bind(tag=TAG).info(
             f"{log_prefix} PROVISION_REQUEST "
             f"target={api_base}/activate payload="
-            f"{protocol_payload_json_for_log({'serial': serial_number, 'mac': mac})}"
+            f"{protocol_payload_json_for_log(activate_payload)}"
         )
         try:
             async with ClientSession(timeout=ClientTimeout(total=5)) as session:
                 async with session.post(
                     f"{api_base}/activate",
-                    json={"serial": serial_number, "mac": mac},
+                    json=activate_payload,
                 ) as response:
                     try:
                         payload = await response.json()
                     except Exception:
                         payload = None
-                    response_summary = (
-                        protocol_payload_json_for_log(payload)
-                        if payload is not None
-                        else "<non-json-response>"
+                    status = response.status
+
+                # Transitional opt-in: make an undeclared identity available
+                # for the existing six-digit web binding flow. It is disabled
+                # by default because it weakens the declared-serial gate.
+                if status == 403 and is_truthy_env(
+                    os.environ.get("AUTO_DECLARE_OTA_SERIAL", "false")
+                ):
+                    declare_payload = {"serial": serial_number, "batch": "ota-auto"}
+                    self.logger.bind(tag=TAG).warning(
+                        f"{log_prefix} AUTO_DECLARE_REQUEST target={api_base}/serials "
+                        f"payload={protocol_payload_json_for_log(declare_payload)}"
                     )
+                    async with session.post(
+                        f"{api_base}/serials", json=declare_payload
+                    ) as declare_response:
+                        try:
+                            declare_result = await declare_response.json()
+                        except Exception:
+                            declare_result = None
+                        declare_status = declare_response.status
                     self.logger.bind(tag=TAG).info(
-                        f"{log_prefix} PROVISION_RESPONSE status={response.status} "
-                        f"payload={response_summary}"
+                        f"{log_prefix} AUTO_DECLARE_RESPONSE status={declare_status} "
+                        f"payload={protocol_payload_json_for_log(declare_result) if declare_result is not None else '<non-json-response>'}"
                     )
-                    if response.status != 200:
-                        self.logger.bind(tag=TAG).warning(
-                            f"{log_prefix} Management MQTT provisioning skipped "
-                            f"serial={serial_number} status={response.status}"
+                    if declare_status in {200, 201}:
+                        self.logger.bind(tag=TAG).info(
+                            f"{log_prefix} PROVISION_RETRY serial={serial_number}"
                         )
-                        return None
-                    mqtt_config = payload.get("mqtt") if isinstance(payload, dict) else None
-                    if not isinstance(mqtt_config, dict):
-                        return None
-                    try:
-                        return build_firmware_mqtt_config(
-                            mqtt_config, topic_identity=serial_number
-                        )
-                    except ValueError:
-                        self.logger.bind(tag=TAG).warning(
-                            f"{log_prefix} Incomplete management MQTT config "
-                            f"serial={serial_number}"
-                        )
-                        return None
+                        async with session.post(
+                            f"{api_base}/activate", json=activate_payload
+                        ) as retry_response:
+                            try:
+                                payload = await retry_response.json()
+                            except Exception:
+                                payload = None
+                            status = retry_response.status
+                response_summary = (
+                    protocol_payload_json_for_log(payload)
+                    if payload is not None
+                    else "<non-json-response>"
+                )
+                self.logger.bind(tag=TAG).info(
+                    f"{log_prefix} PROVISION_RESPONSE status={status} "
+                    f"payload={response_summary}"
+                )
+                if status != 200:
+                    self.logger.bind(tag=TAG).warning(
+                        f"{log_prefix} Management MQTT provisioning skipped "
+                        f"serial={serial_number} status={status}"
+                    )
+                    return None
+                mqtt_config = payload.get("mqtt") if isinstance(payload, dict) else None
+                if not isinstance(mqtt_config, dict):
+                    return None
+                try:
+                    return build_firmware_mqtt_config(
+                        mqtt_config, topic_identity=serial_number
+                    )
+                except ValueError:
+                    self.logger.bind(tag=TAG).warning(
+                        f"{log_prefix} Incomplete management MQTT config "
+                        f"serial={serial_number}"
+                    )
+                    return None
         except Exception as exc:
             self.logger.bind(tag=TAG).warning(
                 f"{log_prefix} Management MQTT provisioning unavailable "

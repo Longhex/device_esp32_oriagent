@@ -10,6 +10,7 @@ sys.path.insert(0, ROOT)
 from core.api.ota_handler import (  # noqa: E402
     OTAHandler,
     build_firmware_mqtt_config,
+    is_truthy_env,
     resolve_ota_serial_number,
 )
 from core.utils.util import protocol_payload_json_for_log  # noqa: E402
@@ -31,6 +32,12 @@ def make_request(host="device.example.com", scheme="http", headers=None):
 
 
 class OtaPublicContractTest(unittest.TestCase):
+    def test_auto_declare_flag_requires_explicit_truthy_value(self):
+        self.assertTrue(is_truthy_env("true"))
+        self.assertTrue(is_truthy_env("1"))
+        self.assertFalse(is_truthy_env("false"))
+        self.assertFalse(is_truthy_env(""))
+
     def test_protocol_log_keeps_contract_fields_and_redacts_credentials(self):
         logged = protocol_payload_json_for_log(
             {

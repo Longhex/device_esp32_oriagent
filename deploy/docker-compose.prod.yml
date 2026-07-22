@@ -20,7 +20,11 @@ services:
       TRUST_PROXY_HEADERS: "true"
       PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:-device.oriagent.com}
       PUBLIC_WEBSOCKET_URL: ${PUBLIC_WEBSOCKET_URL:-}
-      DEVICE_MONITOR_API: http://device-monitor:8090
+      # Provisioning boundary. Point this to the future serial-validation service
+      # without changing the OTA server; it currently uses device-monitor.
+      DEVICE_PROVISIONER_API: ${DEVICE_PROVISIONER_API:-http://device-monitor:8090}
+      # Temporary onboarding bridge. Keep false once serial validation is external.
+      AUTO_DECLARE_OTA_SERIAL: ${AUTO_DECLARE_OTA_SERIAL:-false}
       TRANSPORT_MODE: ${TRANSPORT_MODE:-mqtt_udp_hk}
       FIRMWARE_TRANSPORT_POLICY: ${FIRMWARE_TRANSPORT_POLICY:-mqtt_only}
       MQTT_SIGNALING_CONTRACT: hk_legacy
