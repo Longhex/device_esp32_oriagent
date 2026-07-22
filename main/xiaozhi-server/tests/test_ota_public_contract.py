@@ -141,6 +141,42 @@ class OtaPublicContractTest(unittest.TestCase):
             result["subscribe_topic"], "HKHT2606010046/AI_REMOTE"
         )
 
+    def test_mqtt_topics_keep_provisioner_topics_for_colon_serial(self):
+        result = build_firmware_mqtt_config(
+            {
+                "endpoint": "broker.hkrobotics.ai",
+                "client_id": "A0:F2:62:EA:1E:68",
+                "username": "A0:F2:62:EA:1E:68",
+                "password": "device-password",
+                "publish_topic": "A0_F2_62_EA_1E_68/AI_MONITOR",
+                "subscribe_topic": "A0_F2_62_EA_1E_68/AI_REMOTE",
+            },
+            topic_identity="A0:F2:62:EA:1E:68",
+        )
+        self.assertEqual(result["client_id"], "A0:F2:62:EA:1E:68")
+        self.assertEqual(
+            result["publish_topic"], "A0_F2_62_EA_1E_68/AI_MONITOR"
+        )
+        self.assertEqual(
+            result["subscribe_topic"], "A0_F2_62_EA_1E_68/AI_REMOTE"
+        )
+
+    def test_generated_topics_normalize_mac_identity(self):
+        result = build_firmware_mqtt_config(
+            {
+                "endpoint": "broker.hkrobotics.ai",
+                "client_id": "A0:F2:62:EA:1E:68",
+                "username": "A0:F2:62:EA:1E:68",
+                "password": "device-password",
+            }
+        )
+        self.assertEqual(
+            result["publish_topic"], "A0_F2_62_EA_1E_68/AI_MONITOR"
+        )
+        self.assertEqual(
+            result["subscribe_topic"], "A0_F2_62_EA_1E_68/AI_REMOTE"
+        )
+
     def test_explicit_public_url_wins(self):
         with patch.dict(
             os.environ,

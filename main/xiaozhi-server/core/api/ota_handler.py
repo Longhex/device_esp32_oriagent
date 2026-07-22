@@ -59,11 +59,11 @@ def resolve_ota_serial_number(headers, device_id: str) -> tuple[str, bool]:
 def build_firmware_mqtt_config(
     mqtt_config: dict, topic_identity: str = ""
 ) -> dict:
-    """Return the OTA MQTT contract using the device serial for topic names.
+    """Return the OTA MQTT contract, preserving provisioner topic authority.
 
-    Some MQTT providers use a generated client_id (for example ``GID_...``)
-    while the HK topic contract is keyed by the device Serial-Number.  The
-    caller therefore passes the serial from the OTA request when available.
+    Device-monitor provisions EMQX ACLs and returns the corresponding topics.
+    Those topics must be returned verbatim to firmware.  A locally generated
+    topic is only a fallback for provisioners that do not return both topics.
     """
     required = ("endpoint", "client_id", "username", "password")
     if not isinstance(mqtt_config, dict) or not all(
@@ -72,6 +72,13 @@ def build_firmware_mqtt_config(
         raise ValueError("Incomplete management MQTT config")
 
     result = {key: mqtt_config[key] for key in required}
+    publish_topic = str(mqtt_config.get("publish_topic") or "").strip()
+    subscribe_topic = str(mqtt_config.get("subscribe_topic") or "").strip()
+    if publish_topic and subscribe_topic:
+        result["publish_topic"] = publish_topic
+        result["subscribe_topic"] = subscribe_topic
+        return result
+
     topic_identity = str(topic_identity or result["client_id"]).strip()
     result["publish_topic"] = hk_device_publish_topic(topic_identity)
     result["subscribe_topic"] = hk_device_subscribe_topic(topic_identity)

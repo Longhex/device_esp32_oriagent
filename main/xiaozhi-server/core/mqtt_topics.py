@@ -27,12 +27,23 @@ def validate_hk_device_id(device_id: str) -> str:
     return value
 
 
+def normalize_hk_topic_identity(device_id: str) -> str:
+    """Return the HK topic segment for a serial or a MAC fallback identity.
+
+    MQTT credentials retain the original serial, while HK topics use a safe
+    single-level segment.  This must match device-monitor's
+    ``normalize_client`` contract so that the topic advertised by OTA is also
+    the topic authorized by EMQX.
+    """
+    return validate_hk_device_id(device_id).replace(":", "_").replace(" ", "_")
+
+
 def hk_device_publish_topic(device_id: str) -> str:
-    return f"{validate_hk_device_id(device_id)}/{HK_MQTT_UPLINK_SUFFIX}"
+    return f"{normalize_hk_topic_identity(device_id)}/{HK_MQTT_UPLINK_SUFFIX}"
 
 
 def hk_device_subscribe_topic(device_id: str) -> str:
-    return f"{validate_hk_device_id(device_id)}/{HK_MQTT_DOWNLINK_SUFFIX}"
+    return f"{normalize_hk_topic_identity(device_id)}/{HK_MQTT_DOWNLINK_SUFFIX}"
 
 
 def hk_uplink_subscription() -> str:
