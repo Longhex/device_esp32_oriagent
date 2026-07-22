@@ -71,6 +71,19 @@ class LegacyVoiceAclTest(unittest.TestCase):
         self.assertIn(("subscribe", "+/AI_MONITOR"), allowed)
         self.assertIn(("publish", "+/AI_REMOTE"), allowed)
 
+    def test_anonymous_test_client_acl_allows_only_its_hk_topics(self):
+        admin = CaptureAdmin()
+        admin.set_anonymous_test_client_acl("A0:F2:62:EA:1E:68")
+        rules = admin.requests[-1][2][0]["rules"]
+        allowed = {(rule["action"], rule["topic"]) for rule in rules}
+        self.assertEqual(
+            allowed,
+            {
+                ("publish", "A0_F2_62_EA_1E_68/AI_MONITOR"),
+                ("subscribe", "A0_F2_62_EA_1E_68/AI_REMOTE"),
+            },
+        )
+
     def test_firmware_topics_are_derived_from_serial(self):
         self.assertEqual(
             common.hk_device_publish_topic("HKHT2606010046"),

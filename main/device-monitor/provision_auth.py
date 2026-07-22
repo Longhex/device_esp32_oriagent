@@ -43,6 +43,10 @@ def main():
     emqx.set_full_acl(common.BACKEND_USERNAME, "devices/#")
     print(f"  [user] {common.BACKEND_USERNAME} (backend, full devices/#)")
 
+    for client_id in common.MQTT_ANONYMOUS_TEST_CLIENT_IDS:
+        emqx.set_anonymous_test_client_acl(client_id)
+        print(f"  [anonymous-test-client] {client_id} (client-id scoped HK ACL)")
+
     # Demo theo Serial-Number
     demo_password = os.getenv("PROVISION_DEMO_PASSWORD", "")
     if serials and not demo_password:

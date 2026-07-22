@@ -45,6 +45,29 @@ ENABLE_HK_LEGACY_BRIDGE = os.getenv(
     "ENABLE_HK_LEGACY_BRIDGE", "false"
 ).strip().lower() in {"1", "true", "yes", "on"}
 
+
+def _csv_env(name: str) -> frozenset[str]:
+    return frozenset(
+        value.strip()
+        for value in os.getenv(name, "").split(",")
+        if value.strip()
+    )
+
+
+# Temporary firmware compatibility listener. The dedicated EMQX listener has
+# authentication disabled, but authorization remains restricted per client ID.
+# Keep this list empty in normal production operation.
+MQTT_ANONYMOUS_TEST_CLIENT_IDS = _csv_env(
+    "MQTT_ANONYMOUS_TEST_CLIENT_IDS"
+)
+MQTT_ANONYMOUS_TEST_PUBLIC_ENDPOINT = os.getenv(
+    "MQTT_ANONYMOUS_TEST_PUBLIC_ENDPOINT", ""
+).strip()
+
+
+def is_anonymous_test_client(client_id: str) -> bool:
+    return str(client_id or "").strip() in MQTT_ANONYMOUS_TEST_CLIENT_IDS
+
 # Topic contract returned to HK firmware by OTA.  Keep the suffixes configurable
 # so every backend service can use the same rollout contract without embedding a
 # particular device serial in source code.

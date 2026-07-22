@@ -121,17 +121,31 @@ def activate_serial(serial, mac=None, rotate=False):
         return None, err
     try:
         emqx = EmqxAdmin(logger=_log).login()
-        emqx.provision_device(serial, rec["password"])
+        anonymous_test = common.is_anonymous_test_client(serial)
+        if anonymous_test:
+            if not common.MQTT_ANONYMOUS_TEST_PUBLIC_ENDPOINT:
+                return None, (
+                    "MQTT anonymous test client is configured but "
+                    "MQTT_ANONYMOUS_TEST_PUBLIC_ENDPOINT is empty"
+                )
+            emqx.set_anonymous_test_client_acl(serial)
+        else:
+            emqx.provision_device(serial, rec["password"])
     except EmqxError as e:
         return None, f"EMQX provision lỗi: {e}"
+    endpoint = (
+        common.MQTT_ANONYMOUS_TEST_PUBLIC_ENDPOINT
+        if anonymous_test
+        else common.MQTT_PUBLIC_ENDPOINT
+    )
     return {
         "serial": serial,
         "status": rec["status"],
         "mqtt": {
-            "endpoint": common.MQTT_PUBLIC_ENDPOINT,
+            "endpoint": endpoint,
             "client_id": serial,
-            "username": serial,
-            "password": rec["password"],
+            "username": "" if anonymous_test else serial,
+            "password": "" if anonymous_test else rec["password"],
             "publish_topic": common.hk_device_publish_topic(serial),
             "subscribe_topic": common.hk_device_subscribe_topic(serial),
             "topics": {

@@ -9,6 +9,7 @@ Không print/exit — trả giá trị + raise để caller tự xử lý.
 import json
 import urllib.request
 import urllib.error
+import urllib.parse
 
 import common
 
@@ -136,6 +137,35 @@ class EmqxAdmin:
             "POST", "/authorization/sources/built_in_database/rules/users",
             body=[{"username": username, "rules": rules}],
             ok_conflict=True)
+        return status
+
+    def set_anonymous_test_client_acl(self, clientid):
+        """Restrict the no-auth test listener to one HK firmware client ID."""
+        rules = [
+            {
+                "permission": "allow",
+                "action": "publish",
+                "topic": common.hk_device_publish_topic(clientid),
+            },
+            {
+                "permission": "allow",
+                "action": "subscribe",
+                "topic": common.hk_device_subscribe_topic(clientid),
+            },
+        ]
+        quoted_clientid = urllib.parse.quote(str(clientid), safe="")
+        self._request(
+            "DELETE",
+            "/authorization/sources/built_in_database/rules/clients/"
+            + quoted_clientid,
+            silent=True,
+        )
+        status, _ = self._request(
+            "POST",
+            "/authorization/sources/built_in_database/rules/clients",
+            body=[{"clientid": clientid, "rules": rules}],
+            ok_conflict=True,
+        )
         return status
 
     def set_full_acl(self, username, topic="devices/#"):
