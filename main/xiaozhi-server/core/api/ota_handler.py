@@ -72,13 +72,6 @@ def build_firmware_mqtt_config(
         raise ValueError("Incomplete management MQTT config")
 
     result = {key: mqtt_config[key] for key in required}
-    publish_topic = str(mqtt_config.get("publish_topic") or "").strip()
-    subscribe_topic = str(mqtt_config.get("subscribe_topic") or "").strip()
-    if publish_topic and subscribe_topic:
-        result["publish_topic"] = publish_topic
-        result["subscribe_topic"] = subscribe_topic
-        return result
-
     topic_identity = str(topic_identity or result["client_id"]).strip()
     result["publish_topic"] = hk_device_publish_topic(topic_identity)
     result["subscribe_topic"] = hk_device_subscribe_topic(topic_identity)

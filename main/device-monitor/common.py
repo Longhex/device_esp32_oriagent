@@ -4,6 +4,10 @@ Tách biệt hoàn toàn với luồng audio xiaozhi. Mọi tham số đọc t�
 để khớp phong cách deploy của dự án (.env).
 """
 import os
+import re
+
+
+MAC_ADDRESS_RE = re.compile(r"^[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}$")
 
 # --- Kết nối broker ---
 EMQX_HOST = os.getenv("EMQX_HOST", "127.0.0.1")
@@ -109,8 +113,7 @@ def normalize_client(value: str) -> str:
     Serial-Number hợp lệ sẽ giữ nguyên; MAC (nếu còn dùng) đổi ':' -> '_'.
     Giữ nguyên hoa/thường vì topic & username MQTT phân biệt hoa thường.
     """
-    value = str(value or "").replace("/", "_").replace(" ", "_")
-    return value if HK_MQTT_KEEP_COLON_TOPIC else value.replace(":", "_")
+    return str(value or "").replace("/", "_").replace(" ", "_")
 
 
 def hk_topic_identity(serial: str, mac: str | None = None) -> str:
@@ -137,7 +140,10 @@ def topic_command_ack(client: str) -> str:
 
 
 def legacy_command_topic(client: str) -> str:
-    return f"{normalize_client(client)}/MONITOR"
+    identity = normalize_client(client)
+    if MAC_ADDRESS_RE.fullmatch(identity):
+        identity = identity.lower()
+    return f"{identity}/MONITOR"
 
 
 def hk_device_publish_topic(client: str) -> str:
@@ -146,8 +152,8 @@ def hk_device_publish_topic(client: str) -> str:
 
 
 def hk_device_subscribe_topic(client: str) -> str:
-    """Topic firmware subscribes for signaling responses and commands."""
-    return f"{normalize_client(client)}/{HK_MQTT_DOWNLINK_SUFFIX}"
+    """Downlink implemented by the deployed firmware, not the future contract."""
+    return legacy_command_topic(client)
 
 
 # Topic wildcard cho backend subscribe toàn bộ thiết bị
