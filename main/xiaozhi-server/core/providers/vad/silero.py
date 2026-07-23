@@ -8,6 +8,43 @@ from core.providers.vad.base import VADProviderBase
 
 TAG = __name__
 logger = setup_logging()
+VAD_DIAGNOSTIC_INITIAL_PACKETS = 50
+VAD_DIAGNOSTIC_INTERVAL_PACKETS = 25
+
+
+def _should_log_vad_diagnostics(conn):
+    """Bound VAD diagnostics without changing inference or state transitions."""
+    packet_index = getattr(conn, "_vad_diagnostic_packet_count", 0) + 1
+    conn._vad_diagnostic_packet_count = packet_index
+    should_log = (
+        packet_index <= VAD_DIAGNOSTIC_INITIAL_PACKETS
+        or packet_index % VAD_DIAGNOSTIC_INTERVAL_PACKETS == 0
+    )
+    conn._vad_diagnostic_log_this_packet = should_log
+    return packet_index, should_log
+
+
+def _pcm_metrics(samples):
+    """Return aggregate PCM metrics only; never retain or log raw audio."""
+    if samples.size == 0:
+        return {
+            "samples": 0,
+            "minimum": 0,
+            "maximum": 0,
+            "peak": 0,
+            "rms": 0.0,
+            "non_zero_ratio": 0.0,
+        }
+
+    samples_i32 = samples.astype(np.int32)
+    return {
+        "samples": int(samples.size),
+        "minimum": int(samples.min()),
+        "maximum": int(samples.max()),
+        "peak": int(np.abs(samples_i32).max()),
+        "rms": float(np.sqrt(np.mean(samples_i32.astype(np.float64) ** 2))),
+        "non_zero_ratio": float(np.count_nonzero(samples_i32) / samples_i32.size),
+    }
 
 
 class VADProvider(VADProviderBase):
@@ -62,16 +99,38 @@ class VADProvider(VADProviderBase):
 
         try:
             self._init_connection_state(conn)
+            packet_index, log_diagnostics = _should_log_vad_diagnostics(conn)
 
             pcm_frame = conn._vad_opus_decoder.decode(opus_packet, 960)
             conn.client_audio_buffer.extend(pcm_frame)
+            decoded_pcm = np.frombuffer(pcm_frame, dtype=np.int16)
+            decoded_metrics = _pcm_metrics(decoded_pcm)
+            if log_diagnostics:
+                conn.logger.bind(tag=TAG).info(
+                    "[VAD-DIAG] decoded packet={} opus_bytes={} pcm_bytes={} "
+                    "pcm_samples={} pcm_min={} pcm_max={} pcm_peak={} pcm_rms={:.2f} "
+                    "non_zero_ratio={:.4f} pending_pcm_bytes={}",
+                    packet_index,
+                    len(opus_packet),
+                    len(pcm_frame),
+                    decoded_metrics["samples"],
+                    decoded_metrics["minimum"],
+                    decoded_metrics["maximum"],
+                    decoded_metrics["peak"],
+                    decoded_metrics["rms"],
+                    decoded_metrics["non_zero_ratio"],
+                    len(conn.client_audio_buffer),
+                )
 
             client_have_voice = False
+            vad_window_index = 0
             while len(conn.client_audio_buffer) >= 512 * 2:
+                vad_window_index += 1
                 chunk = conn.client_audio_buffer[: 512 * 2]
                 conn.client_audio_buffer = conn.client_audio_buffer[512 * 2 :]
 
                 audio_int16 = np.frombuffer(chunk, dtype=np.int16)
+                pcm_metrics = _pcm_metrics(audio_int16)
                 audio_float32 = audio_int16.astype(np.float32) / 32768.0
                 audio_input = np.concatenate(
                     [conn._vad_context, audio_float32.reshape(1, -1)], axis=1
@@ -87,6 +146,7 @@ class VADProvider(VADProviderBase):
                 conn._vad_state = state
                 conn._vad_context = audio_input[:, -64:]
                 speech_prob = out.item()
+                session_have_voice_before = conn.client_have_voice
 
                 # 双阈值判断
                 if speech_prob >= self.vad_threshold:
@@ -113,6 +173,46 @@ class VADProvider(VADProviderBase):
                 if client_have_voice:
                     conn.client_have_voice = True
                     conn.last_activity_time = time.time() * 1000
+
+                positive_count = conn.client_voice_window.count(True)
+                negative_count = conn.client_voice_window.count(False)
+                state_changed = session_have_voice_before != conn.client_have_voice
+                if log_diagnostics or state_changed or conn.client_voice_stop:
+                    conn.logger.bind(tag=TAG).info(
+                        "[VAD-DIAG] window packet={} index={} vad_input_samples={} "
+                        "pcm_min={} pcm_max={} pcm_peak={} pcm_rms={:.2f} non_zero_ratio={:.4f} "
+                        "speech_prob={:.4f} threshold_high={:.2f} threshold_low={:.2f} "
+                        "raw_is_voice={} rolling_positive={} rolling_negative={} rolling_size={} "
+                        "have_voice_return={} session_have_voice_before={} "
+                        "session_have_voice_after={} voice_stop={} pending_pcm_bytes={}",
+                        packet_index,
+                        vad_window_index,
+                        pcm_metrics["samples"],
+                        pcm_metrics["minimum"],
+                        pcm_metrics["maximum"],
+                        pcm_metrics["peak"],
+                        pcm_metrics["rms"],
+                        pcm_metrics["non_zero_ratio"],
+                        speech_prob,
+                        self.vad_threshold,
+                        self.vad_threshold_low,
+                        is_voice,
+                        positive_count,
+                        negative_count,
+                        len(conn.client_voice_window),
+                        client_have_voice,
+                        session_have_voice_before,
+                        conn.client_have_voice,
+                        conn.client_voice_stop,
+                        len(conn.client_audio_buffer),
+                    )
+
+            if log_diagnostics and vad_window_index == 0:
+                conn.logger.bind(tag=TAG).info(
+                    "[VAD-DIAG] no_complete_window packet={} pending_pcm_bytes={}",
+                    packet_index,
+                    len(conn.client_audio_buffer),
+                )
 
             return client_have_voice
         except opuslib_next.OpusError as e:

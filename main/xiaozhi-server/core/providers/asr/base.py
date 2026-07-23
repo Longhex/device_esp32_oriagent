@@ -176,11 +176,38 @@ class ASRProviderBase(ABC):
         if conn.client_listen_mode == "manual":
             conn.asr_audio.append(audio)
         else:
+            pre_roll_before = len(conn.asr_audio)
             conn.asr_audio.append(audio)
+            pre_roll_after_append = len(conn.asr_audio)
+            trimmed_to_pre_roll = False
 
             if not audio_have_voice and not conn.client_have_voice:
                 conn.asr_audio = conn.asr_audio[-10:]
+                trimmed_to_pre_roll = True
+                if getattr(conn, "_vad_diagnostic_log_this_packet", False):
+                    conn.logger.bind(tag=TAG).info(
+                        "[VAD-DIAG] pre_roll audio_have_voice={} session_have_voice={} "
+                        "before_append={} after_append={} after_trim={} trimmed_to_ten={}",
+                        audio_have_voice,
+                        conn.client_have_voice,
+                        pre_roll_before,
+                        pre_roll_after_append,
+                        len(conn.asr_audio),
+                        trimmed_to_pre_roll,
+                    )
                 return
+
+            if getattr(conn, "_vad_diagnostic_log_this_packet", False):
+                conn.logger.bind(tag=TAG).info(
+                    "[VAD-DIAG] pre_roll audio_have_voice={} session_have_voice={} "
+                    "before_append={} after_append={} after_trim={} trimmed_to_ten={}",
+                    audio_have_voice,
+                    conn.client_have_voice,
+                    pre_roll_before,
+                    pre_roll_after_append,
+                    len(conn.asr_audio),
+                    trimmed_to_pre_roll,
+                )
 
             if conn.asr.interface_type != InterfaceType.STREAM and conn.client_voice_stop:
                 asr_audio_task = conn.asr_audio.copy()
