@@ -57,7 +57,7 @@ class LegacyVoiceAclTest(unittest.TestCase):
             ("publish", "HKHT2606010011/AI_MONITOR"), allowed
         )
         self.assertIn(
-            ("subscribe", "HKHT2606010011/AI_REMOTE"), allowed
+            ("subscribe", "HKHT2606010011/MONITOR"), allowed
         )
         self.assertNotIn(("publish", "+"), allowed)
 
@@ -78,7 +78,7 @@ class LegacyVoiceAclTest(unittest.TestCase):
         )
         self.assertEqual(
             common.hk_device_subscribe_topic("HKHT2606010046"),
-            "HKHT2606010046/AI_REMOTE",
+            "HKHT2606010046/MONITOR",
         )
 
 

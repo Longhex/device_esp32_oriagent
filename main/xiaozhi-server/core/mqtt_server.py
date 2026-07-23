@@ -8,7 +8,11 @@ import time
 import paho.mqtt.client as mqtt
 from config.logger import setup_logging, bind_log_context
 from core.auth import AuthenticationError
-from core.mqtt_topics import hk_uplink_subscription, parse_hk_uplink_topic
+from core.mqtt_topics import (
+    hk_legacy_monitor_topic,
+    hk_uplink_subscription,
+    parse_hk_uplink_topic,
+)
 from core.utils.util import get_local_ip, protocol_payload_json_for_log
 
 # Try to import our new UDP manager
@@ -124,7 +128,7 @@ class VirtualWebsocket:
             message = build_hk_server_hello(
                 message, self.session_id, self.hk_udp_config
             )
-        topic = self.mqtt_downlink_topic or f"{self.device_id}/MONITOR"
+        topic = self.mqtt_downlink_topic or hk_legacy_monitor_topic(self.device_id)
         try:
             self.mqtt_client.publish(topic, message)
             message_type, message_data = _summarize_state_payload(message)
