@@ -95,11 +95,11 @@ class HkMqttUdpContractTest(unittest.TestCase):
         self.assertEqual(uplink, "HKHT2606010046/AI_MONITOR")
         self.assertEqual(
             hk_device_subscribe_topic(device_id),
-            "HKHT2606010046/AI_REMOTE",
+            "HKHT2606010046/MONITOR",
         )
         self.assertEqual(
             parse_hk_uplink_topic(uplink),
-            (device_id, "HKHT2606010046/AI_REMOTE"),
+            (device_id, "HKHT2606010046/MONITOR"),
         )
 
     def test_legacy_topic_remains_compatible_during_rollout(self):

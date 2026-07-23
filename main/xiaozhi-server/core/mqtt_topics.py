@@ -3,6 +3,7 @@ import re
 
 
 HK_DEVICE_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
+HK_MAC_ADDRESS_RE = re.compile(r"^[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}$")
 
 
 def _topic_suffix(env_name: str, default: str) -> str:
@@ -35,9 +36,22 @@ def normalize_hk_topic_identity(device_id: str) -> str:
     ``normalize_client`` contract so that the topic advertised by OTA is also
     the topic authorized by EMQX.
     """
-    value = validate_hk_device_id(device_id).replace(" ", "_")
-    keep_colon = os.environ.get("HK_MQTT_KEEP_COLON_TOPIC", "").strip().lower()
-    return value if keep_colon in {"1", "true", "yes", "on"} else value.replace(":", "_")
+    # MQTT permits ':' in a topic level.  Preserve the provisioned identity so
+    # the OTA response, EMQX ACL and firmware publish topic cannot diverge.
+    return validate_hk_device_id(device_id)
+
+
+def hk_legacy_monitor_topic(device_id: str) -> str:
+    """Downlink topic implemented by the currently deployed HAKAT firmware.
+
+    Firmware derives this topic from its MAC formatter: lowercase, colons
+    preserved, and the ``MONITOR`` suffix.  This is deliberately separate from
+    canonical topic normalization because MQTT topics are case-sensitive.
+    """
+    identity = validate_hk_device_id(device_id)
+    if HK_MAC_ADDRESS_RE.fullmatch(identity):
+        identity = identity.lower()
+    return f"{identity}/MONITOR"
 
 
 def hk_device_publish_topic(device_id: str) -> str:
@@ -45,7 +59,8 @@ def hk_device_publish_topic(device_id: str) -> str:
 
 
 def hk_device_subscribe_topic(device_id: str) -> str:
-    return f"{normalize_hk_topic_identity(device_id)}/{HK_MQTT_DOWNLINK_SUFFIX}"
+    # Do not advertise AI_REMOTE until firmware consumes OTA subscribe_topic.
+    return hk_legacy_monitor_topic(device_id)
 
 
 def hk_uplink_subscription() -> str:
@@ -57,8 +72,8 @@ def parse_hk_uplink_topic(topic: str):
     parts = str(topic or "").split("/")
     if len(parts) == 1:
         device_id = validate_hk_device_id(parts[0])
-        return device_id, f"{device_id}/MONITOR"
+        return device_id, hk_legacy_monitor_topic(device_id)
     if len(parts) == 2 and parts[1] == HK_MQTT_UPLINK_SUFFIX:
         device_id = validate_hk_device_id(parts[0])
-        return device_id, hk_device_subscribe_topic(device_id)
+        return device_id, hk_legacy_monitor_topic(device_id)
     raise ValueError("Topic does not match the HK MQTT uplink contract")

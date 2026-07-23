@@ -1,7 +1,6 @@
 import os
 import sys
 import unittest
-from unittest.mock import patch
 
 os.environ.setdefault("ENABLE_HK_LEGACY_BRIDGE", "true")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -58,7 +57,7 @@ class LegacyVoiceAclTest(unittest.TestCase):
             ("publish", "HKHT2606010011/AI_MONITOR"), allowed
         )
         self.assertIn(
-            ("subscribe", "HKHT2606010011/AI_REMOTE"), allowed
+            ("subscribe", "HKHT2606010011/MONITOR"), allowed
         )
         self.assertNotIn(("publish", "+"), allowed)
 
@@ -80,21 +79,20 @@ class LegacyVoiceAclTest(unittest.TestCase):
         self.assertEqual(
             allowed,
             {
-                ("publish", "A0_F2_62_EA_1E_68/AI_MONITOR"),
-                ("subscribe", "A0_F2_62_EA_1E_68/AI_REMOTE"),
+                ("publish", "A0:F2:62:EA:1E:68/AI_MONITOR"),
+                ("subscribe", "a0:f2:62:ea:1e:68/MONITOR"),
             },
         )
 
     def test_hk_client_acl_can_use_mac_topic_without_changing_client_id(self):
         admin = CaptureAdmin()
-        with patch.object(common, "HK_MQTT_KEEP_COLON_TOPIC", True):
-            admin.set_hk_client_acl(
-                "A0:F2:62:EA:1E:68", topic_identity="28:84:85:89:56:10"
-            )
+        admin.set_hk_client_acl(
+            "A0:F2:62:EA:1E:68", topic_identity="28:84:85:89:56:10"
+        )
         rules = admin.requests[-1][2][0]["rules"]
         allowed = {(rule["action"], rule["topic"]) for rule in rules}
         self.assertIn(("publish", "28:84:85:89:56:10/AI_MONITOR"), allowed)
-        self.assertIn(("subscribe", "28:84:85:89:56:10/AI_REMOTE"), allowed)
+        self.assertIn(("subscribe", "28:84:85:89:56:10/MONITOR"), allowed)
 
     def test_firmware_topics_are_derived_from_serial(self):
         self.assertEqual(
@@ -103,7 +101,7 @@ class LegacyVoiceAclTest(unittest.TestCase):
         )
         self.assertEqual(
             common.hk_device_subscribe_topic("HKHT2606010046"),
-            "HKHT2606010046/AI_REMOTE",
+            "HKHT2606010046/MONITOR",
         )
 
 

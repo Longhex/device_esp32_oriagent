@@ -8,7 +8,11 @@ import time
 import paho.mqtt.client as mqtt
 from config.logger import setup_logging, bind_log_context
 from core.auth import AuthenticationError
-from core.mqtt_topics import hk_uplink_subscription, parse_hk_uplink_topic
+from core.mqtt_topics import (
+    hk_legacy_monitor_topic,
+    hk_uplink_subscription,
+    parse_hk_uplink_topic,
+)
 from core.utils.util import get_local_ip, protocol_payload_json_for_log
 
 # Try to import our new UDP manager
@@ -124,33 +128,9 @@ class VirtualWebsocket:
             message = build_hk_server_hello(
                 message, self.session_id, self.hk_udp_config
             )
-        topic = self.mqtt_downlink_topic or f"{self.device_id}/MONITOR"
+        topic = self.mqtt_downlink_topic or hk_legacy_monitor_topic(self.device_id)
         try:
             self.mqtt_client.publish(topic, message)
-            # Temporary migration bridge for firmware that still subscribes to
-            # the pre-canonical, lowercase ``{mac}/MONITOR`` topic.  Keep the
-            # canonical AI_REMOTE publish as the primary route; firmware that
-            # has consumed the OTA topic configuration only receives that one.
-            #
-            # MQTT topics are case-sensitive.  The legacy firmware derives its
-            # topic from the MAC formatter (lowercase), while the manager API
-            # provides the canonical MAC with colons.  Publishing both lets the
-            # old firmware receive the server hello (and therefore its new UDP
-            # key/nonce/SSRC) during the rollout.
-            legacy_topic = f"{self.device_id.lower()}/MONITOR"
-            legacy_bridge_enabled = os.environ.get(
-                "HK_LEGACY_MONITOR_BRIDGE", "1"
-            ).strip().lower() in {"1", "true", "yes", "on"}
-            if (
-                self.hk_udp_config
-                and legacy_bridge_enabled
-                and legacy_topic != topic
-            ):
-                self.mqtt_client.publish(legacy_topic, message)
-                self.logger.bind(tag=TAG).info(
-                    f"[HK-MQTT-COMPAT] mirrored downlink device={self.device_id} "
-                    f"topic={legacy_topic}"
-                )
             message_type, message_data = _summarize_state_payload(message)
             if message_type == "hello":
                 self.logger.bind(tag=TAG).info(
