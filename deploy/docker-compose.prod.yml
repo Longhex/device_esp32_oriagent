@@ -166,19 +166,12 @@ services:
       EMQX_NODE__COOKIE: ${EMQX_NODE_COOKIE:?Set EMQX_NODE_COOKIE in .env}
       EMQX_DASHBOARD__DEFAULT_USERNAME: ${EMQX_DASHBOARD_USER:-admin}
       EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_DASHBOARD_PASSWORD:?Set EMQX_DASHBOARD_PASSWORD in .env}
-      # Dedicated test listener. Authentication is disabled only on port 1884;
-      # device-monitor applies an exact client-ID ACL to each listed test device.
-      EMQX_LISTENERS__TCP__FIRMWARE_TEST__BIND: 0.0.0.0:1884
-      EMQX_LISTENERS__TCP__FIRMWARE_TEST__ENABLE_AUTHN: "false"
       # LƯU Ý BẢO MẬT: EMQX 5.x mặc định CHO PHÉP ẩn danh khi chưa cấu hình authenticator.
       # Trước khi mở cổng 1883/8883 ra public PHẢI thêm authn (Dashboard > Access Control >
       # Authentication) — built-in DB hoặc HTTP authn trỏ về manager-api. Xem README_PRODUCTION.md.
     ports:
       # Cổng thiết bị kết nối từ Internet — phải mở public
       - "${MQTT_TCP_PORT:-1883}:1883"      # MQTT TCP
-      # Localhost-only by default. Expose temporarily only for a single-device
-      # compatibility test, then reset MQTT_ANONYMOUS_TEST_BIND to 127.0.0.1.
-      - "${MQTT_ANONYMOUS_TEST_BIND:-127.0.0.1}:${MQTT_ANONYMOUS_TEST_PORT:-1884}:1884"
       - "${MQTT_SSL_PORT:-8883}:8883"      # MQTT over TLS
       - "${MQTT_WS_PORT:-8083}:8083"       # MQTT over WebSocket (cho app/web nếu cần)
       - "${MQTT_WSS_PORT:-8084}:8084"      # MQTT over WSS
@@ -217,7 +210,9 @@ services:
       ENABLE_HK_LEGACY_BRIDGE: ${ENABLE_HK_LEGACY_BRIDGE:-true}
       HK_MQTT_UPLINK_SUFFIX: ${HK_MQTT_UPLINK_SUFFIX:-AI_MONITOR}
       HK_MQTT_DOWNLINK_SUFFIX: ${HK_MQTT_DOWNLINK_SUFFIX:-AI_REMOTE}
-      MQTT_ANONYMOUS_TEST_CLIENT_IDS: ${MQTT_ANONYMOUS_TEST_CLIENT_IDS:-}
+      MQTT_SHARED_TEST_SERIALS: ${MQTT_SHARED_TEST_SERIALS:-}
+      MQTT_SHARED_TEST_USERNAME: ${MQTT_SHARED_TEST_USERNAME:-}
+      MQTT_SHARED_TEST_PASSWORD: ${MQTT_SHARED_TEST_PASSWORD:-}
     depends_on:
       emqx:
         condition: service_healthy
@@ -244,8 +239,9 @@ services:
       ENABLE_HK_LEGACY_BRIDGE: ${ENABLE_HK_LEGACY_BRIDGE:-true}
       HK_MQTT_UPLINK_SUFFIX: ${HK_MQTT_UPLINK_SUFFIX:-AI_MONITOR}
       HK_MQTT_DOWNLINK_SUFFIX: ${HK_MQTT_DOWNLINK_SUFFIX:-AI_REMOTE}
-      MQTT_ANONYMOUS_TEST_CLIENT_IDS: ${MQTT_ANONYMOUS_TEST_CLIENT_IDS:-}
-      MQTT_ANONYMOUS_TEST_PUBLIC_ENDPOINT: ${MQTT_ANONYMOUS_TEST_PUBLIC_ENDPOINT:-}
+      MQTT_SHARED_TEST_SERIALS: ${MQTT_SHARED_TEST_SERIALS:-}
+      MQTT_SHARED_TEST_USERNAME: ${MQTT_SHARED_TEST_USERNAME:-}
+      MQTT_SHARED_TEST_PASSWORD: ${MQTT_SHARED_TEST_PASSWORD:-}
       MONITOR_HTTP_PORT: "8090"
       # Admin EMQX (để /activate cấp credential cho thiết bị)
       EMQX_API_BASE: http://emqx:18083/api/v5

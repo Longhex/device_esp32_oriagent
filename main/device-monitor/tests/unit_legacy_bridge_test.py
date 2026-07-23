@@ -71,9 +71,9 @@ class LegacyVoiceAclTest(unittest.TestCase):
         self.assertIn(("subscribe", "+/AI_MONITOR"), allowed)
         self.assertIn(("publish", "+/AI_REMOTE"), allowed)
 
-    def test_anonymous_test_client_acl_allows_only_its_hk_topics(self):
+    def test_hk_client_acl_allows_only_its_hk_topics(self):
         admin = CaptureAdmin()
-        admin.set_anonymous_test_client_acl("A0:F2:62:EA:1E:68")
+        admin.set_hk_client_acl("A0:F2:62:EA:1E:68")
         rules = admin.requests[-1][2][0]["rules"]
         allowed = {(rule["action"], rule["topic"]) for rule in rules}
         self.assertEqual(

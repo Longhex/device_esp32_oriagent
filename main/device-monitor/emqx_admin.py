@@ -139,8 +139,8 @@ class EmqxAdmin:
             ok_conflict=True)
         return status
 
-    def set_anonymous_test_client_acl(self, clientid):
-        """Restrict the no-auth test listener to one HK firmware client ID."""
+    def set_hk_client_acl(self, clientid):
+        """Restrict an HK firmware MQTT client ID to its own signaling topics."""
         rules = [
             {
                 "permission": "allow",

@@ -54,19 +54,21 @@ def _csv_env(name: str) -> frozenset[str]:
     )
 
 
-# Temporary firmware compatibility listener. The dedicated EMQX listener has
-# authentication disabled, but authorization remains restricted per client ID.
-# Keep this list empty in normal production operation.
-MQTT_ANONYMOUS_TEST_CLIENT_IDS = _csv_env(
-    "MQTT_ANONYMOUS_TEST_CLIENT_IDS"
-)
-MQTT_ANONYMOUS_TEST_PUBLIC_ENDPOINT = os.getenv(
-    "MQTT_ANONYMOUS_TEST_PUBLIC_ENDPOINT", ""
-).strip()
+# Temporary firmware compatibility credentials. Keep the serial list empty in
+# normal production. Authorization remains restricted per MQTT client ID.
+MQTT_SHARED_TEST_SERIALS = _csv_env("MQTT_SHARED_TEST_SERIALS")
+MQTT_SHARED_TEST_USERNAME = os.getenv("MQTT_SHARED_TEST_USERNAME", "").strip()
+MQTT_SHARED_TEST_PASSWORD = os.getenv("MQTT_SHARED_TEST_PASSWORD", "")
 
 
-def is_anonymous_test_client(client_id: str) -> bool:
-    return str(client_id or "").strip() in MQTT_ANONYMOUS_TEST_CLIENT_IDS
+def shared_test_credentials(serial: str):
+    if str(serial or "").strip() not in MQTT_SHARED_TEST_SERIALS:
+        return None
+    if not MQTT_SHARED_TEST_USERNAME or not MQTT_SHARED_TEST_PASSWORD:
+        raise RuntimeError(
+            "MQTT shared test serial is configured but username/password is empty"
+        )
+    return MQTT_SHARED_TEST_USERNAME, MQTT_SHARED_TEST_PASSWORD
 
 # Topic contract returned to HK firmware by OTA.  Keep the suffixes configurable
 # so every backend service can use the same rollout contract without embedding a

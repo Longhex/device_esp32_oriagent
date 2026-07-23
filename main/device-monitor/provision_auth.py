@@ -43,9 +43,21 @@ def main():
     emqx.set_full_acl(common.BACKEND_USERNAME, "devices/#")
     print(f"  [user] {common.BACKEND_USERNAME} (backend, full devices/#)")
 
-    for client_id in common.MQTT_ANONYMOUS_TEST_CLIENT_IDS:
-        emqx.set_anonymous_test_client_acl(client_id)
-        print(f"  [anonymous-test-client] {client_id} (client-id scoped HK ACL)")
+    if common.MQTT_SHARED_TEST_SERIALS:
+        try:
+            username, password = common.shared_test_credentials(
+                next(iter(common.MQTT_SHARED_TEST_SERIALS))
+            )
+        except RuntimeError as exc:
+            print(f"CONFIG ERROR: {exc}")
+            sys.exit(1)
+        emqx.upsert_user(username, password)
+        for client_id in common.MQTT_SHARED_TEST_SERIALS:
+            emqx.set_hk_client_acl(client_id)
+            print(
+                f"  [shared-test-client] {client_id} "
+                f"(user={username}, client-id scoped HK ACL)"
+            )
 
     # Demo theo Serial-Number
     demo_password = os.getenv("PROVISION_DEMO_PASSWORD", "")
