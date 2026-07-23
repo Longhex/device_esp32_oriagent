@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault("ENABLE_HK_LEGACY_BRIDGE", "true")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -83,6 +84,17 @@ class LegacyVoiceAclTest(unittest.TestCase):
                 ("subscribe", "A0_F2_62_EA_1E_68/AI_REMOTE"),
             },
         )
+
+    def test_hk_client_acl_can_use_mac_topic_without_changing_client_id(self):
+        admin = CaptureAdmin()
+        with patch.object(common, "HK_MQTT_KEEP_COLON_TOPIC", True):
+            admin.set_hk_client_acl(
+                "A0:F2:62:EA:1E:68", topic_identity="28:84:85:89:56:10"
+            )
+        rules = admin.requests[-1][2][0]["rules"]
+        allowed = {(rule["action"], rule["topic"]) for rule in rules}
+        self.assertIn(("publish", "28:84:85:89:56:10/AI_MONITOR"), allowed)
+        self.assertIn(("subscribe", "28:84:85:89:56:10/AI_REMOTE"), allowed)
 
     def test_firmware_topics_are_derived_from_serial(self):
         self.assertEqual(

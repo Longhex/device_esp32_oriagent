@@ -45,6 +45,14 @@ ENABLE_HK_LEGACY_BRIDGE = os.getenv(
     "ENABLE_HK_LEGACY_BRIDGE", "false"
 ).strip().lower() in {"1", "true", "yes", "on"}
 
+# Temporary compatibility mode for firmware that uses the hardware MAC as its
+# MQTT topic identity. MQTT itself permits ':' in a topic level; keeping it
+# avoids changing the topic received by that firmware.
+HK_MQTT_TOPIC_IDENTITY = os.getenv("HK_MQTT_TOPIC_IDENTITY", "serial").strip().lower()
+HK_MQTT_KEEP_COLON_TOPIC = os.getenv(
+    "HK_MQTT_KEEP_COLON_TOPIC", "false"
+).strip().lower() in {"1", "true", "yes", "on"}
+
 
 def _csv_env(name: str) -> frozenset[str]:
     return frozenset(
@@ -101,7 +109,15 @@ def normalize_client(value: str) -> str:
     Serial-Number hợp lệ sẽ giữ nguyên; MAC (nếu còn dùng) đổi ':' -> '_'.
     Giữ nguyên hoa/thường vì topic & username MQTT phân biệt hoa thường.
     """
-    return value.replace(":", "_").replace("/", "_").replace(" ", "_")
+    value = str(value or "").replace("/", "_").replace(" ", "_")
+    return value if HK_MQTT_KEEP_COLON_TOPIC else value.replace(":", "_")
+
+
+def hk_topic_identity(serial: str, mac: str | None = None) -> str:
+    """Choose the MQTT topic identity without changing MQTT credentials."""
+    if HK_MQTT_TOPIC_IDENTITY == "mac" and str(mac or "").strip():
+        return str(mac).strip().upper()
+    return str(serial).strip()
 
 
 def topic_status(client: str) -> str:

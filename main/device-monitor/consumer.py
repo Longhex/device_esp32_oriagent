@@ -119,15 +119,18 @@ def activate_serial(serial, mac=None, rotate=False):
     rec, err = serials.activate(serial, mac=mac, rotate=rotate)
     if err:
         return None, err
+    topic_identity = common.hk_topic_identity(serial, mac)
     try:
         emqx = EmqxAdmin(logger=_log).login()
         shared_test = common.shared_test_credentials(serial)
         if shared_test:
             username, password = shared_test
             emqx.upsert_user(username, password)
-            emqx.set_hk_client_acl(serial)
+            emqx.set_hk_client_acl(serial, topic_identity=topic_identity)
         else:
-            emqx.provision_device(serial, rec["password"])
+            emqx.provision_device(
+                serial, rec["password"], topic_identity=topic_identity
+            )
     except (EmqxError, RuntimeError) as e:
         return None, f"EMQX provision lỗi: {e}"
     username, password = shared_test or (serial, rec["password"])
@@ -139,8 +142,8 @@ def activate_serial(serial, mac=None, rotate=False):
             "client_id": serial,
             "username": username,
             "password": password,
-            "publish_topic": common.hk_device_publish_topic(serial),
-            "subscribe_topic": common.hk_device_subscribe_topic(serial),
+            "publish_topic": common.hk_device_publish_topic(topic_identity),
+            "subscribe_topic": common.hk_device_subscribe_topic(topic_identity),
             "topics": {
                 "status": common.topic_status(serial),
                 "telemetry": common.topic_telemetry(serial),

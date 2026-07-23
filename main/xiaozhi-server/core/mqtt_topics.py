@@ -35,7 +35,9 @@ def normalize_hk_topic_identity(device_id: str) -> str:
     ``normalize_client`` contract so that the topic advertised by OTA is also
     the topic authorized by EMQX.
     """
-    return validate_hk_device_id(device_id).replace(":", "_").replace(" ", "_")
+    value = validate_hk_device_id(device_id).replace(" ", "_")
+    keep_colon = os.environ.get("HK_MQTT_KEEP_COLON_TOPIC", "").strip().lower()
+    return value if keep_colon in {"1", "true", "yes", "on"} else value.replace(":", "_")
 
 
 def hk_device_publish_topic(device_id: str) -> str:
