@@ -156,6 +156,31 @@ async def check_bind_device(conn: "ConnectionHandler"):
             return
 
         text = f"Vui lòng đăng nhập vào trang quản lý, nhập mã {conn.bind_code} để liên kết thiết bị."
+
+        # MQTT firmware can render this structured notification on its LCD.
+        # Do not replace the STT/TTS fallback below: deployed firmware that
+        # does not know the new type must still receive the spoken prompt.
+        if conn.conn_from_mqtt_gateway and conn.websocket:
+            activation_message = {
+                "type": "activation",
+                "code": conn.bind_code,
+                "message": text,
+                "session_id": conn.session_id,
+            }
+            try:
+                await conn.websocket.send(
+                    json.dumps(activation_message, ensure_ascii=False)
+                )
+                conn.logger.bind(tag=TAG).info(
+                    f"[BIND] Sent MQTT activation message to device={conn.device_id}"
+                )
+            except Exception as e:
+                # A notification failure must not block device binding by audio.
+                conn.logger.bind(tag=TAG).error(
+                    f"[BIND] Failed to send MQTT activation message "
+                    f"to device={conn.device_id}: {e}"
+                )
+
         await send_stt_message(conn, text)
 
         # 播放提示音
