@@ -157,12 +157,12 @@ async def check_bind_device(conn: "ConnectionHandler"):
 
         text = f"Vui lòng đăng nhập vào trang quản lý, nhập mã {conn.bind_code} để liên kết thiết bị."
 
-        # MQTT firmware can render this structured notification on its LCD.
+        # MQTT firmware can render this structured command on its LCD.
         # Do not replace the STT/TTS fallback below: deployed firmware that
-        # does not know the new type must still receive the spoken prompt.
+        # does not know the new command must still receive the spoken prompt.
         if conn.conn_from_mqtt_gateway and conn.websocket:
             activation_message = {
-                "type": "activation",
+                "cmd": "activation",
                 "code": conn.bind_code,
                 "message": text,
                 "session_id": conn.session_id,
