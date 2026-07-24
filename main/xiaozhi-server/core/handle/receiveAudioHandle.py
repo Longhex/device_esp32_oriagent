@@ -174,8 +174,11 @@ async def check_bind_device(conn: "ConnectionHandler"):
                 conn.logger.bind(tag=TAG).info(
                     f"[BIND] Sent MQTT activation message to device={conn.device_id}"
                 )
+                # New MQTT firmware renders the code directly. Do not queue
+                # the legacy STT/TTS prompt or its UDP audio afterwards.
+                return
             except Exception as e:
-                # A notification failure must not block device binding by audio.
+                # A notification failure falls back to the legacy audio prompt.
                 conn.logger.bind(tag=TAG).error(
                     f"[BIND] Failed to send MQTT activation message "
                     f"to device={conn.device_id}: {e}"
