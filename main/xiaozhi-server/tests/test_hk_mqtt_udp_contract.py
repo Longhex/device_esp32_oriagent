@@ -55,7 +55,12 @@ class HkMqttUdpContractTest(unittest.TestCase):
             self.key, self.client_ssrc, 960, 1, opus
         )
         self.assertTrue(self.session.handle_datagram(packet, ("10.0.0.5", 40000)))
-        self.assertEqual(self.audio_queue.get_nowait(), opus)
+        queued = self.audio_queue.get_nowait()
+        self.assertEqual(queued["type"], "audio")
+        self.assertEqual(queued["payload"], opus)
+        self.assertEqual(queued["sequence"], 1)
+        self.assertEqual(queued["timestamp"], 960)
+        self.assertIsInstance(queued["received_monotonic"], float)
 
     def test_server_downlink_uses_separate_ssrc_and_sequence_one(self):
         transport = FakeTransport()

@@ -25,18 +25,19 @@ def _should_log_hybrid_audio_event(conn: "ConnectionHandler", event_name: str, i
     return count == 1 or count % interval == 0
 
 
-async def handleAudioMessage(conn: "ConnectionHandler", audio):
+async def handleAudioMessage(conn: "ConnectionHandler", audio, packet_meta=None):
     if _should_log_hybrid_audio_event(conn, "handle_audio_message"):
         conn.logger.bind(tag=TAG).info(
-            "[HYBRID-AUDIO] handle_audio_message device={} session={} chunk_len={} audio_format={}",
+            "[HYBRID-AUDIO] handle_audio_message device={} session={} chunk_len={} audio_format={} seq={}",
             conn.device_id or "-",
             conn.session_id or "-",
             len(audio) if audio is not None else 0,
             conn.audio_format,
+            packet_meta.get("sequence", "-") if packet_meta else "-",
         )
 
     # 当前片段是否有人说话
-    have_voice = conn.vad.is_vad(conn, audio)
+    have_voice = conn.vad.is_vad(conn, audio, packet_meta)
     if _should_log_hybrid_audio_event(conn, "vad_decision"):
         conn.logger.bind(tag=TAG).info(
             "[HYBRID-AUDIO] vad_chunk device={} session={} chunk_len={} audio_format={} have_voice={} buffered_frames={}",

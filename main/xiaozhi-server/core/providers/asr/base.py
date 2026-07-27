@@ -51,6 +51,17 @@ def _message_length(message) -> int:
     return 0
 
 
+def _unwrap_hybrid_audio_message(message):
+    """Keep UDP transport metadata available without passing a dict to codecs."""
+    if isinstance(message, dict) and message.get("type") == "audio":
+        return message.get("payload", b""), message
+    return message, None
+
+
+def _vad_metrics(conn):
+    return getattr(conn, "_vad_last_completed_metrics", {}) or {}
+
+
 class ASRProviderBase(ABC):
     def __init__(self):
         pass
@@ -101,16 +112,18 @@ class ASRProviderBase(ABC):
                     )
                     future.result()
                     continue
+                audio, packet_meta = _unwrap_hybrid_audio_message(message)
                 if _should_log_hybrid_asr_event(conn, "queue_dequeue"):
                     conn.logger.bind(tag=TAG).info(
-                        "[HYBRID-AUDIO] queue_dequeue device={} session={} chunk_len={} audio_format={}",
+                        "[HYBRID-AUDIO] queue_dequeue device={} session={} chunk_len={} audio_format={} seq={}",
                         conn.device_id or "-",
                         conn.session_id or "-",
-                        _message_length(message),
+                        _message_length(audio),
                         conn.audio_format,
+                        packet_meta.get("sequence", "-") if packet_meta else "-",
                     )
                 future = asyncio.run_coroutine_threadsafe(
-                    handleAudioMessage(conn, message),
+                    handleAudioMessage(conn, audio, packet_meta),
                     conn.loop,
                 )
                 future.result()
@@ -184,19 +197,39 @@ class ASRProviderBase(ABC):
 
             if conn.asr.interface_type != InterfaceType.STREAM and conn.client_voice_stop:
                 asr_audio_task = conn.asr_audio.copy()
+                vad_metrics = _vad_metrics(conn)
                 conn.reset_audio_states()
 
                 if len(asr_audio_task) > 15:
                     conn.logger.bind(tag=TAG).info(
-                        "[HYBRID-AUDIO] vad_voice_stop trigger_asr device={} session={} frames={} audio_format={}",
+                        "[ASR_TRIGGER] device={} session={} utterance_id={} reason=vad_voice_stop "
+                        "frames={} audio_format={} received_packets={} processed_blocks={} "
+                        "utterance_duration_ms={:.3f} silence_audio_ms={}",
                         conn.device_id or "-",
                         conn.session_id or "-",
+                        vad_metrics.get("utterance_id", "-"),
                         len(asr_audio_task),
                         conn.audio_format,
+                        vad_metrics.get("received_packets", 0),
+                        vad_metrics.get("processed_blocks", 0),
+                        vad_metrics.get("utterance_duration_ms", 0.0),
+                        vad_metrics.get("silence_audio_ms", 0),
                     )
+                    conn._asr_latency_metrics = vad_metrics
                     await self.handle_voice_stop(conn, asr_audio_task)
+                else:
+                    conn.logger.bind(tag=TAG).warning(
+                        "[ASR_TRIGGER_SKIPPED] device={} session={} utterance_id={} reason=too_few_frames frames={}",
+                        conn.device_id or "-",
+                        conn.session_id or "-",
+                        vad_metrics.get("utterance_id", "-"),
+                        len(asr_audio_task),
+                    )
 
     async def handle_voice_stop(self, conn: "ConnectionHandler", asr_audio_task: List[bytes]):
+        asr_started_monotonic = time.monotonic()
+        vad_metrics = getattr(conn, "_asr_latency_metrics", None) or _vad_metrics(conn)
+        utterance_id = vad_metrics.get("utterance_id", "-")
         llm = getattr(conn, "llm", None)
         if llm is not None and hasattr(llm, "_warmup_pool"):
             threading.Thread(
@@ -323,15 +356,30 @@ class ASRProviderBase(ABC):
             text_len, _ = remove_punctuation_and_length(content_for_length_check)
             self.stop_ws_connection()
 
+            conn.logger.bind(tag=TAG, phase="ASR").info(
+                "[ASR_COMPLETE] device={} session={} utterance_id={} status=success "
+                "asr_elapsed_ms={:.3f} end_to_text_ms={:.3f} text_length={} frames={}",
+                conn.device_id or "-",
+                conn.session_id or "-",
+                utterance_id,
+                total_time * 1000,
+                (time.monotonic() - vad_metrics.get("voice_stop_monotonic", asr_started_monotonic)) * 1000,
+                text_len,
+                len(asr_audio_task),
+            )
+
             if text_len > 0:
                 audio_snapshot = asr_audio_task.copy()
                 enqueue_asr_report(conn, enhanced_text, audio_snapshot)
                 await startToChat(conn, enhanced_text)
         except Exception as e:
-            conn.logger.bind(tag=TAG).error(
-                "[HYBRID-ASR] asr_error device={} session={} error_type={} message={}",
+            conn.logger.bind(tag=TAG).exception(
+                "[ASR_COMPLETE] device={} session={} utterance_id={} status=error "
+                "asr_elapsed_ms={:.3f} error_type={} message={}",
                 conn.device_id or "-",
                 conn.session_id or "-",
+                utterance_id,
+                (time.monotonic() - asr_started_monotonic) * 1000,
                 type(e).__name__,
                 e,
             )

@@ -140,7 +140,16 @@ class UdpMediaSession:
             self.last_seq_num = seq_num
             
             if self.asr_audio_queue:
-                self.asr_audio_queue.put(payload)
+                # The legacy UDP header has only sequence, but preserving it
+                # lets the common VAD diagnostics detect scheduling gaps too.
+                self.asr_audio_queue.put(
+                    {
+                        "type": "audio",
+                        "payload": payload,
+                        "sequence": seq_num,
+                        "received_monotonic": time.monotonic(),
+                    }
+                )
                 self.rx_packet_count += 1
                 self.rx_bytes_total += len(payload)
                 if self.rx_packet_count == 1 or self.rx_packet_count % 25 == 0:
@@ -265,7 +274,17 @@ class HkEncryptedUdpSession:
                 }
             )
         else:
-            self.asr_audio_queue.put(payload)
+            # Preserve transport metadata for latency diagnostics without
+            # exposing encrypted media or raw audio in logs.
+            self.asr_audio_queue.put(
+                {
+                    "type": "audio",
+                    "payload": payload,
+                    "sequence": sequence,
+                    "timestamp": timestamp,
+                    "received_monotonic": time.monotonic(),
+                }
+            )
         if self.rx_packet_count == 1 or self.rx_packet_count % 25 == 0:
             self.logger.bind(tag=TAG).info(
                 f"[HK-UDP] uplink packets={self.rx_packet_count} "

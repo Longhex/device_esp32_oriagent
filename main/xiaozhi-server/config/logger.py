@@ -73,6 +73,12 @@ def setup_logging():
             "log_format_file",
             "{time:YYYY-MM-DD HH:mm:ss} - {version}_{extra[selected_module]} - {extra[transport]} - {extra[phase]} - {extra[device]} - {extra[session]} - {name} - {level} - {extra[tag]} - {message}",
         )
+        # Audio latency diagnosis needs an ordering finer than one second.
+        # Preserve user-supplied formats while upgrading the common defaults.
+        log_format = log_format.replace("{time:YYMMDD HH:mm:ss}", "{time:YYMMDD HH:mm:ss.SSS}")
+        log_format_file = log_format_file.replace(
+            "{time:YYYY-MM-DD HH:mm:ss}", "{time:YYYY-MM-DD HH:mm:ss.SSS}"
+        )
         log_format = log_format.replace("{version}", SERVER_VERSION)
         log_format_file = log_format_file.replace("{version}", SERVER_VERSION)
 
