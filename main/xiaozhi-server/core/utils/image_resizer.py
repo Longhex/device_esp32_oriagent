@@ -15,7 +15,9 @@ Flow:
 
 import hashlib
 import os
+import shutil
 import time
+import uuid
 from io import BytesIO
 from pathlib import Path
 from typing import Optional, Tuple
@@ -130,7 +132,7 @@ class ImageResizer:
             cached = self._find_cached(url_hash)
             if cached:
                 logger.bind(tag=TAG).debug(f"Cache hit: {cached.name}")
-                return f"{self.public_url_base}/images/{cached.name}"
+                return self._create_delivery_url(cached)
 
             # 3. Download
             image_bytes, content_type = await self._download(original_url)
@@ -153,7 +155,7 @@ class ImageResizer:
             # 6. Cleanup old cache (non-blocking, best-effort)
             self._cleanup_old()
 
-            return f"{self.public_url_base}/images/{filename}"
+            return self._create_delivery_url(save_path)
 
         except Exception as e:
             logger.bind(tag=TAG).error(f"Image process failed: {e} | URL: {original_url[:80]}")
@@ -172,6 +174,28 @@ class ImageResizer:
                     f.unlink(missing_ok=True)
                     return None
         return None
+
+    def _create_delivery_url(self, source: Path) -> str:
+        """Tạo URL có tên file mới cho mỗi lần gửi xuống firmware.
+
+        Firmware dùng basename của URL làm cache key trên SD. Ảnh resize gốc
+        vẫn được tái sử dụng ở server, còn alias có tên riêng khiến firmware
+        tải lại ảnh thay vì đi vào nhánh cache cục bộ cũ.
+        """
+        delivery_name = f"{source.stem}-{uuid.uuid4().hex[:12]}{source.suffix}"
+        delivery_path = self.cache_dir / delivery_name
+        try:
+            shutil.copyfile(source, delivery_path)
+            logger.bind(tag=TAG).debug(
+                f"Created one-time image delivery alias: {delivery_name}"
+            )
+            return f"{self.public_url_base}/images/{delivery_name}"
+        except Exception as exc:
+            # Không chặn hội thoại nếu không tạo được alias: vẫn trả cache URL.
+            logger.bind(tag=TAG).warning(
+                f"Failed to create image delivery alias: {exc}; using {source.name}"
+            )
+            return f"{self.public_url_base}/images/{source.name}"
 
     async def _download(self, url: str) -> Tuple[Optional[bytes], str]:
         """Download ảnh, trả (bytes, content_type)."""
