@@ -1647,6 +1647,7 @@ class ConnectionHandler:
                     return
 
                 message = {
+                    "type": "cmd",
                     "cmd": "show_image",
                     "url": final_url,
                 }
