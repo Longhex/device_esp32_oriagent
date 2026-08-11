@@ -63,6 +63,7 @@ import xiaozhi.modules.device.dto.DeviceReportRespDTO;
 import xiaozhi.modules.device.entity.DeviceEntity;
 import xiaozhi.modules.device.entity.OtaEntity;
 import xiaozhi.modules.device.service.DeviceService;
+import xiaozhi.modules.device.service.DeviceMonitorProvisioningService;
 import xiaozhi.modules.device.service.OtaService;
 import xiaozhi.modules.device.vo.UserShowDeviceListVO;
 import xiaozhi.modules.security.user.SecurityUser;
@@ -79,6 +80,7 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
     private final SysParamsService sysParamsService;
     private final RedisUtils redisUtils;
     private final OtaService otaService;
+    private final DeviceMonitorProvisioningService deviceMonitorProvisioningService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -160,6 +162,11 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
         if (user.getId() == null) {
             throw new RenException(ErrorCode.USER_NOT_LOGIN);
         }
+
+        // MQTT-only OTA activates only identities already declared in
+        // device-monitor. Do this before consuming the bind code so a
+        // transient monitor failure can be retried with the same code.
+        deviceMonitorProvisioningService.declareDevice(macAddress, "agent:" + agentId);
 
         // ✅ 策略：先清缓存，再插入DB
         // 这样缓存和DB状态会保持一致，即使并发请求也不会看到脏数据
@@ -667,6 +674,8 @@ public class DeviceServiceImpl extends BaseServiceImpl<DeviceDao, DeviceEntity> 
         if (exist != null) {
             throw new RenException(ErrorCode.MAC_ADDRESS_ALREADY_EXISTS);
         }
+        deviceMonitorProvisioningService.declareDevice(
+                dto.getMacAddress(), "agent:" + dto.getAgentId());
         Date now = new Date();
         DeviceEntity entity = new DeviceEntity();
         entity.setId(dto.getMacAddress());
