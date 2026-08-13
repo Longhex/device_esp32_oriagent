@@ -154,6 +154,23 @@ class OtaPublicContractTest(unittest.TestCase):
             result["subscribe_topic"], "a0:f2:62:ea:1e:68/MONITOR"
         )
 
+    def test_mqtt_topics_prefer_device_id_over_serial(self):
+        result = build_firmware_mqtt_config(
+            {
+                "endpoint": "broker.hkrobotics.ai",
+                "client_id": "14:C1:9F:43:FD:1C",
+                "username": "14:C1:9F:43:FD:1C",
+                "password": "device-password",
+            },
+            topic_identity="28:84:85:89:56:28",
+        )
+        self.assertEqual(
+            result["publish_topic"], "28:84:85:89:56:28/AI_MONITOR"
+        )
+        self.assertEqual(
+            result["subscribe_topic"], "28:84:85:89:56:28/MONITOR"
+        )
+
     def test_generated_topics_normalize_mac_identity(self):
         result = build_firmware_mqtt_config(
             {

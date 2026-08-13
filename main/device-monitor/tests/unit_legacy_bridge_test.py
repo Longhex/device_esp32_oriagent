@@ -61,6 +61,17 @@ class LegacyVoiceAclTest(unittest.TestCase):
         )
         self.assertNotIn(("publish", "+"), allowed)
 
+    def test_device_acl_uses_device_id_topics_with_serial_credentials(self):
+        admin = CaptureAdmin()
+        admin.set_device_acl(
+            "14:C1:9F:43:FD:1C", topic_identity="28:84:85:89:56:28"
+        )
+        rules = admin.requests[-1][2][0]["rules"]
+        allowed = {(rule["action"], rule["topic"]) for rule in rules}
+        self.assertIn(("publish", "28:84:85:89:56:28/AI_MONITOR"), allowed)
+        self.assertIn(("subscribe", "28:84:85:89:56:28/MONITOR"), allowed)
+        self.assertNotIn(("publish", "14:C1:9F:43:FD:1C/AI_MONITOR"), allowed)
+
     def test_backend_acl_allows_bare_voice_subscribe(self):
         admin = CaptureAdmin()
         admin.set_full_acl("oriagent-monitor")

@@ -121,7 +121,10 @@ def activate_serial(serial, mac=None, rotate=False):
         return None, err
     try:
         emqx = EmqxAdmin(logger=_log).login()
-        emqx.provision_device(serial, rec["password"])
+        topic_identity = common.normalize_client(mac or serial)
+        emqx.provision_device(
+            serial, rec["password"], topic_identity=topic_identity
+        )
     except EmqxError as e:
         return None, f"EMQX provision lỗi: {e}"
     return {
@@ -132,8 +135,8 @@ def activate_serial(serial, mac=None, rotate=False):
             "client_id": serial,
             "username": serial,
             "password": rec["password"],
-            "publish_topic": common.hk_device_publish_topic(serial),
-            "subscribe_topic": common.hk_device_subscribe_topic(serial),
+            "publish_topic": common.hk_device_publish_topic(topic_identity),
+            "subscribe_topic": common.hk_device_subscribe_topic(topic_identity),
             "topics": {
                 "status": common.topic_status(serial),
                 "telemetry": common.topic_telemetry(serial),

@@ -55,11 +55,11 @@ def resolve_ota_serial_number(headers, device_id: str) -> tuple[str, bool]:
 def build_firmware_mqtt_config(
     mqtt_config: dict, topic_identity: str = ""
 ) -> dict:
-    """Return the OTA MQTT contract using the device serial for topic names.
+    """Return the OTA MQTT contract using the selected topic identity.
 
     Some MQTT providers use a generated client_id (for example ``GID_...``)
-    while the HK topic contract is keyed by the device Serial-Number.  The
-    caller therefore passes the serial from the OTA request when available.
+    while HK firmware routes the current MQTT+UDP contract by its Device-Id
+    (MAC). The caller passes Device-Id when present, falling back to serial.
     """
     required = ("endpoint", "client_id", "username", "password")
     if not isinstance(mqtt_config, dict) or not all(
@@ -278,7 +278,8 @@ class OTAHandler(BaseHandler):
                         return None
                     try:
                         return build_firmware_mqtt_config(
-                            mqtt_config, topic_identity=serial_number
+                            mqtt_config,
+                            topic_identity=normalize_ota_identity(mac) or serial_number,
                         )
                     except ValueError:
                         self.logger.bind(tag=TAG).warning(
