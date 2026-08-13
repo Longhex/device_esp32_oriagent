@@ -98,17 +98,16 @@ class EmqxAdmin:
             status = 200
         return status
 
-    def set_device_acl(self, username, topics_prefix=None, topic_identity=None):
+    def set_device_acl(self, username, topics_prefix=None):
         """Set canonical ACL plus the minimum current-HK compatibility rules."""
         prefix = topics_prefix or f"devices/{username}/#"
-        topic_identity = common.normalize_client(topic_identity or username)
         rules = [{"permission": "allow", "action": "all", "topic": prefix}]
         if common.ENABLE_HK_LEGACY_BRIDGE:
             rules.extend([
                 {
                     "permission": "allow",
                     "action": "publish",
-                    "topic": topic_identity,
+                    "topic": username,
                 },
                 {
                     "permission": "allow",
@@ -118,17 +117,17 @@ class EmqxAdmin:
                 {
                     "permission": "allow",
                     "action": "subscribe",
-                    "topic": common.legacy_command_topic(topic_identity),
+                    "topic": common.legacy_command_topic(username),
                 },
                 {
                     "permission": "allow",
                     "action": "publish",
-                    "topic": common.hk_device_publish_topic(topic_identity),
+                    "topic": common.hk_device_publish_topic(username),
                 },
                 {
                     "permission": "allow",
                     "action": "subscribe",
-                    "topic": common.hk_device_subscribe_topic(topic_identity),
+                    "topic": common.hk_device_subscribe_topic(username),
                 },
             ])
         self._request("DELETE",
@@ -182,7 +181,7 @@ class EmqxAdmin:
         self._request("DELETE",
                       f"/authorization/sources/built_in_database/rules/users/{username}", silent=True)
 
-    def provision_device(self, username, password, topic_identity=None):
+    def provision_device(self, username, password):
         """Tạo/cập nhật credential + ACL cho 1 thiết bị (dùng khi activate)."""
         self.upsert_user(username, password)
-        self.set_device_acl(username, topic_identity=topic_identity)
+        self.set_device_acl(username)
