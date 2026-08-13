@@ -422,24 +422,22 @@ class OTAHandler(BaseHandler):
                 },
             }
 
-            mqtt_config = await self._get_management_mqtt_config(
-                serial_number, device_id, request_id=request_id
-            )
-            if mqtt_config:
+            transport_mode = os.environ.get(
+                "TRANSPORT_MODE", "websocket_legacy"
+            ).strip().lower()
+            if transport_mode == "mqtt_udp_hk":
+                mqtt_config = await self._get_management_mqtt_config(
+                    serial_number, device_id, request_id=request_id
+                )
+                if not mqtt_config:
+                    raise ValueError(
+                        "MQTT-only voice requires successful device identity provisioning"
+                    )
                 return_json["mqtt"] = mqtt_config
                 self.logger.bind(tag=TAG).info(
                     f"{log_prefix} MQTT_CONFIG_READY serial={serial_number} "
                     f"payload={protocol_payload_json_for_log(mqtt_config)}"
                 )
-
-            transport_mode = os.environ.get(
-                "TRANSPORT_MODE", "websocket_legacy"
-            ).strip().lower()
-            if transport_mode == "mqtt_udp_hk":
-                if not mqtt_config:
-                    raise ValueError(
-                        "MQTT-only voice requires successful device identity provisioning"
-                    )
                 return_json["transport"] = {
                     "type": "mqtt_udp",
                     "version": 3,
@@ -449,6 +447,8 @@ class OTAHandler(BaseHandler):
                     f"serial={serial_number}"
                 )
             else:
+                # Do not include MQTT credentials in a WebSocket OTA response.
+                # Some firmware prefers MQTT whenever that field is present.
                 token = ""
                 if self.auth_enable:
                     if self.allowed_devices:
