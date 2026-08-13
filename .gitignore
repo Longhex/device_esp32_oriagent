@@ -198,3 +198,4 @@ deploy/data/*
 !main/manager-mobile/**/*.json
 !main/xiaozhi-server/**/*.json.codex/  
 firmware/.pio/ 
+my-local-folder/
