@@ -30,7 +30,7 @@ Perf metrics emitted:
 import json
 import threading
 import time
-from typing import Callable, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from websockets.exceptions import ConnectionClosed
 from websockets.sync.client import connect as ws_connect
@@ -122,87 +122,6 @@ class LLMProvider(LLMProviderBase):
         for token in self.response(session_id, dialogue, **kwargs):
             yield token, None
 
-    def warmup(
-        self,
-        user_id: str,
-        session_id: str = "",
-        trigger: str = "listen_start",
-        is_cancelled: Optional[Callable[[], bool]] = None,
-    ) -> bool:
-        """Open or reuse the per-device Oriagent WS without sending a chat request."""
-        if callable(is_cancelled) and is_cancelled():
-            return False
-        if not self.ws_url or not self.api_key or not user_id:
-            logger.bind(tag=TAG).warning(
-                "[TIMING] event=oriagent_ws_warm_skipped trigger={} reason=missing_config_or_user wall_ms={}",
-                trigger,
-                int(time.time() * 1000),
-            )
-            return False
-
-        lock = self._get_device_lock(user_id)
-        warm_started = time.perf_counter()
-        logger.bind(tag=TAG).info(
-            "[TIMING] event=oriagent_ws_warm_requested device={} session={} trigger={} wall_ms={}",
-            user_id[:16],
-            session_id or "-",
-            trigger,
-            int(time.time() * 1000),
-        )
-        if not lock.acquire(timeout=_LOCK_TIMEOUT):
-            logger.bind(tag=TAG).warning(
-                "[TIMING] event=oriagent_ws_warm_busy device={} session={} trigger={} wall_ms={}",
-                user_id[:16],
-                session_id or "-",
-                trigger,
-                int(time.time() * 1000),
-            )
-            return False
-
-        try:
-            if callable(is_cancelled) and is_cancelled():
-                return False
-            _, connect_ms = self._get_or_connect(user_id)
-            if callable(is_cancelled) and is_cancelled():
-                self._drop_conn(user_id, reason="warmup_cancelled")
-                logger.bind(tag=TAG).info(
-                    "[TIMING] event=oriagent_ws_warm_cancelled device={} session={} trigger={} wall_ms={}",
-                    user_id[:16],
-                    session_id or "-",
-                    trigger,
-                    int(time.time() * 1000),
-                )
-                return False
-            elapsed_ms = (time.perf_counter() - warm_started) * 1000
-            if connect_ms is not None:
-                perf_metrics.record(
-                    "oriagent_websocket_connect_ms",
-                    connect_ms,
-                    session=session_id or user_id,
-                )
-            logger.bind(tag=TAG).info(
-                "[TIMING] event=oriagent_ws_warm_ready device={} session={} trigger={} wall_ms={} elapsed_ms={:.3f} reused={}",
-                user_id[:16],
-                session_id or "-",
-                trigger,
-                int(time.time() * 1000),
-                elapsed_ms,
-                connect_ms is None,
-            )
-            return True
-        except Exception as exc:
-            logger.bind(tag=TAG).error(
-                "[TIMING] event=oriagent_ws_warm_failed device={} session={} trigger={} wall_ms={} error={}",
-                user_id[:16],
-                session_id or "-",
-                trigger,
-                int(time.time() * 1000),
-                exc,
-            )
-            return False
-        finally:
-            lock.release()
-
     def close(self) -> None:
         """Close all pooled connections and stop the keepalive thread."""
         self._keepalive_running = False
@@ -257,10 +176,7 @@ class LLMProvider(LLMProviderBase):
 
         connect_ms = (time.perf_counter() - t0) * 1000
         logger.bind(tag=TAG).info(
-            "[TIMING] event=oriagent_ws_opened device={} wall_ms={} connect_ms={:.3f}",
-            user_id[:16],
-            int(time.time() * 1000),
-            connect_ms,
+            f"[WS] New connection for {user_id[:16]} in {connect_ms:.0f}ms"
         )
 
         with self._pool_lock:
@@ -271,19 +187,13 @@ class LLMProvider(LLMProviderBase):
 
         return ws, connect_ms
 
-    def _drop_conn(self, user_id: str, reason: str = "unspecified") -> None:
+    def _drop_conn(self, user_id: str) -> None:
         """Remove and close a device's pooled connection."""
         with self._pool_lock:
             ws = self._conns.pop(user_id, None)
             self._last_activity.pop(user_id, None)
             self._stream_clean.pop(user_id, None)
         if ws is not None:
-            logger.bind(tag=TAG).info(
-                "[TIMING] event=oriagent_ws_closed device={} wall_ms={} reason={}",
-                user_id[:16],
-                int(time.time() * 1000),
-                reason,
-            )
             try:
                 ws.close()
             except Exception:
@@ -459,14 +369,6 @@ class LLMProvider(LLMProviderBase):
 
         try:
             ws.send(json.dumps(chat_frame, ensure_ascii=False))
-            logger.bind(tag=TAG).info(
-                "[TIMING] event=oriagent_request_sent device={} session={} wall_ms={} reused={} query_chars={}",
-                user_id[:16],
-                session_id or "-",
-                int(time.time() * 1000),
-                connect_ms is None,
-                len(query),
-            )
         except ConnectionClosed:
             self._drop_conn(user_id)
             if not _conn_retry:
@@ -518,13 +420,7 @@ class LLMProvider(LLMProviderBase):
                 if text:
                     if not ttft_logged:
                         ttft_ms = (time.perf_counter() - t0) * 1000
-                        logger.bind(tag=TAG).info(
-                            "[TIMING] event=oriagent_first_response device={} session={} wall_ms={} ttft_ms={:.3f}",
-                            user_id[:16],
-                            session_id or "-",
-                            int(time.time() * 1000),
-                            ttft_ms,
-                        )
+                        logger.bind(tag=TAG).info(f"[WS] TTFT={ttft_ms:.0f}ms")
                         perf_metrics.record(
                             "oriagent_websocket_ttft_ms", ttft_ms,
                             session=session_id,

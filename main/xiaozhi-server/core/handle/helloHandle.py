@@ -101,22 +101,7 @@ async def handleHelloMessage(conn: "ConnectionHandler", msg_json):
             # 发送初始化
             asyncio.create_task(send_mcp_initialize_message(conn))
 
-    conn.logger.bind(tag=TAG, phase="CONN").info(
-        "[TIMING] event=device_ws_hello_received device={} session={} wall_ms={}",
-        conn.device_id or "-",
-        conn.session_id or "-",
-        int(time.time() * 1000),
-    )
     await conn.websocket.send(json.dumps(conn.welcome_msg))
-    conn.logger.bind(tag=TAG, phase="CONN").info(
-        "[TIMING] event=device_ws_welcome_sent device={} session={} wall_ms={} since_accept_ms={:.3f}",
-        conn.device_id or "-",
-        conn.session_id or "-",
-        int(time.time() * 1000),
-        (time.monotonic() - conn.device_ws_connected_monotonic) * 1000
-        if conn.device_ws_connected_monotonic else 0.0,
-    )
-    conn.start_device_ws_heartbeat()
 
 
 async def checkWakeupWords(conn: "ConnectionHandler", text):
