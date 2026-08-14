@@ -43,6 +43,8 @@ from config.manage_api_client import DeviceNotFoundException, DeviceBindExceptio
 from core.utils.prompt_manager import PromptManager
 from core.utils.voiceprint_provider import VoiceprintProvider
 from core.utils.image_extractor import StreamingImageExtractor
+from core.utils.math_extractor import StreamingMathExtractor
+from core.utils.math_speech_client import MathSpeechClient
 from core.utils.image_resizer import ImageResizer
 from core.utils.util import get_system_error_response
 from core.utils import textUtils
@@ -217,6 +219,9 @@ class ConnectionHandler:
         self.tts_MessageText = ""
         # Trích ảnh markdown ![alt](url) khỏi stream LLM (tạo mới mỗi turn ở chat())
         self._image_extractor = None
+        # MathCAT chạy ở sidecar Python 3.11; client này đồng bộ vì chat() đồng bộ.
+        self._math_speech_client = MathSpeechClient()
+        self._math_extractor = None
         # Ảnh chờ show, gắn với offset ký tự trong text-đưa-vào-TTS. Bắn khi audio
         # phát tới offset đó (đồng bộ theo segment). single-producer(chat, append)
         # / single-consumer(playback+LAST, pop front) -> an toàn dưới GIL, không cần lock.
@@ -1059,6 +1064,11 @@ class ConnectionHandler:
             # Extractor mới cho turn này: tách ![alt](url) khỏi text vào TTS,
             # url được gửi xuống device (show_image) + web caller.
             self._image_extractor = StreamingImageExtractor()
+            self._math_extractor = (
+                StreamingMathExtractor(self._math_speech_client)
+                if self._math_speech_client.enabled
+                else None
+            )
             self._pending_image_signals = []
             self._tts_emitted_chars = 0
             self.dialogue.put(Message(role="user", content=query))
@@ -1419,7 +1429,9 @@ class ConnectionHandler:
                             # Resizer chạy async (download+resize) song song với TTS.
                             for _alt, _img_url in extracted_images:
                                 self._send_show_image(_img_url)
-                            self._tts_emitted_chars += len(tts_content)
+                        if self._math_extractor is not None:
+                            tts_content = self._math_extractor.feed(tts_content)
+                        self._tts_emitted_chars += len(tts_content)
                         if tts_content:
                             self.tts.tts_text_queue.put(
                                 TTSMessageDTO(
@@ -1555,21 +1567,24 @@ class ConnectionHandler:
 
         if depth == 0:
             # Nhả nốt text extractor còn giữ (đuôi nghi là form ảnh nhưng stream đã hết)
+            _tail = ""
             if self._image_extractor is not None:
                 _tail, _tail_images = self._image_extractor.flush()
                 # GỬI ẢNH NGAY LẬP TỨC (flush cuối stream)
                 for _alt, _img_url in _tail_images:
                     self._send_show_image(_img_url)
-                self._tts_emitted_chars += len(_tail)
-                if _tail and _tail.strip() and not self.client_abort:
-                    self.tts.tts_text_queue.put(
-                        TTSMessageDTO(
-                            sentence_id=self.sentence_id,
-                            sentence_type=SentenceType.MIDDLE,
-                            content_type=ContentType.TEXT,
-                            content_detail=_tail,
-                        )
+            if self._math_extractor is not None:
+                _tail = self._math_extractor.feed(_tail) + self._math_extractor.flush()
+            self._tts_emitted_chars += len(_tail)
+            if _tail and _tail.strip() and not self.client_abort:
+                self.tts.tts_text_queue.put(
+                    TTSMessageDTO(
+                        sentence_id=self.sentence_id,
+                        sentence_type=SentenceType.MIDDLE,
+                        content_type=ContentType.TEXT,
+                        content_detail=_tail,
                     )
+                )
             self.tts.tts_text_queue.put(
                 TTSMessageDTO(
                     sentence_id=self.sentence_id,
@@ -1898,6 +1913,9 @@ class ConnectionHandler:
                 await self.tts.close()
             if self.asr:
                 await self.asr.close()
+
+            if self._math_speech_client:
+                self._math_speech_client.close()
 
             # 最后关闭线程池（避免阻塞）
             if self.executor:

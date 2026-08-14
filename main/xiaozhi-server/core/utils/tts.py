@@ -119,7 +119,16 @@ class MarkdownCleaner:
 
         # Mảnh markdown bị vỡ: ](https://...)
         (re.compile(r"\]\s*\(\s*https?://[^)\s]+[^)]*\)"), ""),
-        
+
+        # Sidecar lỗi/tắt thì vẫn giữ nội dung công thức để TTS đọc thô.
+        # Phải unwrap \[...\] trước rule xóa nội dung trong ngoặc vuông.
+        (re.compile(r"\$\$(.*?)\$\$", re.DOTALL), r"\1"),
+        (
+            re.compile(r"(?<![A-Za-z0-9])\$([^\n$]+)\$(?![A-Za-z0-9])"),
+            _replace_inline_dollar,
+        ),
+        (re.compile(r"\\\((.*?)\\\)", re.DOTALL), r"\1"),
+        (re.compile(r"\\\[(.*?)\\\]", re.DOTALL), r"\1"),
 
         # Xóa triệt để mọi nội dung nằm trong ngoặc vuông còn lại (như [en], [laugh]...)
         (re.compile(r"\[[^\]]*\]"), ""),
@@ -135,11 +144,6 @@ class MarkdownCleaner:
             _replace_table_block
         ),
         (re.compile(r'^\s*[*+-]\s*', re.MULTILINE), '- '),  # 列表
-        (re.compile(r'\$\$.*?\$\$', re.DOTALL), ''),  # 块级公式
-        (
-            re.compile(r'(?<![A-Za-z0-9])\$([^\n$]+)\$(?![A-Za-z0-9])'),
-            _replace_inline_dollar
-        ),
         (re.compile(r'\n{2,}'), '\n'),  # 多余空行
     ]
 

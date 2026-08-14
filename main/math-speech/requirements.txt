@@ -1,0 +1,4 @@
+fastapi==0.115.6
+latex2mathml==3.81.0
+pydantic==2.10.4
+uvicorn[standard]==0.34.0

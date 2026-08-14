@@ -1,0 +1,39 @@
+# Opt-in production overlay. Không tự khởi động hay sửa stack production hiện tại.
+# Dùng:
+# docker compose -f deploy/docker-compose.prod.yml \
+#   -f deploy/docker-compose.math-speech.yml config
+
+services:
+  xiaozhi-server:
+    environment:
+      MATH_SPEECH_ENABLED: "true"
+      MATH_SPEECH_API: http://math-speech:8100
+      MATH_SPEECH_TIMEOUT_SECONDS: ${MATH_SPEECH_TIMEOUT_SECONDS:-1.5}
+      MATH_SPEECH_FAILURE_THRESHOLD: ${MATH_SPEECH_FAILURE_THRESHOLD:-3}
+      MATH_SPEECH_COOLDOWN_SECONDS: ${MATH_SPEECH_COOLDOWN_SECONDS:-30}
+    depends_on:
+      math-speech:
+        condition: service_healthy
+
+  math-speech:
+    image: ${MATH_SPEECH_IMAGE_NAME:-oriagent-math-speech:local}
+    build:
+      context: ../main/math-speech
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      MATHCAT_LANGUAGE: ${MATHCAT_LANGUAGE:-vi}
+      MATHCAT_SPEECH_STYLE: ${MATHCAT_SPEECH_STYLE:-SimpleSpeak}
+      MATHCAT_MAX_INPUT_CHARS: ${MATHCAT_MAX_INPUT_CHARS:-16000}
+    expose:
+      - "8100"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    mem_limit: ${MATH_SPEECH_MEMORY_LIMIT:-256m}
+    cpus: ${MATH_SPEECH_CPU_LIMIT:-0.3}
+    networks:
+      - backend

@@ -1,0 +1,288 @@
+{
+  "language": "vi",
+  "comment": [
+    "Sửa bản dịch tiếng Việt của MathCAT v0.7.3 (Rules/Languages/vi/vi.zip).",
+    "Bản upstream dịch máy nên một số cách đọc không đúng chuẩn toán học Việt Nam.",
+    "Mỗi mục khớp NGUYÊN một dòng (find/replace) hoặc một khối dòng liền nhau",
+    "(find_block/replace_block), và bắt buộc đúng 'count' lần; sai số lượng thì",
+    "build fail thay vì âm thầm phát sai."
+  ],
+  "edits": [
+    {
+      "why": [
+        "Viết lại hai luật phân số của SimpleSpeak:",
+        "1) Tử/mẫu đều là SỐ CỤ THỂ -> 'phần' (1/2 = 'một phần hai');",
+        "   có ẩn/tên biến -> 'trên' (a/b = 'a trên b').",
+        "2) Tử hoặc mẫu là biểu thức ghép -> 'phân số, <tử>, tất cả trên <mẫu>',",
+        "   để (a+1)/2 khác hẳn a + 1/2.",
+        "Bỏ điều kiện chặn phân số lồng nhau vì cách đọc mới đã đủ rõ ràng.",
+        "'trên' của đơn vị (luật per-fraction) và của chỉ số trên giữ nguyên."
+      ],
+      "file": "SimpleSpeak_Rules.yaml",
+      "count": 1,
+      "find_block": [
+        "- name: simple",
+        "  # don't include nested fractions. E.g, fraction a plus b over c + 1 end fraction\" is ambiguous",
+        "  # by simplistic SimpleSpeak's rules \"b over c\" is a fraction, but if we say nested fractions",
+        "  # are never simple, then any 'over' applies only to enclosing \"fraction...end fraction\" pair.",
+        "  tag: fraction",
+        "  match:",
+        "  - \"(IsNode(*[1],'leaf') and IsNode(*[2],'leaf')) and\"",
+        "  - \"not(ancestor::*[name() != 'mrow'][1]/self::m:fraction)\" # FIX: can't test for mrow -- what should be used???",
+        "  replace:",
+        "  - x: \"*[1]\"",
+        "  - T: trên",
+        "  - x: \"*[2]\"",
+        "  - pause: short",
+        "",
+        "- name: default",
+        "  tag: fraction",
+        "  match: \".\"",
+        "  replace:",
+        "  - T: phân số",
+        "  - pause: short",
+        "  - x: \"*[1]\"",
+        "  - test:",
+        "      if: \"not(IsNode(*[1],'leaf'))\"",
+        "      then: [{pause: short}]",
+        "  - T: trên",
+        "  - test:",
+        "      if: \"not(IsNode(*[2],'leaf'))\"",
+        "      then: [{pause: short}]",
+        "  - x: \"*[2]\"",
+        "  - pause: short",
+        "  - T: hết phân số",
+        "  - pause: medium"
+      ],
+      "replace_block": [
+        "- name: simple",
+        "  # Phân số lồng nhau vẫn dùng luật này được: vế ngoài đã mở bằng \"phân số\"",
+        "  # nên \"phân số, a trên b, tất cả trên c\" vẫn đọc rõ.",
+        "  tag: fraction",
+        "  match: \"IsNode(*[1],'leaf') and IsNode(*[2],'leaf')\"",
+        "  replace:",
+        "  - x: \"*[1]\"",
+        "  - test:",
+        "      # Giá trị cụ thể (số) đọc \"phần\"; ẩn/tên biến đọc \"trên\".",
+        "      if: \"*[1][self::m:mn] and *[2][self::m:mn]\"",
+        "      then: [{T: phần}]",
+        "      else: [{T: trên}]",
+        "  - x: \"*[2]\"",
+        "  - pause: short",
+        "",
+        "- name: default",
+        "  tag: fraction",
+        "  match: \".\"",
+        "  replace:",
+        "  - T: phân số",
+        "  - pause: short",
+        "  - x: \"*[1]\"",
+        "  - pause: short",
+        "  - T: tất cả trên",
+        "  - x: \"*[2]\"",
+        "  - pause: medium"
+      ]
+    },
+    {
+      "why": [
+        "Thêm hai luật mrow cho dấu gạch chéo viết thẳng (a/b), vì latex2mathml",
+        "sinh ra mo '/' chứ không phải mfrac nên các luật phân số không bắt được.",
+        "Đặt ngay trước các include để thắng luật mrow chung trong SharedRules."
+      ],
+      "file": "SimpleSpeak_Rules.yaml",
+      "count": 1,
+      "find_block": [
+        "- include: \"SharedRules/geometry.yaml\""
+      ],
+      "replace_block": [
+        "- name: slash-simple",
+        "  tag: mrow",
+        "  match:",
+        "  - \"count(*)=3 and *[2][self::m:mo][.='/'] and\"",
+        "  - \"IsNode(*[1],'leaf') and IsNode(*[3],'leaf')\"",
+        "  replace:",
+        "  - x: \"*[1]\"",
+        "  - test:",
+        "      if: \"*[1][self::m:mn] and *[3][self::m:mn]\"",
+        "      then: [{T: phần}]",
+        "      else: [{T: trên}]",
+        "  - x: \"*[3]\"",
+        "",
+        "- name: slash-compound",
+        "  tag: mrow",
+        "  match: \"count(*)=3 and *[2][self::m:mo][.='/']\"",
+        "  replace:",
+        "  - T: phân số",
+        "  - pause: short",
+        "  - test:",
+        "      # \"(a+1)/2\": bỏ ngoặc vì chữ \"tất cả\" đã nói thay vai trò của ngoặc.",
+        "      if: \"*[1][self::m:mrow][IsBracketed(., '(', ')')]\"",
+        "      then: [{x: \"*[1]/*[2]\"}]",
+        "      else: [{x: \"*[1]\"}]",
+        "  - pause: short",
+        "  - T: tất cả trên",
+        "  - test:",
+        "      if: \"*[3][self::m:mrow][IsBracketed(., '(', ')')]\"",
+        "      then: [{x: \"*[3]/*[2]\"}]",
+        "      else: [{x: \"*[3]\"}]",
+        "  - pause: medium",
+        "",
+        "- include: \"SharedRules/geometry.yaml\""
+      ]
+    },
+    {
+      "why": "Cùng lý do, cho SpeechStyle=ClearSpeak.",
+      "file": "ClearSpeak_Rules.yaml",
+      "find": "  - T: trên",
+      "replace": "  - T: phần",
+      "count": 2
+    },
+    {
+      "why": "Quy tắc phân số mặc định dùng chung. Dòng 'trên' của chỉ số trên (# phrase(x 'super' 2)) cố ý không đổi.",
+      "file": "SharedRules/default.yaml",
+      "find": "  - T: \"trên\"               # phrase(\"the fraction x 'over' y\")",
+      "replace": "  - T: \"phần\"               # phrase(\"the fraction x 'over' y\")",
+      "count": 1
+    },
+    {
+      "why": "Chế độ đọc tổng quan (overview) của phân số.",
+      "file": "overview.yaml",
+      "find": "      - T: \"trên\"",
+      "replace": "      - T: \"phần\"",
+      "count": 1
+    },
+    {
+      "why": "U+2044 FRACTION SLASH là dấu phân số, đọc 'phần'.",
+      "file": "unicode-full.yaml",
+      "find": " - \"⁄\": [T: \"trên\"]                                 #  0x2044",
+      "replace": " - \"⁄\": [T: \"phần\"]                                 #  0x2044",
+      "count": 1
+    },
+    {
+      "why": "Bỏ hẳn 'hết căn' theo yêu cầu; chỉ giữ một nhịp ngắt. Áp cho cả luật square-root và root.",
+      "file": "SimpleSpeak_Rules.yaml",
+      "count": 2,
+      "find_block": [
+        "  - test:",
+        "      if: IsNode(*[1], 'leaf')",
+        "      then: [{pause: short}]",
+        "      else: [{T: hết căn}, {pause: short}]"
+      ],
+      "replace_block": [
+        "  - pause: short"
+      ]
+    },
+    {
+      "why": "± đọc rõ là 'cộng hoặc trừ' (unicode-full.yaml đã dịch đúng, unicode.yaml thì chưa).",
+      "file": "unicode.yaml",
+      "find": " - \"±\": [T: cộng trừ]                       # 0xb1",
+      "replace": " - \"±\": [T: cộng hoặc trừ]                 # 0xb1",
+      "count": 1
+    },
+    {
+      "why": "∓ tương ứng.",
+      "file": "unicode.yaml",
+      "find": " - \"∓\": [T: trừ cộng]                       # 0x2213",
+      "replace": " - \"∓\": [T: trừ hoặc cộng]                 # 0x2213",
+      "count": 1
+    },
+    {
+      "why": "Dự phòng cho các dạng luật slash-simple/slash-compound không bắt (ví dụ a/b/c). Chỉ đổi U+002F; dấu ÷ vẫn là 'chia'.",
+      "file": "unicode.yaml",
+      "find": " - \"/\": [T: chia]                          # 0x2f",
+      "replace": " - \"/\": [T: trên]                          # 0x2f",
+      "count": 1
+    },
+    {
+      "why": "U+2215 DIVISION SLASH dùng như gạch phân số, đọc giống U+002F.",
+      "file": "unicode-full.yaml",
+      "find": " - \"∕\": [T: \"chia\"]                             #  0x2215",
+      "replace": " - \"∕\": [T: \"trên\"]                             #  0x2215",
+      "count": 1
+    },
+    {
+      "why": "Bản dự phòng của U+002F trong unicode-full.yaml.",
+      "file": "unicode-full.yaml",
+      "find": " - \"/\": [t: \"chia\"]                                 #  0x2f (en: 'divided by')",
+      "replace": " - \"/\": [t: \"trên\"]                                 #  0x2f (en: 'divided by')",
+      "count": 1
+    },
+    {
+      "why": "U+220F N-ARY PRODUCT là 'tích', không phải chữ cái Hy Lạp 'pi'.",
+      "file": "unicode.yaml",
+      "find": " - \"∏\": [T: pi]                             # 0x220f",
+      "replace": " - \"∏\": [T: tích]                           # 0x220f",
+      "count": 1
+    },
+    {
+      "why": "U+2210 N-ARY COPRODUCT là 'đối tích'.",
+      "file": "unicode.yaml",
+      "find": " - \"∐\": [T: pi ngược]                           # 0x2210",
+      "replace": " - \"∐\": [T: đối tích]                         # 0x2210",
+      "count": 1
+    },
+    {
+      "why": "unicode-full.yaml dịch máy ∏/∐ thành 'sản phẩm'.",
+      "file": "unicode-full.yaml",
+      "find": " - \"∏\": [t: \"sản phẩm\"]                             #  0x220f   (en: 'product')",
+      "replace": " - \"∏\": [t: \"tích\"]                                 #  0x220f   (en: 'product')",
+      "count": 1
+    },
+    {
+      "why": "unicode-full.yaml dịch máy ∐ thành 'sản phẩm sản xuất'.",
+      "file": "unicode-full.yaml",
+      "find": " - \"∐\": [t: \"sản phẩm sản xuất\"]                    #  0x2210   (en: 'coproduct')",
+      "replace": " - \"∐\": [t: \"đối tích\"]                             #  0x2210   (en: 'coproduct')",
+      "count": 1
+    },
+    {
+      "why": "'log' phiên âm thành 'lóc' nghe không ra chữ; đọc 'lô-ga-rít'.",
+      "file": "SharedRules/general.yaml",
+      "find": "      then: [T: \"lóc\"]      # phrase(the 'log' function is used in mathematics)",
+      "replace": "      then: [T: \"lô-ga-rít\"]      # phrase(the 'log' function is used in mathematics)",
+      "count": 1
+    },
+    {
+      "why": "'ln' phiên âm thành 'lóc nơ be' (đọc chệch từ 'log natural be'); đọc 'lô-ga-rít tự nhiên'.",
+      "file": "SharedRules/general.yaml",
+      "find": "      then: [T: \"lóc nơ be\"]",
+      "replace": "      then: [T: \"lô-ga-rít tự nhiên\"]",
+      "count": 1
+    },
+    {
+      "why": "Nhánh verbose của 'ln'.",
+      "file": "SharedRules/general.yaml",
+      "find": "      else: [T: \"lóc nơ be\"]      # phrase(the 'natural log' function is used in mathematics)",
+      "replace": "      else: [T: \"lô-ga-rít tự nhiên\"]      # phrase(the 'natural log' function is used in mathematics)",
+      "count": 1
+    },
+    {
+      "why": "Cùng lý do, cho SpeechStyle=ClearSpeak.",
+      "file": "ClearSpeak_Rules.yaml",
+      "find": "  - T: \"lóc\"   # log",
+      "replace": "  - T: \"lô-ga-rít\"   # log",
+      "count": 1
+    },
+    {
+      "why": "Bản gốc dùng ';' thay vì ':' nên \\log_2 x đọc thành 'lóc của 2, của x'. Định dạng đúng là 'terse: medium: verbose'.",
+      "file": "definitions.yaml",
+      "find": "    \"logarithm-with-base\": \"prefix=lóc cơ số; lóc của\",",
+      "replace": "    \"logarithm-with-base\": \"prefix=lô-ga-rít cơ số: lô-ga-rít cơ số: lô-ga-rít cơ số\",",
+      "count": 1
+    },
+    {
+      "why": "Tên hàm đã kèm 'của' trong khi quy tắc gọi hàm cũng thêm 'của' -> |x| đọc thành 'trị tuyệt đối của của x'.",
+      "file": "definitions.yaml",
+      "find": "    \"absolute-value\": \"function= ; trị tuyệt đối: trị tuyệt đối của: trị tuyệt đối của; hết trị tuyệt đối\",",
+      "replace": "    \"absolute-value\": \"function= ; trị tuyệt đối: trị tuyệt đối: trị tuyệt đối; hết trị tuyệt đối\",",
+      "count": 1
+    },
+    {
+      "why": "Thiếu 'khi': \\lim_{x \\to 0} đọc thành 'giới hạn x tiến đến 0'.",
+      "file": "definitions.yaml",
+      "find": "    \"limit\": \"prefix=giới hạn\",",
+      "replace": "    \"limit\": \"prefix=giới hạn khi\",",
+      "count": 1
+    }
+  ]
+}

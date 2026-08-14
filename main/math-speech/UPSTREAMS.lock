@@ -1,0 +1,12 @@
+# Source snapshots inspected while implementing this service.
+# Runtime artifacts are pinned separately to the stable v0.7.3 release below.
+
+MathCAT https://github.com/daisy/MathCAT.git ed9c025a42d53c54f055fc89ce8c86af0490a5b5
+MathCATForPython https://github.com/daisy/MathCATForPython.git dce11b7bdb2bdda2623adaf662d6b8055ed82155
+latex2mathml https://github.com/roniemartinez/latex2mathml.git f03f4b525e18e3b25b1e9a724a67804a68ea7de3
+speech-rule-engine https://github.com/Speech-Rule-Engine/speech-rule-engine.git d60c0650509e1dd9db004d22b077d05b63507657
+
+MathCATForPython-release v0.7.3
+libmathcat_py-64-3.11-linux.zip sha256:cf72ddff5bdfd24ca397d40eb2a50dcc9e4ac1c5acd0f2044d938fc945cc7fc5
+Rules.zip sha256:3eab4b5b5d2c8ca4adf3aac203efbc638191e5ddab6f72c4b35f690758b7c9a5
+vendor/libmathcat_py.so sha256:f20573a4b62a7bdea8b180b59d3de61f0674f3d1025e85b2a2147559c2390076
