@@ -9,6 +9,10 @@ AGENTS.md
 
 # C extensions
 *.so
+!main/math-speech/vendor/libmathcat_py.so
+
+# Effective MathCAT rules, generated from vendor/Rules + rules_overrides/
+main/math-speech/rules/
 
 # Distribution / packaging
 .Python
@@ -196,5 +200,6 @@ deploy/data/*
 !main/manager-mobile/**/env/
 !main/manager-mobile/**/.env*
 !main/manager-mobile/**/*.json
-!main/xiaozhi-server/**/*.json.codex/  
-firmware/.pio/ 
+!main/xiaozhi-server/**/*.json.codex/
+firmware/.pio/
+third_party/math-tts-src/
