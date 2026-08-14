@@ -12,6 +12,8 @@ services:
     environment:
       TZ: ${TZ:-Asia/Saigon}
       PYTHONIOENCODING: utf-8
+      VAD_DEBUG_LOG: ${VAD_DEBUG_LOG:-false}
+      VAD_DEBUG_SAMPLE_EVERY_N_BLOCKS: ${VAD_DEBUG_SAMPLE_EVERY_N_BLOCKS:-1}
       LANG: C.UTF-8
       LC_ALL: C.UTF-8
       LANGUAGE: en_US:en
@@ -25,13 +27,15 @@ services:
       FIRMWARE_TRANSPORT_POLICY: ${FIRMWARE_TRANSPORT_POLICY:-mqtt_only}
       MQTT_SIGNALING_CONTRACT: hk_legacy
       HK_MQTT_UPLINK_SUFFIX: ${HK_MQTT_UPLINK_SUFFIX:-AI_MONITOR}
-      HK_MQTT_DOWNLINK_SUFFIX: ${HK_MQTT_DOWNLINK_SUFFIX:-AI_REMOTE}
-      MQTT_HOST: emqx
+      HK_MQTT_DOWNLINK_SUFFIX: ${HK_MQTT_DOWNLINK_SUFFIX:-MONITOR}
+      MQTT_HOST: ${XIAOZHI_MQTT_HOST:-emqx}
       MQTT_PORT: "1883"
       MQTT_USERNAME: ${MQTT_BACKEND_USER:-oriagent-monitor}
       MQTT_PASSWORD: ${MQTT_BACKEND_PASS:?Set MQTT_BACKEND_PASS in .env}
       PUBLIC_UDP_HOST: ${PUBLIC_UDP_HOST:?Set PUBLIC_UDP_HOST to the public IP/domain reachable by firmware}
       UDP_PORT: ${VOICE_UDP_PORT:-8883}
+      HK_MQTT_TOPIC_IDENTITY: ${HK_MQTT_TOPIC_IDENTITY:-mac}
+      HK_MQTT_KEEP_COLON_TOPIC: ${HK_MQTT_KEEP_COLON_TOPIC:-true}
     volumes:
       - ./data:/opt/xiaozhi-esp32-server/data
       - ../main/xiaozhi-server/models:/opt/xiaozhi-esp32-server/models
@@ -205,7 +209,9 @@ services:
       MQTT_BACKEND_PASS: ${MQTT_BACKEND_PASS:?Set MQTT_BACKEND_PASS in .env}
       ENABLE_HK_LEGACY_BRIDGE: ${ENABLE_HK_LEGACY_BRIDGE:-true}
       HK_MQTT_UPLINK_SUFFIX: ${HK_MQTT_UPLINK_SUFFIX:-AI_MONITOR}
-      HK_MQTT_DOWNLINK_SUFFIX: ${HK_MQTT_DOWNLINK_SUFFIX:-AI_REMOTE}
+      HK_MQTT_DOWNLINK_SUFFIX: ${HK_MQTT_DOWNLINK_SUFFIX:-MONITOR}
+      HK_MQTT_TOPIC_IDENTITY: ${HK_MQTT_TOPIC_IDENTITY:-mac}
+      HK_MQTT_KEEP_COLON_TOPIC: ${HK_MQTT_KEEP_COLON_TOPIC:-true}
     depends_on:
       emqx:
         condition: service_healthy
@@ -231,7 +237,7 @@ services:
       MQTT_BACKEND_PASS: ${MQTT_BACKEND_PASS:?Set MQTT_BACKEND_PASS in .env}
       ENABLE_HK_LEGACY_BRIDGE: ${ENABLE_HK_LEGACY_BRIDGE:-true}
       HK_MQTT_UPLINK_SUFFIX: ${HK_MQTT_UPLINK_SUFFIX:-AI_MONITOR}
-      HK_MQTT_DOWNLINK_SUFFIX: ${HK_MQTT_DOWNLINK_SUFFIX:-AI_REMOTE}
+      HK_MQTT_DOWNLINK_SUFFIX: ${HK_MQTT_DOWNLINK_SUFFIX:-MONITOR}
       MONITOR_HTTP_PORT: "8090"
       # Admin EMQX (để /activate cấp credential cho thiết bị)
       EMQX_API_BASE: http://emqx:18083/api/v5
@@ -240,6 +246,8 @@ services:
       # Endpoint MQTT public trả cho thiết bị khi activate
       MQTT_PUBLIC_ENDPOINT: ${MQTT_PUBLIC_ENDPOINT:?Set MQTT_PUBLIC_ENDPOINT to the public broker host:port}
     # Lưu ý: EMQX phải được provision auth trước (provision_auth.py) để backend user tồn tại.
+      HK_MQTT_TOPIC_IDENTITY: ${HK_MQTT_TOPIC_IDENTITY:-mac}
+      HK_MQTT_KEEP_COLON_TOPIC: ${HK_MQTT_KEEP_COLON_TOPIC:-true}
     ports:
       - "${MONITOR_HTTP_BIND:-127.0.0.1}:${MONITOR_HTTP_PORT:-8090}:8090"
     depends_on:

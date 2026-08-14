@@ -30,6 +30,10 @@ export async function webSocketConnect(otaUrl, config) {
     let connUrl = new URL(websocket.url);
 
     // Dynamic rewrite for web test client to match current browser address
+    // Protocol must follow the page too: a wss:// URL from OTA pointed at a plain
+    // HTTP dev server fails the TLS handshake with an empty error event, and a
+    // ws:// URL on an https page is blocked as mixed content.
+    connUrl.protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     connUrl.hostname = window.location.hostname;
     if (window.location.port) {
         connUrl.port = window.location.port;

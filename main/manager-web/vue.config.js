@@ -42,10 +42,21 @@ module.exports = defineConfig({
   productionSourceMap: process.env.NODE_ENV !=='production', // 生产环境不生成 source map
   devServer: {
     port: 8001, // 指定端口为 8001
+    // CHỈ một rule: hai rule cùng tiền tố '/xiaozhi' sẽ cùng khớp request
+    // WebSocket, khiến nó được gửi tới cả hai đích và phản hồi HTTP của
+    // manager-api bị chèn vào luồng WS ("reserved bits must be 0").
+    // 'router' chọn đích theo đường dẫn nên không còn chồng lấn.
     proxy: {
       '/xiaozhi': {
-        target: 'http://127.0.0.1:8002',
-        changeOrigin: true
+        target: process.env.VUE_APP_API_TARGET || 'http://127.0.0.1:8002',
+        changeOrigin: true,
+        ws: true,
+        router: (req) => {
+          const path = req.url || '';
+          return path.startsWith('/xiaozhi/v1')
+            ? process.env.VUE_APP_WS_TARGET || 'http://127.0.0.1:8000'
+            : process.env.VUE_APP_API_TARGET || 'http://127.0.0.1:8002';
+        }
       }
     },
     client: {

@@ -2,6 +2,7 @@ import re
 import time
 import json
 import asyncio
+import audioop
 import ssl
 import queue
 from urllib.parse import urlencode, urlsplit
@@ -44,11 +45,14 @@ _WS_DEAD_BASES = set()
 # Mỗi segment tự lấy token mới + mở WS riêng (vẫn fetch song song nhiều segment).
 # =============================================================================
 
-INITIAL_BUFFER_BYTES = 14400     # ~300ms @ 24kHz/16bit/mono — buffer trước packet đầu
-CONTINUOUS_JITTER_BYTES = 14400  # ~300ms — buffer liên tục, chịu jitter mạng
-# Lead-in: chèn ~250ms im lặng TRƯỚC audio thật của segment đầu để che giai đoạn
+# Buffer tính theo THỜI GIAN, không theo byte: số byte cho cùng một khoảng thời gian
+# phụ thuộc sample_rate của thiết bị (24k và 16k lệch nhau 1.5x). Quy ra byte ở
+# open_audio_channels khi đã biết conn.sample_rate.
+INITIAL_BUFFER_MS = 300      # buffer trước packet đầu
+CONTINUOUS_JITTER_MS = 300   # buffer liên tục, chịu jitter mạng
+# Lead-in: chèn im lặng TRƯỚC audio thật của segment đầu để che giai đoạn
 # DAC/amp ESP32 ramp-up (nếu không, âm tiết đầu bị clip).
-LEAD_IN_SILENCE_BYTES = 12000
+DEFAULT_LEAD_IN_SILENCE_MS = 500
 
 FETCH_CONCURRENCY = 3            # giới hạn token+WS song song (rate limit 100 req/min/key)
 TOKEN_TIMEOUT = 8.0             # timeout REST lấy stream-token
@@ -126,13 +130,35 @@ class TTSProvider(TTSProviderBase):
         # thêm bị che khuất vì fetch song song trong lúc segment trước đang phát.
         self.dit_steps = config.get("dit_steps", 8)
         self.dit_steps_first = config.get("dit_steps_first", 6)
-        self.streaming_mode = config.get("streaming_mode", "stable")
         self.control_instruction = config.get("control_instruction", "")
+
+        # Tham số chất lượng theo §9 của public contract. Trước đây không gửi field
+        # nào trong nhóm này nên server luôn dùng default của nó.
+        #
+        # do_normalize là đòn chính cho ĐỘ MƯỢT GIỮA CÁC CÂU: mỗi segment được sinh
+        # độc lập bởi model clone, biên độ giữa các segment lệch nhau -> nghe như bị
+        # "nhấp nhô" to/nhỏ giữa câu. Chuẩn hóa làm phẳng mức này.
+        self.do_normalize = config.get("do_normalize", True) is not False
+        self.denoise = config.get("denoise", True) is not False
+        self.preprocess_prompt = config.get("preprocess_prompt", True) is not False
+        self.postprocess_output = config.get("postprocess_output", True) is not False
+        # speed clamp 0.5–1.5 theo doc; ngoài khoảng server tự clamp nhưng ta chặn sớm.
+        try:
+            self.speed = min(1.5, max(0.5, float(config.get("speed", 1.0))))
+        except (TypeError, ValueError):
+            self.speed = 1.0
 
         # Lead-in silence (ms) chèn trước câu đầu để che DAC/amp ramp-up (chống clip âm
         # tiết đầu). Tăng nếu thiết bị vẫn bị mất chữ đầu. Tính ra bytes ở open_audio_channels.
-        self.lead_in_silence_ms = int(config.get("lead_in_silence_ms", 500))
-        self._lead_in_bytes = LEAD_IN_SILENCE_BYTES
+        self.lead_in_silence_ms = int(
+            config.get("lead_in_silence_ms", DEFAULT_LEAD_IN_SILENCE_MS)
+        )
+        # Quy ra byte ở open_audio_channels; giá trị 24kHz chỉ là tạm cho tới lúc đó.
+        self._lead_in_bytes = 0
+        self._initial_buffer_bytes = 24000 * 2 * INITIAL_BUFFER_MS // 1000
+        self._continuous_jitter_bytes = 24000 * 2 * CONTINUOUS_JITTER_MS // 1000
+        self._resample_state = None
+        self._resample_carry = b""
 
         self._verify_ssl = config.get("verify_ssl") is not False
         self._ssl_ctx = ssl.create_default_context()
@@ -170,8 +196,14 @@ class TTSProvider(TTSProviderBase):
 
     async def open_audio_channels(self, conn):
         await super().open_audio_channels(conn)
-        # Lead-in silence theo sample_rate thực tế của thiết bị.
-        self._lead_in_bytes = max(0, int(conn.sample_rate * 2 * self.lead_in_silence_ms / 1000))
+        # Mọi buffer quy ra byte theo sample_rate thực tế của thiết bị (PCM16 mono
+        # => 2 byte/sample), để "300ms" luôn đúng là 300ms bất kể 16k hay 24k.
+        bytes_per_ms = conn.sample_rate * 2 / 1000
+        self._lead_in_bytes = max(0, int(bytes_per_ms * self.lead_in_silence_ms))
+        self._initial_buffer_bytes = max(2, int(bytes_per_ms * INITIAL_BUFFER_MS))
+        self._continuous_jitter_bytes = max(2, int(bytes_per_ms * CONTINUOUS_JITTER_MS))
+        self._resample_state = None
+        self._resample_carry = b""
         if self._fetch_semaphore is None:
             self._fetch_semaphore = asyncio.Semaphore(FETCH_CONCURRENCY)
         if self._http is None:
@@ -286,7 +318,7 @@ class TTSProvider(TTSProviderBase):
 
                         jitter_buffer.extend(pcm_chunk)
                         if not first_packet_sent:
-                            if len(jitter_buffer) >= INITIAL_BUFFER_BYTES:
+                            if len(jitter_buffer) >= self._initial_buffer_bytes:
                                 valid_len = len(jitter_buffer) - (len(jitter_buffer) % 2)
                                 await _emit_seg_text()
                                 self.opus_encoder.encode_pcm_to_opus_stream(
@@ -295,7 +327,7 @@ class TTSProvider(TTSProviderBase):
                                 del jitter_buffer[:valid_len]
                                 first_packet_sent = True
                         else:
-                            if len(jitter_buffer) >= CONTINUOUS_JITTER_BYTES:
+                            if len(jitter_buffer) >= self._continuous_jitter_bytes:
                                 valid_len = len(jitter_buffer) - (len(jitter_buffer) % 2)
                                 await _emit_seg_text()
                                 self.opus_encoder.encode_pcm_to_opus_stream(
@@ -373,7 +405,10 @@ class TTSProvider(TTSProviderBase):
                     backoff_ms = RETRY_BACKOFF_MS[min(attempt, len(RETRY_BACKOFF_MS) - 1)]
                     if backoff_ms > 0:
                         await asyncio.sleep(backoff_ms / 1000.0)
-                    success = await self._do_fetch(idx, text, session_id, attempt)
+                    success = await self._do_fetch(
+                        idx, text, session_id, attempt,
+                        last_attempt=(attempt == MAX_RETRY_ATTEMPTS - 1),
+                    )
                     if success:
                         break
             if not success and not self.conn.client_abort:
@@ -485,15 +520,20 @@ class TTSProvider(TTSProviderBase):
         except Exception:
             pass
 
-    async def _do_fetch(self, idx, text, session_id, attempt=0) -> bool:
-        """Dispatcher: ưu tiên WS realtime; nếu WS không khả dụng (404) -> blocking /tts/generate."""
+    async def _do_fetch(self, idx, text, session_id, attempt=0, last_attempt=False) -> bool:
+        """Dispatcher: ưu tiên WS realtime; nếu WS không khả dụng (404) -> blocking /tts/generate.
+
+        Ở lần thử cuối cùng, WS hỏng vì lý do tạm thời cũng rơi xuống blocking thay vì
+        bỏ segment: mất một segment là mất trọn một câu trong lời thoại, khó chịu hơn
+        nhiều so với việc câu đó tới chậm hơn vài trăm ms.
+        """
         if not self._ws_disabled:
             ok = await self._do_fetch_ws(idx, text, session_id, attempt)
             if ok:
                 return True
-            if not self._ws_disabled:
+            if not self._ws_disabled and not last_attempt:
                 return False  # lỗi WS tạm thời -> để vòng retry thử lại WS
-            # WS vừa bị tắt (404) -> rơi xuống blocking ngay trong attempt này
+            # WS vừa bị tắt (404), hoặc đây là cơ hội cuối -> chuyển sang blocking
         return await self._do_fetch_blocking(idx, text, session_id, attempt)
 
     async def _do_fetch_ws(self, idx, text, session_id, attempt=0) -> bool:
@@ -534,20 +574,31 @@ class TTSProvider(TTSProviderBase):
                         _WS_DEAD_BASES.add(self.api_base)
                     raise
 
+            # Chỉ gửi field có trong §9 của public contract. "streaming_mode" từng
+            # được gửi ở đây nhưng không nằm trong contract nên server bỏ qua.
             start_msg = {
                 "type": "start",
                 "text": text,
                 "language": self.language,
+                "speed": self.speed,
                 "control_instruction": self.control_instruction or "",
                 "cfg_value": self.cfg_value,
                 # Segment đầu ưu tiên tốc độ (TTFB), segment sau ưu tiên chất lượng.
                 "dit_steps": self.dit_steps_first if idx == 0 else self.dit_steps,
-                "streaming_mode": self.streaming_mode,
+                # Cân bằng biên độ giữa các segment -> hết hiện tượng câu to câu nhỏ.
+                "do_normalize": self.do_normalize,
+                "denoise": self.denoise,
+                "preprocess_prompt": self.preprocess_prompt,
+                "postprocess_output": self.postprocess_output,
             }
             t_send = time.perf_counter()
             await ws.send(json.dumps(start_msg))
 
             ttfb_recorded = False
+            # Trước khi nhận event start, giả định server phát đúng rate thiết bị.
+            src_rate = int(self.conn.sample_rate)
+            self._resample_state = None
+            self._resample_carry = b""
             while True:
                 if self.conn.client_abort or self.current_session_id != session_id:
                     return True
@@ -563,16 +614,22 @@ class TTSProvider(TTSProviderBase):
                             attempt=attempt, text_len=len(text), session=str(session_id),
                         )
                         ttfb_recorded = True
-                    await seg_queue.put(bytes(message))
+                    await seg_queue.put(self._to_device_rate(bytes(message), src_rate))
                 else:
                     data = json.loads(message)
                     mtype = data.get("type")
                     if mtype == "start":
+                        # Doc §9: sample_rate do server quyết định, client không được
+                        # hard-code. Lệch với thiết bị mà cứ đẩy thẳng vào opus encoder
+                        # thì giọng méo cao độ + sai tốc độ, nên bật resample tại đây.
                         sr = data.get("sample_rate")
-                        if sr and int(sr) != int(self.conn.sample_rate):
-                            logger.bind(tag=TAG).warning(
-                                f"Oriagent sample_rate={sr} khác device={self.conn.sample_rate} "
-                                f"(có thể méo cao độ)."
+                        src_rate = int(sr) if sr else int(self.conn.sample_rate)
+                        self._resample_state = None
+                        self._resample_carry = b""
+                        if src_rate != int(self.conn.sample_rate):
+                            logger.bind(tag=TAG).info(
+                                f"Oriagent sample_rate={src_rate} != device="
+                                f"{self.conn.sample_rate} -> resample streaming."
                             )
                         continue
                     if mtype == "done":
@@ -603,6 +660,29 @@ class TTSProvider(TTSProviderBase):
                     await ws.close()
                 except Exception:
                     pass
+
+    def _to_device_rate(self, pcm: bytes, src_rate: int) -> bytes:
+        """Resample PCM16 mono src_rate -> sample_rate thiết bị, giữ state qua chunk.
+
+        audioop.ratecv là bộ resample CÓ STATE. Phải mang state sang chunk kế tiếp,
+        nếu reset mỗi chunk thì mỗi ranh giới thành một điểm gián đoạn -> nghe lách
+        tách. Byte lẻ (nếu có) được giữ lại chờ chunk sau để không vỡ khung 16-bit.
+        """
+        dst_rate = int(self.conn.sample_rate)
+        if src_rate == dst_rate:
+            return pcm
+        if self._resample_carry:
+            pcm = self._resample_carry + pcm
+            self._resample_carry = b""
+        if len(pcm) % 2:
+            self._resample_carry = pcm[-1:]
+            pcm = pcm[:-1]
+        if not pcm:
+            return b""
+        converted, self._resample_state = audioop.ratecv(
+            pcm, 2, 1, src_rate, dst_rate, self._resample_state
+        )
+        return converted
 
     @staticmethod
     def _sniff_format(audio_bytes: bytes) -> str:
