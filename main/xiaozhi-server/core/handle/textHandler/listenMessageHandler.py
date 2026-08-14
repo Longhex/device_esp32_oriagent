@@ -15,6 +15,48 @@ from core.providers.asr.dto.dto import InterfaceType
 
 TAG = __name__
 
+
+def _schedule_oriagent_warmup(conn: "ConnectionHandler", trigger: str) -> None:
+    if not conn.device_id:
+        return
+
+    existing = getattr(conn, "oriagent_warmup_task", None)
+    if existing is not None and not existing.done():
+        conn.logger.bind(tag=TAG, phase="LLM").debug(
+            "[TIMING] event=oriagent_ws_warm_already_running device={} session={} trigger={} wall_ms={}",
+            conn.device_id or "-",
+            conn.session_id or "-",
+            trigger,
+            int(time.time() * 1000),
+        )
+        return
+
+    async def _run_warmup():
+        await conn.llm_ready_event.wait()
+        if conn.stop_event.is_set():
+            return
+        llm = getattr(conn, "llm", None)
+        if llm is None or not hasattr(llm, "warmup"):
+            return
+
+        conn.logger.bind(tag=TAG, phase="LLM").info(
+            "[TIMING] event=oriagent_ws_warm_scheduled device={} session={} trigger={} wall_ms={}",
+            conn.device_id or "-",
+            conn.session_id or "-",
+            trigger,
+            int(time.time() * 1000),
+        )
+        await asyncio.to_thread(
+            llm.warmup,
+            conn.device_id,
+            conn.session_id,
+            trigger,
+            conn.stop_event.is_set,
+        )
+
+    conn.oriagent_warmup_task = asyncio.create_task(_run_warmup())
+
+
 class ListenTextMessageHandler(TextMessageHandler):
     """Listen消息处理器"""
 
@@ -29,6 +71,16 @@ class ListenTextMessageHandler(TextMessageHandler):
                 f"客户端拾音模式：{conn.client_listen_mode}"
             )
         if msg_json["state"] == "start":
+            conn.logger.bind(tag=TAG, phase="INPUT").info(
+                "[TIMING] event=listen_start_received device={} session={} wall_ms={} mode={}",
+                conn.device_id or "-",
+                conn.session_id or "-",
+                int(time.time() * 1000),
+                conn.client_listen_mode,
+            )
+            # Warm upstream while the user is speaking; by VAD stop the
+            # Oriagent handshake should already be off the critical path.
+            _schedule_oriagent_warmup(conn, "listen_start")
             # 设备从播放模式切回录音模式,清除所有音频状态和缓冲区
             conn.reset_audio_states()
         elif msg_json["state"] == "stop":

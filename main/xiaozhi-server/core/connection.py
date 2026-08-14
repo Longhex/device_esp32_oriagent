@@ -137,6 +137,11 @@ class ConnectionHandler:
         self.read_config_from_api = self.config.get("read_config_from_api", False)
 
         self.websocket: websockets.ServerConnection | None = None
+        self.device_ws_heartbeat_task = None
+        self.device_ws_connected_monotonic = 0.0
+        self.device_ws_connected_wall_ms = 0
+        self._close_started = False
+        self.llm_ready_event = asyncio.Event()
         self.headers = None
         self.device_id = None
         self.client_ip = None
@@ -350,6 +355,15 @@ class ConnectionHandler:
 
             # 认证通过,继续处理
             self.websocket = ws
+            self.device_ws_connected_monotonic = time.monotonic()
+            self.device_ws_connected_wall_ms = int(time.time() * 1000)
+            self.logger.bind(tag=TAG, phase="CONN").info(
+                "[TIMING] event=device_ws_accepted device={} session={} wall_ms={} client_ip={}",
+                self.device_id or "-",
+                self.session_id or "-",
+                self.device_ws_connected_wall_ms,
+                self.client_ip or "-",
+            )
 
             # 检查是否来自MQTT连接
             request_path = ws.request.path
@@ -806,11 +820,17 @@ class ConnectionHandler:
                 if not self.read_config_from_api:
                     await self._bootstrap_hybrid_audio_input_channels()
             await self._initialize_private_config_async()
+            # _initialize_private_config_async has now replaced self.llm with
+            # the per-device provider, if one was configured.
+            self.llm_ready_event.set()
             if self.conn_from_mqtt_gateway and self.read_config_from_api:
                 await self._bootstrap_hybrid_audio_input_channels()
             self.executor.submit(self._initialize_components)
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"Background initialization failed: {e}")
+        finally:
+            # Never leave listen/start warmup waiting forever on an init error.
+            self.llm_ready_event.set()
 
     async def _initialize_private_config_async(self):
         """Async differential config retrieval"""
@@ -1835,7 +1855,56 @@ class ConnectionHandler:
 
     async def close(self, ws=None):
         """资源清理方法"""
+        if self._close_started:
+            self.logger.bind(tag=TAG, phase="CONN").debug(
+                "[TIMING] event=device_ws_close_already_running device={} session={} wall_ms={}",
+                self.device_id or "-",
+                self.session_id or "-",
+                int(time.time() * 1000),
+            )
+            return
+        self._close_started = True
+        self.stop_event.set()
+
+        close_wall_ms = int(time.time() * 1000)
+        connected_ms = (
+            (time.monotonic() - self.device_ws_connected_monotonic) * 1000
+            if self.device_ws_connected_monotonic else 0.0
+        )
+        self.logger.bind(tag=TAG, phase="CONN").info(
+            "[TIMING] event=device_ws_close_started device={} session={} wall_ms={} connected_ms={:.3f}",
+            self.device_id or "-",
+            self.session_id or "-",
+            close_wall_ms,
+            connected_ms,
+        )
         try:
+            warmup_task = getattr(self, "oriagent_warmup_task", None)
+            if (
+                warmup_task
+                and warmup_task is not asyncio.current_task()
+                and not warmup_task.done()
+            ):
+                warmup_task.cancel()
+                try:
+                    await warmup_task
+                except asyncio.CancelledError:
+                    pass
+            self.oriagent_warmup_task = None
+
+            heartbeat_task = self.device_ws_heartbeat_task
+            if (
+                heartbeat_task
+                and heartbeat_task is not asyncio.current_task()
+                and not heartbeat_task.done()
+            ):
+                heartbeat_task.cancel()
+                try:
+                    await heartbeat_task
+                except asyncio.CancelledError:
+                    pass
+            self.device_ws_heartbeat_task = None
+
             # 清理 VAD 连接资源
             if (
                     hasattr(self, "vad")
@@ -1850,12 +1919,15 @@ class ConnectionHandler:
 
             # 取消超时任务
             if self.timeout_task and not self.timeout_task.done():
-                self.timeout_task.cancel()
-                try:
-                    await self.timeout_task
-                except asyncio.CancelledError:
-                    pass
-                self.timeout_task = None
+                if self.timeout_task is asyncio.current_task():
+                    self.timeout_task = None
+                else:
+                    self.timeout_task.cancel()
+                    try:
+                        await self.timeout_task
+                    except asyncio.CancelledError:
+                        pass
+                    self.timeout_task = None
 
             # 清理工具处理器资源
             if hasattr(self, "func_handler") and self.func_handler:
@@ -1926,6 +1998,14 @@ class ConnectionHandler:
                         f"关闭线程池时出错: {executor_error}"
                     )
                 self.executor = None
+            self.logger.bind(tag=TAG, phase="CONN").info(
+                "[TIMING] event=device_ws_closed device={} session={} wall_ms={} connected_ms={:.3f}",
+                self.device_id or "-",
+                self.session_id or "-",
+                int(time.time() * 1000),
+                (time.monotonic() - self.device_ws_connected_monotonic) * 1000
+                if self.device_ws_connected_monotonic else 0.0,
+            )
             self.logger.bind(tag=TAG).info("连接资源已释放")
         except Exception as e:
             self.logger.bind(tag=TAG).error(f"关闭连接时出错: {e}")
@@ -1980,6 +2060,77 @@ class ConnectionHandler:
 
         self.logger.bind(tag=TAG).debug("All audio states reset.")
 
+    def start_device_ws_heartbeat(self):
+        """Start an application-level server heartbeat after hello negotiation."""
+        if self.conn_from_mqtt_gateway or not self.config.get("persistent_device_ws", True):
+            return
+        if self.device_ws_heartbeat_task and not self.device_ws_heartbeat_task.done():
+            return
+        self.device_ws_heartbeat_task = asyncio.create_task(
+            self._device_ws_heartbeat_loop(), name=f"device-ws-heartbeat-{self.session_id[:8]}"
+        )
+        self.logger.bind(tag=TAG, phase="CONN").info(
+            "[TIMING] event=device_ws_heartbeat_started device={} session={} wall_ms={} interval_s={}",
+            self.device_id or "-",
+            self.session_id or "-",
+            int(time.time() * 1000),
+            self.config.get("device_ws_heartbeat_interval_seconds", 25),
+        )
+
+    async def _device_ws_heartbeat_loop(self):
+        try:
+            interval = max(
+                5.0,
+                float(self.config.get("device_ws_heartbeat_interval_seconds", 25)),
+            )
+        except (TypeError, ValueError):
+            interval = 25.0
+
+        try:
+            while not self.stop_event.is_set():
+                await asyncio.sleep(interval)
+                if self.stop_event.is_set() or self.websocket is None:
+                    break
+                wall_ms = int(time.time() * 1000)
+                try:
+                    # HK firmware treats this as an ordinary text frame and
+                    # refreshes Protocol::last_incoming_time_ after dispatch.
+                    await self.websocket.send(
+                        json.dumps(
+                            {
+                                "type": "pong",
+                                "timestamp": time.strftime(
+                                    "%Y-%m-%d %H:%M:%S", time.localtime()
+                                ),
+                                "server_time_ms": wall_ms,
+                            }
+                        )
+                    )
+                    self.logger.bind(tag=TAG, phase="CONN").debug(
+                        "[TIMING] event=device_ws_heartbeat_sent device={} session={} wall_ms={}",
+                        self.device_id or "-",
+                        self.session_id or "-",
+                        wall_ms,
+                    )
+                except Exception as exc:
+                    self.logger.bind(tag=TAG, phase="CONN").warning(
+                        "[TIMING] event=device_ws_heartbeat_failed device={} session={} wall_ms={} error={}",
+                        self.device_id or "-",
+                        self.session_id or "-",
+                        wall_ms,
+                        exc,
+                    )
+                    break
+        except asyncio.CancelledError:
+            raise
+        finally:
+            self.logger.bind(tag=TAG, phase="CONN").info(
+                "[TIMING] event=device_ws_heartbeat_stopped device={} session={} wall_ms={}",
+                self.device_id or "-",
+                self.session_id or "-",
+                int(time.time() * 1000),
+            )
+
     def chat_and_close(self, text):
         """Chat with the user and then close the connection"""
         try:
@@ -1995,6 +2146,16 @@ class ConnectionHandler:
         """检查连接超时（Layer 1: 提示并准备关闭, Layer 2: 强制关闭）"""
         try:
             while not self.stop_event.is_set():
+                # Persistent device sockets are closed by transport failure,
+                # explicit firmware close, OTA/profile change, or shutdown —
+                # never merely because there was no voice for N seconds.
+                if (
+                    self.config.get("persistent_device_ws", True)
+                    and not self.conn_from_mqtt_gateway
+                ):
+                    await asyncio.sleep(5)
+                    continue
+
                 last_activity_time = self.last_activity_time
                 if self.need_bind:
                     last_activity_time = self.first_activity_time

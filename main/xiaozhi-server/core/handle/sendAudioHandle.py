@@ -249,11 +249,50 @@ async def _do_send_audio(conn: "ConnectionHandler", opus_packet, flow_control):
     packet_index = flow_control.get("packet_count", 0)
     sequence = flow_control.get("sequence", 0)
 
+    if packet_index == 0:
+        tts_start_monotonic = getattr(conn, "_tts_start_sent_monotonic", None)
+        try:
+            startup_guard_ms = max(
+                0.0, float(conn.config.get("tts_startup_guard_ms", 400))
+            )
+        except (TypeError, ValueError):
+            startup_guard_ms = 0.0
+
+        if tts_start_monotonic is not None and startup_guard_ms > 0 and not conn.conn_from_mqtt_gateway:
+            elapsed_ms = (time.monotonic() - tts_start_monotonic) * 1000
+            remaining_ms = startup_guard_ms - elapsed_ms
+            if remaining_ms > 0:
+                conn.logger.bind(tag=TAG, phase="TTS").info(
+                    "[TIMING] event=tts_startup_guard device={} session={} wall_ms={} guard_ms={:.3f} elapsed_ms={:.3f} wait_ms={:.3f}",
+                    conn.device_id or "-",
+                    conn.session_id or "-",
+                    int(time.time() * 1000),
+                    startup_guard_ms,
+                    elapsed_ms,
+                    remaining_ms,
+                )
+                await asyncio.sleep(remaining_ms / 1000.0)
+
     if conn.conn_from_mqtt_gateway:
         await _send_to_mqtt_gateway(conn, opus_packet)
     else:
         # 直接发送opus数据包
         await conn.websocket.send(opus_packet)
+
+    if packet_index == 0:
+        tts_start_monotonic = getattr(conn, "_tts_start_sent_monotonic", None)
+        since_start_ms = (
+            (time.monotonic() - tts_start_monotonic) * 1000
+            if tts_start_monotonic is not None else -1.0
+        )
+        conn.logger.bind(tag=TAG, phase="TTS").info(
+            "[TIMING] event=first_tts_audio_sent device={} session={} wall_ms={} since_tts_start_ms={:.3f} bytes={}",
+            conn.device_id or "-",
+            conn.session_id or "-",
+            int(time.time() * 1000),
+            since_start_ms,
+            len(opus_packet),
+        )
 
     # 更新流控状态
     flow_control["packet_count"] = packet_index + 1
@@ -295,6 +334,25 @@ async def send_tts_message(conn: "ConnectionHandler", state, text=None):
 
     # 发送消息到客户端
     await conn.websocket.send(json.dumps(message))
+    sent_monotonic = time.monotonic()
+    sent_wall_ms = int(time.time() * 1000)
+    if state == "start":
+        conn._tts_start_sent_monotonic = sent_monotonic
+        conn._tts_start_sent_wall_ms = sent_wall_ms
+        conn.logger.bind(tag=TAG, phase="TTS").info(
+            "[TIMING] event=tts_start_sent device={} session={} wall_ms={}",
+            conn.device_id or "-",
+            conn.session_id or "-",
+            sent_wall_ms,
+        )
+    else:
+        conn.logger.bind(tag=TAG, phase="TTS").info(
+            "[TIMING] event=tts_state_sent device={} session={} wall_ms={} state={}",
+            conn.device_id or "-",
+            conn.session_id or "-",
+            sent_wall_ms,
+            state,
+        )
 
 
 async def send_stt_message(conn: "ConnectionHandler", text):
